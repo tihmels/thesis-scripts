@@ -19,6 +19,7 @@ def frame_similarity_detection(frame1: Image, frame2: Image, cutoff=12):
 
 
 def match_scenes(main_video: VideoFile, summary_videos):
+
     binary_scene_vector = np.zeros(main_video.n_scenes)
     summary_scenes = list(flatmap(lambda v: v.scenes, summary_videos))
 
@@ -31,16 +32,17 @@ def match_scenes(main_video: VideoFile, summary_videos):
             sum_first_frame, sum_last_frame = sum_scene.load_scene_frames()
 
             if frame_similarity_detection(first_frame, sum_first_frame):
-                print(f'[{main_video.timecode}] Scene {index}, {scene.first_frame_path} - {sum_scene.first_frame_path}')
+                print(f'[{main_video.date}] Scene {index}, {scene.first_frame_path} - {sum_scene.first_frame_path}')
                 binary_scene_vector[index] = 1
                 break
 
             if frame_similarity_detection(last_frame, sum_last_frame):
-                print(f'[{main_video.timecode}] Scene {index}, {scene.last_frame_path} - {sum_scene.last_frame_path}')
+                print(f'[{main_video.date}] Scene {index}, {scene.last_frame_path} - {sum_scene.last_frame_path}')
                 binary_scene_vector[index] = 1
                 break
 
-    print(f'{np.count_nonzero(binary_scene_vector == 1)} matched scenes detected')
+    print(f'{np.count_nonzero(binary_scene_vector == 1)}/{len(binary_scene_vector)} matched scenes detected')
+
     return binary_scene_vector
 
 
@@ -71,7 +73,7 @@ if __name__ == "__main__":
     parser.add_argument('dir', type=lambda p: Path(p).resolve(strict=True))
     args = parser.parse_args()
 
-    mp4_files = [VideoFile(path) for path in list(args.dir.rglob('*.mp4'))]
+    mp4_files = [VideoFile(file) for file in list(args.dir.rglob('TV-*.mp4'))]
     assert len(mp4_files) > 0, "no .mp4 files present in " + str(args.dir)
 
     mp4_files = list(filter(lambda video: video.check_requirements(), mp4_files))
@@ -79,7 +81,7 @@ if __name__ == "__main__":
         video.load_scene_data()
 
     videos_by_date = dict()
-    for date, videos in groupby(mp4_files, lambda vd: str(vd.timecode)):
+    for date, videos in groupby(mp4_files, lambda vd: str(vd.date)):
         videos_by_date[date] = list(videos)
 
     process_videos_by_date(videos_by_date)

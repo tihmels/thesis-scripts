@@ -11,9 +11,9 @@ from numpy import asarray
 from transnetv2 import TransNetV2
 
 
-def extract_frames_from_dir(frame_dir: Path):
+def load_frames_from_dir(frame_dir: Path):
     if not frame_dir.is_dir() or len(list(frame_dir.glob('frame_*.jpg'))) == 0:
-        sys.exit(f'{frame_dir} is not a directory or does not contain any .jpg files')
+        raise Exception(f'{frame_dir} is not a directory or does not contain any .jpg files')
 
     frames = sorted(frame_dir.glob('frame_*.jpg'))
     return np.array([asarray(Image.open(f).convert('RGB').resize((48, 27))) for f in frames], dtype=np.uint8)
@@ -55,14 +55,16 @@ if __name__ == "__main__":
     for directory in args.dirs:
         frame_dirs.extend([Path(d) for d in subdirs(directory) if len(list(d.glob('frame_*.jpg'))) > 0])
 
-    if len(frame_dirs) == 0:
-        sys.exit(f'{args.dir} does not contain any subdirectories with *.jpg files.')
+    assert len(frame_dirs) > 0, f'{args.dir} does not contain any subdirectories with *.jpg files.'
 
-    print(f'Starting Shot Boundary Detection...')
-    [print(d) for d in frame_dirs]
+    print(f'Shot Boundary Detection')
+    [print(f'- {d}') for d in frame_dirs]
 
     for frame_dir in frame_dirs:
-        print(f'\nEstimating Shot Boundaries for {frame_dir.relative_to(frame_dir.parent.parent)}')
+        print(f'\nEstimating shot boundaries for {frame_dir.relative_to(frame_dir.parent.parent)}')
 
-        video_frames = extract_frames_from_dir(frame_dir)
-        predict_shot_boundaries(video_frames, args.visualize)
+        try:
+            video_frames = load_frames_from_dir(frame_dir)
+            predict_shot_boundaries(video_frames, args.visualize)
+        except Exception as e:
+            print(e)

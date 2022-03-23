@@ -23,17 +23,23 @@ class Scene:
 @dataclass
 class VideoFile:
     path: Path
+
+    id: str = field(init=False)
     name: str = field(init=False)
-    timecode: str = field(init=False)
+    date: str = field(init=False)
     frame_path: Path = field(init=False)
     n_frames: int = field(init=False)
     scenes: [Scene] = field(init=False)
     n_scenes: int = field(init=False)
 
+    def get_frame_path(self):
+        return Path(self.path.parent, self.id)
+
     def __post_init__(self):
-        self.timecode = self.path.parent.name
         self.name = self.path.name
-        self.frame_path = Path(self.path.parent, self.path.name.split('-')[2])
+        self.id = self.name.split('-')[2]
+        self.date = self.name.split('-')[1]
+        self.frame_path = Path(self.path.parent, self.id)
 
     def check_requirements(self):
         if not self.path.is_file():
