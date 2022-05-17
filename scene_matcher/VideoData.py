@@ -20,6 +20,7 @@ class Scene:
         return Image.open(self.first_frame_path), Image.open(self.last_frame_path)
 
 
+
 @dataclass
 class VideoFile:
     path: Path
@@ -34,6 +35,20 @@ class VideoFile:
 
     def get_frame_path(self):
         return Path(self.path.parent, self.id)
+
+    def get_scene_path(self):
+        return Path(self.get_frame_path(), "scenes.txt")
+
+    def load_scenes_from_file(self):
+        file = open(Path(self.frame_path, 'scenes.txt'), 'r')
+        lines = file.readlines()
+
+        scenes = []
+        for line in lines:
+            first_index, last_index = [int(x.strip(' ')) for x in line.split(' ')]
+            scenes.append((first_index, last_index))
+
+        return scenes
 
     def __post_init__(self):
         self.name = self.path.name

@@ -63,7 +63,22 @@ def process_videos_by_date(videos_by_date):
         print(
             f'[{timecode}] Scene Matching ({main_broadcast.name} : {", ".join(list(map(lambda v: v.name, summary_broadcasts)))})')
 
-        binary_scene_vector = match_scenes(main_broadcast, summary_broadcasts)
+        binary_scene_vector = np.array(match_scenes(main_broadcast, summary_broadcasts), dtype=np.int64)
+
+        scenes = np.array(main_broadcast.load_scenes_from_file())
+
+        print(f'scenes shape {scenes.shape}')
+        print(scenes.dtype)
+        print(scenes[:10, :])
+
+        binary_scene_vector = binary_scene_vector[np.newaxis].T
+
+        print(f'binary scene vector {binary_scene_vector.shape}')
+        print(binary_scene_vector[:10])
+
+        binary_scene_vector = np.append(scenes, binary_scene_vector, axis=1)
+
+        print(binary_scene_vector)
 
         return binary_scene_vector
 
