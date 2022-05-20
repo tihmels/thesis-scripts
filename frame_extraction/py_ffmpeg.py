@@ -45,8 +45,7 @@ if __name__ == "__main__":
     parser.add_argument('-r', '--recursive', action='store_true', help="search recursively for video files")
     parser.add_argument('-o', '--overwrite', action='store_true', help="overwrite existing frame files")
     parser.add_argument('-p', '--prune', action='store_true', help="prune all frame files if output directory exists")
-    parser.add_argument('--parallel', action='store_true', help="execute frame extraction in parallel multiprocessing")
-
+    parser.add_argument('--parallel', action='store_true', help="execute frame extraction using parallel multiprocessing")
     args = parser.parse_args()
 
     files = []

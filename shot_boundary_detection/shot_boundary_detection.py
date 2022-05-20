@@ -8,7 +8,6 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 from PIL import Image
 from numpy import asarray
 
@@ -27,7 +26,7 @@ def set_tf_loglevel(level):
     logging.getLogger('tensorflow').setLevel(level)
 
 
-def get_images_from_dir(directory: Path, mode: str = 'RGB', size: (int, int) = (48, 27)):
+def get_frames_from_dir(directory: Path, mode: str = 'RGB', size: (int, int) = (48, 27)):
     assert directory.is_dir(), f'{directory} is not a directory'
     assert len(list(directory.glob('frame_*.jpg'))) > 0, f'{directory} does not contain any frame_*.jpg files'
 
@@ -47,6 +46,22 @@ def shot_transition_detection(frames):
     return predictions, scenes, img
 
 
+def process_frame_dir(directory: Path):
+    print(f'\n{directory.relative_to(directory.parent.parent)}')
+
+    try:
+        frames = get_frames_from_dir(directory)
+        _, scenes, img = shot_transition_detection(np.array([asarray(img) for img in frames]))
+
+        np.savetxt(Path(directory, 'shots.txt').absolute(), scenes, fmt="%d")
+        img.save(Path(directory, 'shots.png').absolute())
+
+        return directory
+
+    except Exception as e:
+        print(e)
+
+
 def subdirs(root):
     dirs = [root]
     for path in Path(root).iterdir():
@@ -54,25 +69,6 @@ def subdirs(root):
             dirs.append(path)
             subdirs(path)
     return dirs
-
-
-def process_frame_directory(directory: Path):
-    print(f'\nStarting Shot Transition Detection on {directory.relative_to(directory.parent.parent)}')
-
-    try:
-        frames = get_images_from_dir(directory)
-        _, scenes, img = shot_transition_detection(np.array([asarray(img) for img in frames]))
-
-        df = pd.DataFrame(scenes)
-        print(df)
-
-        np.savetxt(Path(directory, 'scenes.txt').absolute(), scenes, fmt="%d")
-        img.save(Path(directory, 'scenes.png').absolute())
-
-        return directory
-
-    except Exception as e:
-        print(e)
 
 
 def mute():
@@ -84,7 +80,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('dirs', type=lambda p: Path(p).resolve(strict=True), nargs='+')
-    parser.add_argument('-p', '--parallel', action='store_true')
+    parser.add_argument('--parallel', action='store_true')
     args = parser.parse_args()
 
     frame_dirs = []
@@ -93,26 +89,16 @@ if __name__ == "__main__":
 
     assert len(frame_dirs) > 0, f'{args.dir} does not contain any subdirectories with frame_*.jpg files.'
 
-    print("Executing Shot Transition Detection on...")
+    print("Executing Shot Segmentation for...")
     [print(f'- {d}') for d in frame_dirs]
 
     if args.parallel:
-        pool = mp.Pool(os.cpu_count(), initializer=mute)
-
-        processes = []
-
-        for d in frame_dirs:
-            p = pool.apply_async(process_frame_directory, [d],
-                                 callback=lambda d: print(f'{d.relative_to(d.parent.parent)} done'))
-            processes.append(p)
-
-        [p.get() for p in processes]
-
-        pool.close()
-        pool.join()
-
-        print("Shutdown")
+        with mp.Pool(os.cpu_count(), initializer=mute) as pool:
+            [pool.apply_async(process_frame_dir, (d,),
+                              callback=lambda d: print(f'{d.relative_to(d.parent.parent)} done')) for d in frame_dirs]
+            pool.close()
+            pool.join()
 
     else:
         for d in frame_dirs:
-            process_frame_directory(d)
+            process_frame_dir(d)

@@ -20,7 +20,6 @@ class Scene:
         return Image.open(self.first_frame_path), Image.open(self.last_frame_path)
 
 
-
 @dataclass
 class VideoFile:
     path: Path

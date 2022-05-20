@@ -5,11 +5,14 @@ from itertools import groupby, chain
 from pathlib import Path
 
 import imagehash
+import re
+import os
 import numpy as np
 from PIL import Image
 
 from VideoData import VideoFile
 
+TV_FILENAME_RE = r'TV-(\d{8})-(\d{4})-(\d{4}).webs.h264.mp4'
 
 def frame_similarity_detection(frame1: Image, frame2: Image, cutoff=12):
     hash1 = imagehash.average_hash(frame1)
@@ -85,11 +88,12 @@ def process_videos_by_date(videos_by_date):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('dir', type=lambda p: Path(p).resolve(strict=True))
+
+    parser.add_argument('dirs', type=lambda p: Path(p).resolve(strict=True))
     args = parser.parse_args()
 
-    mp4_files = [VideoFile(file) for file in list(args.dir.rglob('TV-*.mp4'))]
-    assert len(mp4_files) > 0, "no .mp4 files present in " + str(args.dir)
+    mp4_files = [VideoFile(file) for file in list(args.dir.rglob('*.mp4')) if re.match(TV_FILENAME_RE, os.path.basename(file))]
+    assert len(mp4_files) > 0, "no TV-*.mp4 files could be found in " + str(args.dir)
 
     mp4_files = list(filter(lambda video: video.check_requirements(), mp4_files))
     for video in mp4_files:
