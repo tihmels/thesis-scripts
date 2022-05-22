@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
     assert len(frame_dirs) > 0, f'{args.dir} does not contain any subdirectories with frame_*.jpg files.'
 
-    print("Executing Shot Segmentation for...")
+    print("Performing Shot Segmentation for ...")
     [print(f'- {d}') for d in frame_dirs]
 
     if args.parallel:
