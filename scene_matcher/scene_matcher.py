@@ -1,106 +1,163 @@
-#!/Users/tihmels/Scripts/thesis/conda-env/bin/python
+#!/Users/tihmels/Scripts/thesis-scripts/conda-env/bin/python
 
 import argparse
-from itertools import groupby, chain
+import itertools
+import re
+from datetime import datetime
+from enum import Enum
+from functools import lru_cache
+from itertools import groupby
 from pathlib import Path
 
 import imagehash
-import re
-import os
 import numpy as np
 from PIL import Image
 
-from VideoData import VideoFile
-
 TV_FILENAME_RE = r'TV-(\d{8})-(\d{4})-(\d{4}).webs.h264.mp4'
 
-def frame_similarity_detection(frame1: Image, frame2: Image, cutoff=12):
-    hash1 = imagehash.average_hash(frame1)
-    hash2 = imagehash.average_hash(frame2)
+
+class VideoData:
+    def __init__(self, path: Path):
+        self._dateformat = '%Y%m%d'
+
+        self.id: str = path.stem
+        self.path: Path = path
+        self.date: datetime = datetime.strptime(path.parent.name, self._dateformat)
+        self.frame_dir: Path = Path(path.parent, path.name.split('-')[2])
+        self.frames: [Path] = sorted(self.frame_dir.glob('frame_*.jpg'))
+        self.n_frames: int = len(self.frames)
+        self.segments: [(int, int)] = self.read_segments_from_file(Path(self.frame_dir, 'shots.txt'))
+        self.n_segments: int = len(self.segments)
+
+    @staticmethod
+    def read_segments_from_file(file):
+        shots = []
+
+        file = open(file, 'r')
+        for line in file.readlines():
+            first_index, last_index = [int(x.strip(' ')) for x in line.split(' ')]
+            shots.append((first_index, last_index))
+
+        return shots
+
+    def __str__(self):
+        return "[" + str(self.__dict__['date'].strftime('%Y%m%d')) + "] " + str(
+            self.__dict__['path'].id) + ": " + str(
+            self.__dict__['n_frames']) + " frames, " + str(len(self.__dict__['segments'])) + " segments"
+
+
+class VideoType(Enum):
+    FULL = 0
+    SUMMARY = 1
+
+
+class VideoStats:
+    def __init__(self, vd: VideoData, vt: VideoType, segment_vector: np.array):
+        self.name = vd.id
+        self.date = vd.date.strftime("%d.%m.%Y")
+        self.vt = vt.name
+        self.segments = vd.segments
+        self.seg_vec = segment_vector
+
+        # matched_segments_indices = np.where(main_binary_segment_vector)
+        # matched_segments_n_frames = [i2 - i1 for i1, i2 in np.array(main_video.segments)[matched_segments_indices]]
+
+
+def frame_similarity_detection(frame1: Image, frame2: Image, cutoff):
+    hash1 = imagehash.dhash(frame1)
+    hash2 = imagehash.dhash(frame2)
 
     return hash1 - hash2 < cutoff
 
 
-def match_scenes(main_video: VideoFile, summary_videos):
-
-    binary_scene_vector = np.zeros(main_video.n_scenes)
-    summary_scenes = list(flatmap(lambda v: v.scenes, summary_videos))
-
-    for index, scene in enumerate(main_video.scenes):
-
-        first_frame, last_frame = scene.load_scene_frames()
-
-        for sum_scene in summary_scenes:
-
-            sum_first_frame, sum_last_frame = sum_scene.load_scene_frames()
-
-            if frame_similarity_detection(first_frame, sum_first_frame):
-                print(f'[{main_video.date}] Scene {index}, {scene.first_frame_path} - {sum_scene.first_frame_path}')
-                binary_scene_vector[index] = 1
-                break
-
-            if frame_similarity_detection(last_frame, sum_last_frame):
-                print(f'[{main_video.date}] Scene {index}, {scene.last_frame_path} - {sum_scene.last_frame_path}')
-                binary_scene_vector[index] = 1
-                break
-
-    print(f'{np.count_nonzero(binary_scene_vector == 1)}/{len(binary_scene_vector)} matched scenes detected')
-
-    return binary_scene_vector
+def compare_framesets(frames1: [Image], frames2: [Image], cutoff=8):
+    for f1, f2 in itertools.product(frames1, frames2):
+        if frame_similarity_detection(f1, f2, cutoff):
+            return True
+    return False
 
 
-def flatmap(func, *iterable):
-    return chain.from_iterable(map(func, *iterable))
+@lru_cache(maxsize=256)
+def get_image(path: str):
+    return Image.open(path).convert('RGB')
 
 
-def process_videos_by_date(videos_by_date):
-    for timecode, videos in videos_by_date.items():
+def process_videos(date: str, videos: [VideoData]):
+    if len(videos) < 2:
+        print(f'not enough video data available for {date}')
+        return
 
-        if len(videos) < 2:
-            print(f'not enough video data available for {timecode}')
-            continue
+    main_video = max(videos, key=lambda v: v.n_frames)
+    summary_videos = list(filter(lambda v: v is not main_video, videos))
 
-        main_broadcast = max(videos, key=lambda v: v.n_frames)
-        summary_broadcasts = list(filter(lambda v: v is not main_broadcast, videos))
+    main_binary_segment_vector = np.zeros(main_video.n_segments)
+    sum_binary_segment_dict = {summary.id: np.zeros(summary.n_segments) for summary in summary_videos}
 
+    for seg_idx, (seg_start_idx, seg_end_idx) in enumerate(main_video.segments):
         print(
-            f'[{timecode}] Scene Matching ({main_broadcast.name} : {", ".join(list(map(lambda v: v.name, summary_broadcasts)))})')
+            f'[S{seg_idx + 1}/{main_video.n_segments}]: {seg_start_idx} - {seg_end_idx} ({seg_end_idx - seg_start_idx} frames)')
 
-        binary_scene_vector = np.array(match_scenes(main_broadcast, summary_broadcasts), dtype=np.int64)
+        main_frame_indices = np.round(np.linspace(seg_start_idx, seg_end_idx, 5)).astype(int)
+        main_segment_frames = [Image.open(frame).convert('RGB') for frame in
+                               np.array(main_video.frames)[main_frame_indices]]
 
-        scenes = np.array(main_broadcast.load_scenes_from_file())
+        for summary in summary_videos:
+            for sum_seg_idx, (sum_seg_start_idx, sum_seg_end_idx) in enumerate(summary.segments):
 
-        print(f'scenes shape {scenes.shape}')
-        print(scenes.dtype)
-        print(scenes[:10, :])
+                sum_frame_indices = np.round(np.linspace(sum_seg_start_idx, sum_seg_end_idx, 3)).astype(int)
+                sum_segment_frames = [get_image(str(frame)) for frame in np.array(summary.frames)[sum_frame_indices]]
 
-        binary_scene_vector = binary_scene_vector[np.newaxis].T
+                if compare_framesets(main_segment_frames, sum_segment_frames):
+                    main_binary_segment_vector[seg_idx] = 1
+                    sum_binary_segment_dict[summary.id][sum_seg_idx] = seg_idx + 1
+                    break
 
-        print(f'binary scene vector {binary_scene_vector.shape}')
-        print(binary_scene_vector[:10])
+    # TODO: matched_segments_indices & n_reused_segments difference?
+    matched_segments_indices = np.where(main_binary_segment_vector)
+    matched_segments_n_frames = [i2 - i1 for i1, i2 in np.array(main_video.segments)[matched_segments_indices]]
 
-        binary_scene_vector = np.append(scenes, binary_scene_vector, axis=1)
+    n_reused_segments = np.count_nonzero(main_binary_segment_vector == 1)
+    n_reused_frames = sum(matched_segments_n_frames)
 
-        print(binary_scene_vector)
+    print(
+        f'\n{n_reused_segments}/{len(main_binary_segment_vector)} reused segments ({round((n_reused_segments / len(main_binary_segment_vector)) * 100, 2)} %)')
+    print(
+        f'{n_reused_frames}/{main_video.n_frames} reused frames ({round((n_reused_frames / main_video.n_frames) * 100, 2)} %, {n_reused_frames / 25} sec)\n')
 
-        return binary_scene_vector
+    get_image.cache_clear()
+
+
+def check_requirements(video: Path):
+    match = re.match(TV_FILENAME_RE, video.name)
+
+    if match is None or not video.exists():
+        print(f'{video.name} does not exist or does not match TV-*.mp4 pattern.')
+        return False
+
+    frame_dir = Path(video.parent, match.group(2))
+
+    if not frame_dir.exists() or len(list(frame_dir.glob('frame_*.jpg'))) == 0:
+        print(f'{video.name} no frames have been extracted.')
+        return False
+
+    if not Path(frame_dir, 'shots.txt').exists():
+        print(f'{video.name} has no detected shots.')
+        return False
+
+    return True
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('dirs', type=lambda p: Path(p).resolve(strict=True))
+    parser.add_argument('dir', type=lambda p: Path(p).resolve(strict=True))
     args = parser.parse_args()
 
-    mp4_files = [VideoFile(file) for file in list(args.dir.rglob('*.mp4')) if re.match(TV_FILENAME_RE, os.path.basename(file))]
-    assert len(mp4_files) > 0, "no TV-*.mp4 files could be found in " + str(args.dir)
+    tv_files = [file for file in args.dir.rglob('*.mp4') if check_requirements(file)]
+    assert len(tv_files) > 0, "No TV-*.mp4 files could be found in " + str(args.dir)
 
-    mp4_files = list(filter(lambda video: video.check_requirements(), mp4_files))
-    for video in mp4_files:
-        video.load_scene_data()
+    videos_by_date = dict([(date, list(videos)) for date, videos in groupby(tv_files, lambda f: f.id.split('-')[1])])
 
-    videos_by_date = dict()
-    for date, videos in groupby(mp4_files, lambda vd: str(vd.date)):
-        videos_by_date[date] = list(videos)
-
-    process_videos_by_date(videos_by_date)
+    for date, files in videos_by_date.items():
+        videos = [VideoData(file) for file in files]
+        process_videos(date, videos)

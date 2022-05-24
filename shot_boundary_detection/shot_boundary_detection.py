@@ -1,4 +1,4 @@
-#!/Users/tihmels/Scripts/thesis/conda-env/bin/python
+#!/Users/tihmels/Scripts/thesis-scripts/conda-env/bin/python
 
 import argparse
 import logging
@@ -9,7 +9,6 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
-from numpy import asarray
 
 from transnetv2 import TransNetV2
 
@@ -50,10 +49,13 @@ def process_frame_dir(directory: Path):
     print(f'\n{directory.relative_to(directory.parent.parent)}')
 
     try:
-        frames = get_frames_from_dir(directory)
-        _, scenes, img = shot_transition_detection(np.array([asarray(img) for img in frames]))
 
-        np.savetxt(Path(directory, 'shots.txt').absolute(), scenes, fmt="%d")
+        frames = get_frames_from_dir(directory)
+        _, segments, img = shot_transition_detection(np.array([np.asarray(img) for img in frames]))
+
+        segments = segments[segments[:, 1] - segments[:, 0] > 10]
+
+        np.savetxt(Path(directory, 'shots.txt').absolute(), segments, fmt="%d")
         img.save(Path(directory, 'shots.png').absolute())
 
         return directory
@@ -89,7 +91,7 @@ if __name__ == "__main__":
 
     assert len(frame_dirs) > 0, f'{args.dir} does not contain any subdirectories with frame_*.jpg files.'
 
-    print("Performing Shot Segmentation for ...")
+    print("Shot Segmentation on ...")
     [print(f'- {d}') for d in frame_dirs]
 
     if args.parallel:

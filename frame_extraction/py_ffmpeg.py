@@ -1,4 +1,4 @@
-#!/Users/tihmels/Scripts/thesis/conda-env/bin/python
+#!/Users/tihmels/Scripts/thesis-scripts/conda-env/bin/python
 
 import argparse
 import multiprocessing as mp
@@ -53,22 +53,22 @@ if __name__ == "__main__":
     tv_files = []
 
     for file in args.files:
-        if file.is_file() and re.match(TV_FILENAME_RE, file.name):
+        if file.is_file() and re.match(TV_FILENAME_RE, file.id):
             tv_files.append(file)
         elif file.is_dir() and not args.recursive:
-            [tv_files.append(f) for f in file.glob('*.mp4') if re.match(TV_FILENAME_RE, f.name)]
+            [tv_files.append(f) for f in file.glob('*.mp4') if re.match(TV_FILENAME_RE, f.id)]
         elif file.is_dir() and args.recursive:
-            [tv_files.append(f) for f in file.rglob('*.mp4') if re.match(TV_FILENAME_RE, f.name)]
+            [tv_files.append(f) for f in file.rglob('*.mp4') if re.match(TV_FILENAME_RE, f.id)]
 
     if args.parallel:
         with mp.Pool(os.cpu_count()) as pool:
             [pool.apply_async(extract_frames_from_video, (file,),
                               kwds={'fps': args.fps, 'overwrite': args.overwrite, 'prune': args.prune},
-                              callback=lambda f: print(f'{f.name} done')) for file in tv_files]
+                              callback=lambda f: print(f'{f.id} done')) for file in tv_files]
             pool.close()
             pool.join()
 
     else:
         for file in tv_files:
             extract_frames_from_video(file, args.fps, args.overwrite, args.prune)
-            print(f'{file.name} done')
+            print(f'{file.id} done')
