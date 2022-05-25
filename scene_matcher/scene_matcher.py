@@ -30,6 +30,14 @@ class VideoData:
         self.segments: [(int, int)] = self.read_segments_from_file(Path(self.frame_dir, 'shots.txt'))
         self.n_segments: int = len(self.segments)
 
+    @property
+    def timecode(self):
+        return self.id.split("-")[2]
+
+    @property
+    def date_str(self):
+        return self.date.strftime("%Y%m%d")
+
     @staticmethod
     def read_segments_from_file(file):
         shots = []
@@ -142,9 +150,24 @@ def get_image(path: str):
     return Image.open(path).convert('RGB')
 
 
-def process_videos(date: str, videos: [VideoData], to_csv=False):
+def was_processed(video: VideoData):
+    date, timecode = video.date_str, video.timecode
+    pattern = re.compile(r"^TV-" + re.escape(date) + r"-" + re.escape(timecode) + r"-\S*.csv$")
+
+    for file in video.path.parent.iterdir():
+        if file.is_file() and pattern.match(file.name):
+            return True
+
+    return False
+
+
+def process_videos(date: str, videos: [VideoData], skip_existing=False, to_csv=False):
     if len(videos) < 2:
-        print(f'not enough video data available for {date}')
+        print(f'Not enough video data available for {date}')
+        return
+
+    if skip_existing and all(was_processed(video) for video in videos):
+        print(f'All {len(videos)} videos for {date} already processed. Skip ... ')
         return
 
     main_video = max(videos, key=lambda v: v.n_frames)
@@ -243,10 +266,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument('dir', type=lambda p: Path(p).resolve(strict=True))
-    parser.add_argument('--csv', action='store_true')
+    parser.add_argument('-r', '--recursive', action='store_true', help="search recursively for TV-*.mp4 files")
+    parser.add_argument('-s', '--skip', action='store_true', help="skip scene matching if already exist")
+    parser.add_argument('--csv', action='store_true', help="store scene matching results in a csv file")
     args = parser.parse_args()
 
-    tv_files = [file for file in args.dir.rglob('*.mp4') if check_requirements(file)]
+    tv_files = []
+
+    if args.recursive:
+        tv_files = [file for file in args.dir.rglob('*.mp4') if check_requirements(file)]
+    else:
+        tv_files = [file for file in args.dir.glob('*.mp4') if check_requirements(file)]
+
     assert len(tv_files) > 0, "No TV-*.mp4 files could be found in " + str(args.dir)
 
     videos_by_date = dict([(date, list(videos)) for date, videos in groupby(tv_files, lambda f: f.name.split('-')[1])])
@@ -256,10 +287,12 @@ if __name__ == "__main__":
 
     for date, files in videos_by_date.items():
         videos = [VideoData(file) for file in files]
-        main_stats, sum_stats = process_videos(date, videos, args.csv)
+        stats = process_videos(date, videos, args.skip, args.csv)
 
-        main_video_statistics.append(main_stats)
-        summary_video_statistics.extend(sum_stats)
+        if stats:
+            main_stats, sum_stats = stats
+            main_video_statistics.append(main_stats)
+            summary_video_statistics.extend(sum_stats)
 
     eval_video_statistics(main_video_statistics)
     eval_video_statistics(summary_video_statistics)
