@@ -11,6 +11,7 @@ from pathlib import Path
 
 import imagehash
 import numpy as np
+import pandas as pd
 from PIL import Image
 
 TV_FILENAME_RE = r'TV-(\d{8})-(\d{4})-(\d{4}).webs.h264.mp4'
@@ -47,20 +48,79 @@ class VideoData:
 
 
 class VideoType(Enum):
-    FULL = 0
-    SUMMARY = 1
+    SUM = 0
+    FULL = 1
 
 
 class VideoStats:
     def __init__(self, vd: VideoData, vt: VideoType, segment_vector: np.array):
-        self.name = vd.id
-        self.date = vd.date.strftime("%d.%m.%Y")
-        self.vt = vt.name
-        self.segments = vd.segments
-        self.seg_vec = segment_vector
+        self.id = vd.id
+        self.date = vd.date.strftime("%Y%m%d")
+        self.type = vt.name
 
-        # matched_segments_indices = np.where(main_binary_segment_vector)
-        # matched_segments_n_frames = [i2 - i1 for i1, i2 in np.array(main_video.segments)[matched_segments_indices]]
+        data = np.array([*vd.segments], dtype=np.int32)
+        data = np.column_stack((data, np.array([s2 - s1 for s1, s2 in vd.segments], dtype=np.int32)))
+        data = np.column_stack((data, segment_vector.astype(np.int32)))
+
+        segment_center_indices = [np.round((s1 + s2) / 2).astype(int) for s1, s2 in vd.segments]
+        representative_frames = np.array(vd.frames)[segment_center_indices]
+
+        data = np.column_stack((data, representative_frames))
+
+        self.df = pd.DataFrame(data=data, columns=['seg_start', 'seg_end', 'n_frames', 'match', 'rframe'])
+        self.df.index += 1
+
+    @property
+    def n_segments(self):
+        return self.df.shape[0]
+
+    @property
+    def n_frames(self):
+        return sum(self.n_frames_per_segment)
+
+    @property
+    def n_frames_per_segment(self):
+        return self.df.iloc[:, 2]
+
+    @property
+    def matched_segments(self):
+        return self.df.iloc[:, 3]
+
+    @property
+    def n_segments_reused(self):
+        return len(np.flatnonzero(self.matched_segments))
+
+    @property
+    def n_frames_reused(self):
+        return sum(self.n_frames_per_segment[np.flatnonzero(self.matched_segments)])
+
+    @property
+    def segments_reused_ratio(self):
+        return self.n_segments_reused / self.n_segments
+
+    @property
+    def frames_reused_ratio(self):
+        return self.n_frames_reused / self.n_frames
+
+    def print(self):
+        n_segments = self.n_segments
+        n_reused_segments = self.n_segments_reused
+        total_frames = self.n_frames
+        n_reused_frames = self.n_frames_reused
+
+        print(f'Statistics for {self.id} ({self.type})')
+        print("-------------------------------------------------")
+        print(
+            f'{n_reused_segments}/{n_segments} reused segments ({round(self.segments_reused_ratio * 100, 2)} %)')
+        print(
+            f'{n_reused_frames}/{total_frames} reused frames ({round(self.frames_reused_ratio * 100, 2)} %, {n_reused_frames / 25} sec)')
+        print("-------------------------------------------------\n")
+
+    def save_as_csv(self, dir_path: Path, suffix=""):
+        if suffix:
+            suffix = f'-{suffix}'
+
+        self.df.to_csv(Path(dir_path, self.id + "-" + self.type + suffix + ".csv"))
 
 
 def frame_similarity_detection(frame1: Image, frame2: Image, cutoff):
@@ -70,19 +130,19 @@ def frame_similarity_detection(frame1: Image, frame2: Image, cutoff):
     return hash1 - hash2 < cutoff
 
 
-def compare_framesets(frames1: [Image], frames2: [Image], cutoff=8):
+def compare_framesets(frames1: [Image], frames2: [Image], cutoff=10):
     for f1, f2 in itertools.product(frames1, frames2):
         if frame_similarity_detection(f1, f2, cutoff):
             return True
     return False
 
 
-@lru_cache(maxsize=256)
+@lru_cache(maxsize=128)
 def get_image(path: str):
     return Image.open(path).convert('RGB')
 
 
-def process_videos(date: str, videos: [VideoData]):
+def process_videos(date: str, videos: [VideoData], to_csv=False):
     if len(videos) < 2:
         print(f'not enough video data available for {date}')
         return
@@ -92,6 +152,12 @@ def process_videos(date: str, videos: [VideoData]):
 
     main_binary_segment_vector = np.zeros(main_video.n_segments)
     sum_binary_segment_dict = {summary.id: np.zeros(summary.n_segments) for summary in summary_videos}
+
+    cutoff = 10
+
+    print(
+        f'Comparing {len(main_video.segments)} segments of {main_video.id}'
+        f' with segments of {len(summary_videos)} summary videos ... \n')
 
     for seg_idx, (seg_start_idx, seg_end_idx) in enumerate(main_video.segments):
         print(
@@ -107,24 +173,26 @@ def process_videos(date: str, videos: [VideoData]):
                 sum_frame_indices = np.round(np.linspace(sum_seg_start_idx, sum_seg_end_idx, 3)).astype(int)
                 sum_segment_frames = [get_image(str(frame)) for frame in np.array(summary.frames)[sum_frame_indices]]
 
-                if compare_framesets(main_segment_frames, sum_segment_frames):
-                    main_binary_segment_vector[seg_idx] = 1
+                if compare_framesets(main_segment_frames, sum_segment_frames, cutoff):
+                    main_binary_segment_vector[seg_idx] += 1
                     sum_binary_segment_dict[summary.id][sum_seg_idx] = seg_idx + 1
-                    break
 
-    # TODO: matched_segments_indices & n_reused_segments difference?
-    matched_segments_indices = np.where(main_binary_segment_vector)
-    matched_segments_n_frames = [i2 - i1 for i1, i2 in np.array(main_video.segments)[matched_segments_indices]]
+    main_video_stats = VideoStats(main_video, VideoType.FULL, main_binary_segment_vector)
+    summary_video_stats = [VideoStats(video, VideoType.SUM, sum_binary_segment_dict[video.id]) for video in
+                           summary_videos]
 
-    n_reused_segments = np.count_nonzero(main_binary_segment_vector == 1)
-    n_reused_frames = sum(matched_segments_n_frames)
+    print()
+    main_video_stats.print()
+    [s.print() for s in summary_video_stats]
 
-    print(
-        f'\n{n_reused_segments}/{len(main_binary_segment_vector)} reused segments ({round((n_reused_segments / len(main_binary_segment_vector)) * 100, 2)} %)')
-    print(
-        f'{n_reused_frames}/{main_video.n_frames} reused frames ({round((n_reused_frames / main_video.n_frames) * 100, 2)} %, {n_reused_frames / 25} sec)\n')
+    if to_csv:
+        csv_dir = main_video.path.parent
+        main_video_stats.save_as_csv(csv_dir, "co" + str(cutoff))
+        [summary.save_as_csv(csv_dir, "co" + str(cutoff)) for summary in summary_video_stats]
 
     get_image.cache_clear()
+
+    return main_video_stats, summary_video_stats
 
 
 def check_requirements(video: Path):
@@ -147,17 +215,51 @@ def check_requirements(video: Path):
     return True
 
 
+def eval_video_statistics(vs: [VideoStats]):
+    assert len(set([stats.type for stats in vs])) == 1
+
+    print(f'Statistics of {len(vs)} videos ({vs[0].type})')
+    print("-------------------------------------------------")
+
+    total_segments = sum([stats.n_segments for stats in vs])
+    total_segments_reused = sum([stats.n_segments_reused for stats in vs])
+
+    segments_reused_ratio = total_segments_reused / total_segments
+    segments_reused_perc = np.round(segments_reused_ratio * 100, 2)
+
+    total_frames = sum([stats.n_frames for stats in vs])
+    total_frames_reused = sum([stats.n_frames_reused for stats in vs])
+
+    frames_reused_ratio = total_frames_reused / total_frames
+    frames_reused_perc = np.round(frames_reused_ratio * 100, 2)
+
+    print(f'Avg reused segments: {segments_reused_perc} %')
+    print(f'Avg reused frames: {frames_reused_perc} %')
+    print(f'Avg reused seconds: {total_frames_reused / len(vs) / 25}')
+    print("-------------------------------------------------\n")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument('dir', type=lambda p: Path(p).resolve(strict=True))
+    parser.add_argument('--csv', action='store_true')
     args = parser.parse_args()
 
     tv_files = [file for file in args.dir.rglob('*.mp4') if check_requirements(file)]
     assert len(tv_files) > 0, "No TV-*.mp4 files could be found in " + str(args.dir)
 
-    videos_by_date = dict([(date, list(videos)) for date, videos in groupby(tv_files, lambda f: f.id.split('-')[1])])
+    videos_by_date = dict([(date, list(videos)) for date, videos in groupby(tv_files, lambda f: f.name.split('-')[1])])
+
+    main_video_statistics = []
+    summary_video_statistics = []
 
     for date, files in videos_by_date.items():
         videos = [VideoData(file) for file in files]
-        process_videos(date, videos)
+        main_stats, sum_stats = process_videos(date, videos, args.csv)
+
+        main_video_statistics.append(main_stats)
+        summary_video_statistics.extend(sum_stats)
+
+    eval_video_statistics(main_video_statistics)
+    eval_video_statistics(summary_video_statistics)
