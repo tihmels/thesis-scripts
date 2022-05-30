@@ -1,3 +1,5 @@
+import itertools
+import time
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -5,14 +7,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+TV_DATEFORMAT = '%Y%m%d'
+
 
 class VideoData:
     def __init__(self, path: Path):
-        self._dateformat = '%Y%m%d'
-
         self.id: str = path.stem
         self.path: Path = path
-        self.date: datetime = datetime.strptime(path.parent.name, self._dateformat)
+        self.date: datetime = datetime.strptime(path.parent.name, TV_DATEFORMAT)
         self.frame_dir: Path = Path(path.parent, path.name.split('-')[2])
         self.frames: [Path] = sorted(self.frame_dir.glob('frame_*.jpg'))
         self.segments: [(int, int)] = self.read_segments_from_file(Path(self.frame_dir, 'shots.txt'))
@@ -62,16 +64,21 @@ class VideoStats:
         self.type = vt.name
 
         data = np.array([*vd.segments], dtype=np.int32)
-        data = np.column_stack((data, np.array([s2 - s1 for s1, s2 in vd.segments], dtype=np.int32)))
+        data = np.column_stack((data, np.array([(s2 - s1 + 1) for s1, s2 in vd.segments], dtype=np.int32)))
         data = np.column_stack((data, segment_vector.astype(np.int32)))
 
+        start_frame_paths = np.array(vd.frames)[[seg[0] for seg in vd.segments]]
+        end_frame_paths = np.array(vd.frames)[[seg[1] for seg in vd.segments]]
+
         segment_center_indices = [np.round((s1 + s2) / 2).astype(int) for s1, s2 in vd.segments]
-        representative_frames = np.array(vd.frames)[segment_center_indices]
+        center_frame_paths = np.array(vd.frames)[segment_center_indices]
 
-        data = np.column_stack((data, representative_frames))
+        data = np.column_stack((data, start_frame_paths))
+        data = np.column_stack((data, center_frame_paths))
+        data = np.column_stack((data, end_frame_paths))
 
-        self.df = pd.DataFrame(data=data, columns=['seg_start', 'seg_end', 'n_frames', 'match', 'rframe'])
-        self.df.index += 1
+        self.df = pd.DataFrame(data=data,
+                               columns=['seg_start', 'seg_end', 'n_frames', 'match', 's_frame', 'c_frame', 'e_frame'])
 
     @property
     def n_segments(self):
@@ -95,7 +102,8 @@ class VideoStats:
 
     @property
     def n_frames_reused(self):
-        return sum(self.n_frames_per_segment[np.flatnonzero(self.matched_segments)])
+        matched_segments_indices = np.flatnonzero(self.matched_segments)
+        return sum(self.n_frames_per_segment[matched_segments_indices])
 
     @property
     def segments_reused_ratio(self):
@@ -123,4 +131,67 @@ class VideoStats:
         if suffix:
             suffix = f'-{suffix}'
 
-        self.df.to_csv(Path(dir_path, self.id + "-" + self.type + suffix + ".csv"))
+        csv_df = self.df.copy(deep=True)
+        csv_df.index += 1
+        csv_df.to_csv(Path(dir_path, self.id + "-" + self.type + suffix + ".csv"))
+
+
+def get_mm_ss(seconds):
+    return time.strftime("%M:%S", time.gmtime(seconds))
+
+
+def flatten(t):
+    return [item for sublist in t for item in sublist]
+
+
+def get_binary_frame_vector(vs: VideoStats):
+    return flatten(
+        [[value] * n for value, n in zip(np.where(vs.matched_segments == 0, 0, 1), vs.n_frames_per_segment)])
+
+
+def get_frame_vector(vs: VideoStats):
+    return flatten([[value] * n for value, n in zip(vs.matched_segments, vs.n_frames_per_segment)])
+
+
+def get_vs_eval_df(main_vs: [VideoStats], summary_vs: [VideoStats]):
+    main_vs = sorted(main_vs, key=lambda s: s.date)
+
+    data = np.array([s.date for s in main_vs])
+    data = np.column_stack((data, [s.id for s in main_vs]))
+    data = np.column_stack((data, [get_mm_ss(int(s.n_frames / 25)) for s in main_vs]))
+    data = np.column_stack((data, [s.n_frames for s in main_vs]))
+    data = np.column_stack((data, [s.n_segments for s in main_vs]))
+    data = np.column_stack((data, [s.n_frames_reused for s in main_vs]))
+    data = np.column_stack((data, [np.round(s.frames_reused_ratio * 100, 1) for s in main_vs]))
+    data = np.column_stack((data, [np.rint(s.n_frames_reused / 25).astype(int) for s in main_vs]))
+    data = np.column_stack((data, [s.n_segments_reused for s in main_vs]))
+    data = np.column_stack((data, [np.round(s.segments_reused_ratio * 100, 1) for s in main_vs]))
+
+    sum_vs_by_date = dict([(date, list(vs)) for date, vs in
+                           itertools.groupby(sorted(summary_vs, key=lambda s: s.date), lambda s: s.date)])
+
+    n_summaries = [len(vs) for vs in sum_vs_by_date.values()]
+    data = np.column_stack((data, n_summaries))
+
+    max_n_frames_summary = [max(vs, key=lambda s: s.n_frames_reused) for vs in sum_vs_by_date.values()]
+    data = np.column_stack((data, [summary.id for summary in max_n_frames_summary]))
+
+    max_n_frames_reused = [max([video.n_frames_reused for video in videos]) for videos in sum_vs_by_date.values()]
+    data = np.column_stack((data, max_n_frames_reused))
+    data = np.column_stack((data, [int(n_frames / 25) for n_frames in max_n_frames_reused]))
+
+    max_n_seg_summary = [max(vs, key=lambda s: s.n_segments_reused) for vs in sum_vs_by_date.values()]
+    data = np.column_stack((data, [summary.id for summary in max_n_seg_summary]))
+
+    max_n_segments_reused = [max([video.n_segments_reused for video in videos]) for videos in sum_vs_by_date.values()]
+    data = np.column_stack((data, max_n_segments_reused))
+
+    df = pd.DataFrame(data=data,
+                      columns=['date', 'main_video',
+                               'dur (mm:ss)', 'n_frames', 'n_segments',
+                               'n_frames_ru', 'n_frames_ru_perc', 'sec_ru',
+                               'n_seg_ru', 'n_seg_ru_perc', 'n_summaries', 'max_n_frames_summary',
+                               'max_n_frames_ru', 'sum_ss_ru', 'max_n_seg_summary',
+                               'max_n_seg_ru'])
+
+    return df

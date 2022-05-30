@@ -1,8 +1,9 @@
-#!/Users/tihmels/Scripts/thesis-scripts/conda-env/bin/python
+#!/Users/tihmels/Scripts/thesis-scripts/conda-env/bin/python -u
 
 import argparse
 import itertools
 import re
+from datetime import datetime
 from functools import lru_cache
 from itertools import groupby
 from pathlib import Path
@@ -11,7 +12,7 @@ import imagehash
 import numpy as np
 from PIL import Image
 
-from VideoData import VideoData, VideoStats, VideoType
+from VideoData import VideoData, VideoStats, VideoType, get_vs_eval_df
 
 TV_FILENAME_RE = r'TV-(\d{8})-(\d{4})-(\d{4}).webs.h264.mp4'
 
@@ -23,16 +24,16 @@ def frame_similarity_detection(frame1: Image, frame2: Image, cutoff):
     return hash1 - hash2 < cutoff
 
 
-def compare_framesets(frames1: [Image], frames2: [Image], cutoff=10):
+def compare_framesets(frames1: [Image], frames2: [Image], cutoff=8):
     for f1, f2 in itertools.product(frames1, frames2):
         if frame_similarity_detection(f1, f2, cutoff):
             return True
     return False
 
 
-@lru_cache(maxsize=128)
+@lru_cache(maxsize=1024)
 def get_image(path: str):
-    return Image.open(path).convert('RGB')
+    return Image.open(path).convert('L').resize((9, 8), Image.ANTIALIAS)
 
 
 def was_processed(video: VideoData):
@@ -56,12 +57,12 @@ def process_videos(date: str, videos: [VideoData], skip_existing=False, to_csv=F
         return
 
     main_video = max(videos, key=lambda v: v.n_frames)
-    summary_videos = list(filter(lambda v: v is not main_video, videos))
+    summary_videos = sorted(list(filter(lambda v: v is not main_video, videos)), key=lambda s: s.date)
 
-    main_binary_segment_vector = np.zeros(main_video.n_segments)
-    sum_binary_segment_dict = {summary.id: np.zeros(summary.n_segments) for summary in summary_videos}
+    main_segment_vector = np.zeros(main_video.n_segments)
+    sum_segment_dict = {summary.id: np.zeros(summary.n_segments) for summary in summary_videos}
 
-    cutoff = 10
+    cutoff = 12
 
     print(
         f'Comparing {len(main_video.segments)} segments of {main_video.id}'
@@ -69,24 +70,37 @@ def process_videos(date: str, videos: [VideoData], skip_existing=False, to_csv=F
 
     for seg_idx, (seg_start_idx, seg_end_idx) in enumerate(main_video.segments):
         print(
-            f'[S{seg_idx + 1}/{main_video.n_segments}]: {seg_start_idx} - {seg_end_idx} ({seg_end_idx - seg_start_idx} frames)')
+            f'[S{seg_idx + 1}/{main_video.n_segments}]: F{seg_start_idx} - F{seg_end_idx} ({seg_end_idx - seg_start_idx + 1} frames)',
+            end="\t")
 
         main_frame_indices = np.round(np.linspace(seg_start_idx, seg_end_idx, 5)).astype(int)
-        main_segment_frames = [Image.open(frame).convert('RGB') for frame in
+        main_segment_frames = [Image.open(frame).convert('L').resize((9, 8), Image.ANTIALIAS) for frame in
                                np.array(main_video.frames)[main_frame_indices]]
 
         for summary in summary_videos:
+            match = False
+
             for sum_seg_idx, (sum_seg_start_idx, sum_seg_end_idx) in enumerate(summary.segments):
 
                 sum_frame_indices = np.round(np.linspace(sum_seg_start_idx, sum_seg_end_idx, 3)).astype(int)
                 sum_segment_frames = [get_image(str(frame)) for frame in np.array(summary.frames)[sum_frame_indices]]
 
                 if compare_framesets(main_segment_frames, sum_segment_frames, cutoff):
-                    main_binary_segment_vector[seg_idx] += 1
-                    sum_binary_segment_dict[summary.id][sum_seg_idx] = seg_idx + 1
+                    main_segment_vector[seg_idx] += 1
+                    match = True
 
-    main_video_stats = VideoStats(main_video, VideoType.FULL, main_binary_segment_vector)
-    summary_video_stats = [VideoStats(video, VideoType.SUM, sum_binary_segment_dict[video.id]) for video in
+                    if sum_segment_dict[summary.id][sum_seg_idx] == 0:
+                        sum_segment_dict[summary.id][sum_seg_idx] = seg_idx + 1
+
+                    break
+
+            print("x", end="") if match else print(".", end="")
+        print()
+
+        [f.close() for f in main_segment_frames]
+
+    main_video_stats = VideoStats(main_video, VideoType.FULL, main_segment_vector)
+    summary_video_stats = [VideoStats(video, VideoType.SUM, sum_segment_dict[video.id]) for video in
                            summary_videos]
 
     print()
@@ -123,55 +137,38 @@ def check_requirements(video: Path):
     return True
 
 
-def eval_video_statistics(vs: [VideoStats]):
-    assert len(set([stats.type for stats in vs])) == 1
-
-    print(f'Statistics of {len(vs)} videos ({vs[0].type})')
-    print("-------------------------------------------------")
-
-    total_segments = sum([stats.n_segments for stats in vs])
-    total_segments_reused = sum([stats.n_segments_reused for stats in vs])
-
-    segments_reused_ratio = total_segments_reused / total_segments
-    segments_reused_perc = np.round(segments_reused_ratio * 100, 2)
-
-    total_frames = sum([stats.n_frames for stats in vs])
-    total_frames_reused = sum([stats.n_frames_reused for stats in vs])
-
-    frames_reused_ratio = total_frames_reused / total_frames
-    frames_reused_perc = np.round(frames_reused_ratio * 100, 2)
-
-    print(f'Avg reused segments: {segments_reused_perc} %')
-    print(f'Avg reused frames: {frames_reused_perc} %')
-    print(f'Avg reused seconds: {total_frames_reused / len(vs) / 25}')
-    print("-------------------------------------------------\n")
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('dir', type=lambda p: Path(p).resolve(strict=True))
+    parser.add_argument('dirs', type=lambda p: Path(p).resolve(strict=True), nargs='+')
     parser.add_argument('-r', '--recursive', action='store_true', help="search recursively for TV-*.mp4 files")
     parser.add_argument('-s', '--skip', action='store_true', help="skip scene matching if already exist")
     parser.add_argument('--csv', action='store_true', help="store scene matching results in a csv file")
+    parser.add_argument('--append', action='store_true', help="append to csv file")
     args = parser.parse_args()
 
     tv_files = []
 
     if args.recursive:
-        tv_files = [file for file in args.dir.rglob('*.mp4') if check_requirements(file)]
+        for directory in args.dirs:
+            tv_files.extend([file for file in directory.rglob('*.mp4') if check_requirements(file)])
     else:
-        tv_files = [file for file in args.dir.glob('*.mp4') if check_requirements(file)]
+        for directory in args.dirs:
+            tv_files.extend([file for file in directory.glob('*.mp4') if check_requirements(file)])
 
-    assert len(tv_files) > 0, "No TV-*.mp4 files could be found in " + str(args.dir)
+    assert len(tv_files) > 0, "No TV-*.mp4 files could be found in " + str(args.dirs)
 
-    videos_by_date = dict([(date, list(videos)) for date, videos in groupby(tv_files, lambda f: f.name.split('-')[1])])
+    tv_files.sort(key=lambda file: datetime.strptime(file.name.split("-")[1] + file.name.split("-")[2], "%Y%m%d%H%M"))
+
+    videos_by_date = dict([(date, list(videos)) for date, videos in groupby(tv_files, lambda f: f.parent.name)])
 
     main_video_statistics = []
     summary_video_statistics = []
 
-    for date, files in videos_by_date.items():
+    for idx, (date, files) in enumerate(videos_by_date.items()):
         videos = [VideoData(file) for file in files]
+
+        print(f'\n[{idx + 1}/{len(videos_by_date)}] {date}')
         stats = process_videos(date, videos, args.skip, args.csv)
 
         if stats:
@@ -179,5 +176,10 @@ if __name__ == "__main__":
             main_video_statistics.append(main_stats)
             summary_video_statistics.extend(sum_stats)
 
-    eval_video_statistics(main_video_statistics)
-    eval_video_statistics(summary_video_statistics)
+    df = get_vs_eval_df(main_video_statistics, summary_video_statistics)
+
+    output_path = Path(Path.home(), "TV", "stats.csv")
+    if args.append:
+        df.to_csv(str(output_path), mode='a', header=not output_path.exists())
+    else:
+        df.to_csv(str(output_path))

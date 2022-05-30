@@ -48,6 +48,7 @@ def shot_transition_detection(frames):
 
 def process_frame_dir(directory: Path, skip_existing=False):
     if skip_existing and Path(directory, 'shots.txt').exists():
+        print(f'{directory} + " has already shots detected. Skip ...')
         return
 
     print(f'\n{directory.relative_to(directory.parent.parent)}')
@@ -74,7 +75,7 @@ def check_requirements(path: Path):
     if match is None or not path.exists() or not path.is_dir():
         return False
 
-    if not len(list(path.glob('frame_*.jpg'))) > 0:
+    if len(list(path.glob('frame_*.jpg'))) == 0:
         print(f'{path} has no extracted frames.')
         return False
 
@@ -103,7 +104,7 @@ if __name__ == "__main__":
 
     frame_dirs = []
     for directory in args.dirs:
-        frame_dirs.extend([d for d in subdirs(directory) if check_requirements(d)])
+        frame_dirs.extend([d for d in sorted(subdirs(directory)) if check_requirements(d)])
 
     assert len(frame_dirs) > 0, f'{args.dirs} does not contain any subdirectories with frame_*.jpg files.'
 
