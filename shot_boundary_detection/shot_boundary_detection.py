@@ -46,11 +46,7 @@ def shot_transition_detection(frames):
     return predictions, scenes, img
 
 
-def process_frame_dir(directory: Path, skip_existing=False):
-    if skip_existing and Path(directory, 'shots.txt').exists():
-        print(f'{directory} + " has already shots detected. Skip ...')
-        return
-
+def process_frame_dir(directory: Path):
     print(f'\n{directory.relative_to(directory.parent.parent)}')
 
     try:
@@ -58,7 +54,7 @@ def process_frame_dir(directory: Path, skip_existing=False):
         frames = get_frames_from_dir(directory)
         _, segments, img = shot_transition_detection(np.array([np.asarray(img) for img in frames]))
 
-        segments = segments[segments[:, 1] - segments[:, 0] > 8]
+        segments = segments[segments[:, 1] - segments[:, 0] > 10]
 
         np.savetxt(Path(directory, 'shots.txt').absolute(), segments, fmt="%d")
         img.save(Path(directory, 'shots.png').absolute())
@@ -67,9 +63,10 @@ def process_frame_dir(directory: Path, skip_existing=False):
 
     except Exception as e:
         print(e)
+        return e
 
 
-def check_requirements(path: Path):
+def check_requirements(path: Path, skip_existing=False):
     match = re.match(r'^(\d{4})$', path.name)
 
     if match is None or not path.exists() or not path.is_dir():
@@ -77,6 +74,10 @@ def check_requirements(path: Path):
 
     if len(list(path.glob('frame_*.jpg'))) == 0:
         print(f'{path} has no extracted frames.')
+        return False
+
+    if skip_existing and Path(path, 'shots.txt').exists():
+        print(f'{path} has already shots detected. Skip ...')
         return False
 
     return True
@@ -104,19 +105,27 @@ if __name__ == "__main__":
 
     frame_dirs = []
     for directory in args.dirs:
-        frame_dirs.extend([d for d in sorted(subdirs(directory)) if check_requirements(d)])
+        frame_dirs.extend([d for d in sorted(subdirs(directory)) if check_requirements(d, args.skip)])
 
     assert len(frame_dirs) > 0, f'{args.dirs} does not contain any subdirectories with frame_*.jpg files.'
 
-    print(f'Video Segmentation ({len(frame_dirs)} videos)')
+    print(f'\nVideo Segmentation ({len(frame_dirs)} videos)')
+
+
+    def callback_handler(result):
+        if result is not None and isinstance(result, Path):
+            print(f'{result.relative_to(result.parent.parent)} done')
+
 
     if args.parallel:
+
         with mp.Pool(os.cpu_count(), initializer=mute) as pool:
-            [pool.apply_async(process_frame_dir, (d,),
-                              callback=lambda d: print(f'{d.relative_to(d.parent.parent)} done')) for d in frame_dirs]
+            [pool.apply_async(process_frame_dir, (d,), callback=callback_handler) for d in frame_dirs]
+
             pool.close()
             pool.join()
 
     else:
         for d in frame_dirs:
-            process_frame_dir(d)
+            result = process_frame_dir(d)
+            callback_handler(result)

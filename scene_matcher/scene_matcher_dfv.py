@@ -1,7 +1,6 @@
 #!/Users/tihmels/Scripts/thesis-scripts/conda-env/bin/python -u
 
 import argparse
-import itertools
 import re
 from datetime import datetime
 from functools import lru_cache
@@ -10,11 +9,28 @@ from pathlib import Path
 
 import imagehash
 import numpy as np
+import tensorflow as tf
+import tensorflow_hub as hub
 from PIL import Image
+from scipy.spatial import distance
+import logging
+import os
 
 from VideoData import VideoData, VideoStats, VideoType, get_vs_evaluation_df
 
 TV_FILENAME_RE = r'TV-(\d{8})-(\d{4})-(\d{4}).webs.h264.mp4'
+
+
+def set_tf_loglevel(level):
+    if level >= logging.FATAL:
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    if level >= logging.ERROR:
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+    if level >= logging.WARNING:
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+    else:
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'
+    logging.getLogger('tensorflow').setLevel(level)
 
 
 def frame_similarity_detection(frame1: Image, frame2: Image, cutoff):
@@ -24,20 +40,20 @@ def frame_similarity_detection(frame1: Image, frame2: Image, cutoff):
     return hash1 - hash2 < cutoff
 
 
-def compare_framesets(frames1: [Image], frames2: [Image], cutoff=8):
-    for f1, f2 in itertools.product(frames1, frames2):
-        if frame_similarity_detection(f1, f2, cutoff):
-            return True
+def compare_feature_vector_sets(main_feature_vectors, sum_feature_vectors):
+    metric = 'cosine'
+
+    for fv1 in main_feature_vectors:
+        for fv2 in sum_feature_vectors:
+            cosine_distance = distance.cdist([fv1], [fv2], metric)[0]
+            if cosine_distance < 0.15:
+                return True
     return False
 
 
 @lru_cache(maxsize=1024)
-def get_image_cached(file):
-    return get_image(file)
-
-
-def get_image(file):
-    return Image.open(str(file)).convert('L').resize((9, 8), Image.ANTIALIAS)
+def get_image(path: str):
+    return preprocess_img(tf.io.read_file(path))
 
 
 def was_processed(video: VideoData):
@@ -49,6 +65,50 @@ def was_processed(video: VideoData):
             return True
 
     return False
+
+
+def preprocess_img(img):
+    img = tf.io.decode_jpeg(img, channels=3)
+    img = tf.image.resize(img, [224, 224])
+    img = tf.image.convert_image_dtype(img, tf.float32)[tf.newaxis, ...]
+
+    return img
+
+
+def get_image_feature_vectors(images):
+    module_handle = "https://tfhub.dev/google/imagenet/mobilenet_v2_140_224/feature_vector/4"
+
+    module = hub.load(module_handle)
+
+    feature_vectors = []
+
+    for img in images:
+        # Calculate the image feature vector of the img
+        image = img[np.newaxis, ...]
+
+        print(img.shape)
+        features = module(image)
+
+        # Remove single-dimensional entries from the 'features' array
+        feature_set = np.squeeze(features)
+
+        feature_vectors.append(feature_set)
+
+
+def get_feature_vector(file):
+    img = tf.io.read_file(str(file))
+    img = tf.io.decode_jpeg(img, channels=3)
+    img = tf.image.resize(img, [224, 224])
+    img = tf.image.convert_image_dtype(img, tf.float32)[tf.newaxis, ...]
+
+    module_handle = "https://tfhub.dev/google/imagenet/mobilenet_v2_140_224/feature_vector/4"
+
+    module = hub.load(module_handle)
+
+    features = module(img)
+    feature_set = np.squeeze(features)
+
+    return feature_set
 
 
 def process_videos(date: str, videos: [VideoData], skip_existing=False, to_csv=False):
@@ -66,7 +126,7 @@ def process_videos(date: str, videos: [VideoData], skip_existing=False, to_csv=F
     main_segment_vector = np.zeros(main_video.n_segments)
     sum_segment_dict = {summary.id: np.zeros(summary.n_segments) for summary in summary_videos}
 
-    cutoff = 12
+    cutoff = 15
 
     print(
         f'Comparing {len(main_video.segments)} segments of {main_video.id}'
@@ -77,19 +137,20 @@ def process_videos(date: str, videos: [VideoData], skip_existing=False, to_csv=F
             f'[S{seg_idx + 1}/{main_video.n_segments}]: F{seg_start_idx} - F{seg_end_idx} ({seg_end_idx - seg_start_idx + 1} frames)',
             end="\t")
 
-        main_frame_indices = np.round(np.linspace(seg_start_idx + 3, seg_end_idx - 3, 5)).astype(int)
-        main_segment_frames = [get_image(frame) for frame in
-                               np.array(main_video.frames)[main_frame_indices]]
+        main_frame_indices = np.round(np.linspace(seg_start_idx, seg_end_idx, 5)).astype(int)
+        main_segment_feature_vectors = [get_feature_vector(frame) for frame in
+                                        np.array(main_video.frames)[main_frame_indices]]
 
         for summary in summary_videos:
             match = False
 
             for sum_seg_idx, (sum_seg_start_idx, sum_seg_end_idx) in enumerate(summary.segments):
 
-                sum_frame_indices = np.round(np.linspace(sum_seg_start_idx + 3, sum_seg_end_idx - 3, 3)).astype(int)
-                sum_segment_frames = [get_image_cached(frame) for frame in np.array(summary.frames)[sum_frame_indices]]
+                sum_frame_indices = np.round(np.linspace(sum_seg_start_idx, sum_seg_end_idx, 3)).astype(int)
+                sum_segment_feature_vectors = [get_feature_vector(frame) for frame in
+                                               np.array(summary.frames)[sum_frame_indices]]
 
-                if compare_framesets(main_segment_frames, sum_segment_frames, cutoff):
+                if compare_feature_vector_sets(main_segment_feature_vectors, sum_segment_feature_vectors):
                     main_segment_vector[seg_idx] += 1
                     match = True
 
@@ -100,8 +161,6 @@ def process_videos(date: str, videos: [VideoData], skip_existing=False, to_csv=F
 
             print("x", end="") if match else print(".", end="")
         print()
-
-        [f.close() for f in main_segment_frames]
 
     main_video_stats = VideoStats(main_video, VideoType.FULL, main_segment_vector)
     summary_video_stats = [VideoStats(video, VideoType.SUM, sum_segment_dict[video.id]) for video in
@@ -116,7 +175,7 @@ def process_videos(date: str, videos: [VideoData], skip_existing=False, to_csv=F
         main_video_stats.save_as_csv(csv_dir, "co" + str(cutoff))
         [summary.save_as_csv(csv_dir, "co" + str(cutoff)) for summary in summary_video_stats]
 
-    get_image_cached.cache_clear()
+    get_image.cache_clear()
 
     return main_video_stats, summary_video_stats
 
@@ -142,6 +201,7 @@ def check_requirements(video: Path):
 
 
 if __name__ == "__main__":
+    set_tf_loglevel(logging.FATAL)
     parser = argparse.ArgumentParser()
 
     parser.add_argument('dirs', type=lambda p: Path(p).resolve(strict=True), nargs='+')

@@ -153,7 +153,7 @@ def get_frame_vector(vs: VideoStats):
     return flatten([[value] * n for value, n in zip(vs.matched_segments, vs.n_frames_per_segment)])
 
 
-def get_vs_eval_df(main_vs: [VideoStats], summary_vs: [VideoStats]):
+def get_vs_evaluation_df(main_vs: [VideoStats], summary_vs: [VideoStats]):
     main_vs = sorted(main_vs, key=lambda s: s.date)
 
     data = np.array([s.date for s in main_vs])
@@ -189,9 +189,9 @@ def get_vs_eval_df(main_vs: [VideoStats], summary_vs: [VideoStats]):
     df = pd.DataFrame(data=data,
                       columns=['date', 'main_video',
                                'dur (mm:ss)', 'n_frames', 'n_segments',
-                               'n_frames_ru', 'n_frames_ru_perc', 'sec_ru',
-                               'n_seg_ru', 'n_seg_ru_perc', 'n_summaries', 'max_n_frames_summary',
-                               'max_n_frames_ru', 'sum_ss_ru', 'max_n_seg_summary',
-                               'max_n_seg_ru'])
+                               'n_frames_ru', 'n_frames_ru_perc', 'seconds_ru',
+                               'n_segments_ru', 'n_segments_ru_perc', 'n_summaries', 'max_n_frames_summary',
+                               'max_n_frames_ru', 'sum_ss_ru', 'max_n_segments_summary',
+                               'max_n_segments_ru'])
 
     return df
