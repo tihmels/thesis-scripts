@@ -28,7 +28,7 @@ def min_frame_set_hash_distance(main_frames: [Image], sum_frames: [Image]):
     return min([frame_hash_distance(f1, f2) for f1, f2 in itertools.product(main_frames, sum_frames)])
 
 
-@lru_cache(maxsize=1024)
+@lru_cache(maxsize=2048)
 def get_image_cached(file):
     return get_image(file)
 
@@ -114,6 +114,7 @@ def process_videos(date: str, videos: [VideoData], cutoff: int, skip_existing=Fa
         main_video_stats.save_as_csv(csv_dir, "co" + str(cutoff))
         [summary.save_as_csv(csv_dir, "co" + str(cutoff)) for summary in summary_video_stats]
 
+    print(get_image_cached.cache_info())
     get_image_cached.cache_clear()
 
     return main_video_stats, summary_video_stats
