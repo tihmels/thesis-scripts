@@ -182,5 +182,5 @@ if __name__ == "__main__":
             bin_seg_vec = get_binary_segment_vector(main_vs)
             np.savetxt(str(Path(videos[0].path.parent, "SEGVEC.txt")), bin_seg_vec, fmt='%i')
 
-            output_path = Path(Path.home(), "TV", "statistics.csv")
+            output_path = Path(Path.home(), "TV", "statistics-co" + str(args.co) + ".csv")
             df.to_csv(str(output_path), mode='a', header=not output_path.exists())

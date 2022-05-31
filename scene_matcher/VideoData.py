@@ -120,12 +120,12 @@ class VideoStats:
         n_reused_frames = self.n_frames_reused
 
         print(f'Statistics for {self.id} ({self.type})')
-        print("-------------------------------------------------")
+        print("----------------------------------------------------")
         print(
             f'{n_reused_segments}/{n_segments} reused segments ({round(self.segments_reused_ratio * 100, 2)} %)')
         print(
             f'{n_reused_frames}/{total_frames} reused frames ({round(self.frames_reused_ratio * 100, 2)} %, {n_reused_frames / 25} sec)')
-        print("-------------------------------------------------\n")
+        print("----------------------------------------------------\n")
 
     def save_as_csv(self, dir_path: Path, suffix=""):
         if suffix:
