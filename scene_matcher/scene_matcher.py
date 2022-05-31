@@ -139,6 +139,10 @@ def check_requirements(video: Path):
     return True
 
 
+def get_binary_segment_vector(vs: VideoStats):
+    return np.where(vs.matched_segments == 0, 0, 1)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
@@ -174,6 +178,9 @@ if __name__ == "__main__":
             main_vs, sum_vs = result
             df = get_vs_evaluation_df([main_vs], sum_vs)
             df.index += idx
+
+            bin_seg_vec = get_binary_segment_vector(main_vs)
+            np.savetxt(str(Path(videos[0].path.parent, "SEGVEC.txt")), bin_seg_vec, fmt='%i')
 
             output_path = Path(Path.home(), "TV", "statistics.csv")
             df.to_csv(str(output_path), mode='a', header=not output_path.exists())
