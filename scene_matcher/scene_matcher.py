@@ -17,18 +17,15 @@ from VideoData import VideoData, VideoStats, VideoType, get_vs_evaluation_df
 TV_FILENAME_RE = r'TV-(\d{8})-(\d{4})-(\d{4}).webs.h264.mp4'
 
 
-def frame_similarity_detection(frame1: Image, frame2: Image, cutoff):
-    hash1 = imagehash.dhash(frame1)
-    hash2 = imagehash.dhash(frame2)
+def frame_hash_distance(f1: Image, f2: Image):
+    hash1 = imagehash.dhash(f1)
+    hash2 = imagehash.dhash(f2)
 
-    return hash1 - hash2 < cutoff
+    return hash1 - hash2
 
 
-def compare_framesets(frames1: [Image], frames2: [Image], cutoff=8):
-    for f1, f2 in itertools.product(frames1, frames2):
-        if frame_similarity_detection(f1, f2, cutoff):
-            return True
-    return False
+def min_frame_set_hash_distance(main_frames: [Image], sum_frames: [Image]):
+    return min([frame_hash_distance(f1, f2) for f1, f2 in itertools.product(main_frames, sum_frames)])
 
 
 @lru_cache(maxsize=1024)
@@ -51,7 +48,7 @@ def was_processed(video: VideoData):
     return False
 
 
-def process_videos(date: str, videos: [VideoData], skip_existing=False, to_csv=False):
+def process_videos(date: str, videos: [VideoData], cutoff: int, skip_existing=False, to_csv=False):
     if len(videos) < 2:
         print(f'Not enough video data available for {date}')
         return
@@ -66,39 +63,40 @@ def process_videos(date: str, videos: [VideoData], skip_existing=False, to_csv=F
     main_segment_vector = np.zeros(main_video.n_segments)
     sum_segment_dict = {summary.id: np.zeros(summary.n_segments) for summary in summary_videos}
 
-    cutoff = 12
-
     print(
         f'Comparing {len(main_video.segments)} segments of {main_video.id}'
         f' with segments of {len(summary_videos)} summary videos ... \n')
 
     for seg_idx, (seg_start_idx, seg_end_idx) in enumerate(main_video.segments):
-        print(
-            f'[S{seg_idx + 1}/{main_video.n_segments}]: F{seg_start_idx} - F{seg_end_idx} ({seg_end_idx - seg_start_idx + 1} frames)',
-            end="\t")
 
-        main_frame_indices = np.round(np.linspace(seg_start_idx + 3, seg_end_idx - 3, 5)).astype(int)
+        print('{:<45s}'.format(
+            "[S{}/{}]: F{} - F{} ({} frames)".format(seg_idx + 1, main_video.n_segments, seg_start_idx, seg_end_idx,
+                                                     seg_end_idx - seg_start_idx + 1)), end="")
+
+        main_frame_indices = np.round(np.linspace(seg_start_idx + 5, seg_end_idx - 5, 5)).astype(int)
         main_segment_frames = [get_image(frame) for frame in
                                np.array(main_video.frames)[main_frame_indices]]
 
         for summary in summary_videos:
-            match = False
+
+            segment_distances = np.zeros(summary.n_segments)
 
             for sum_seg_idx, (sum_seg_start_idx, sum_seg_end_idx) in enumerate(summary.segments):
-
-                sum_frame_indices = np.round(np.linspace(sum_seg_start_idx + 3, sum_seg_end_idx - 3, 3)).astype(int)
+                sum_frame_indices = np.round(np.linspace(sum_seg_start_idx + 5, sum_seg_end_idx - 5, 3)).astype(int)
                 sum_segment_frames = [get_image_cached(frame) for frame in np.array(summary.frames)[sum_frame_indices]]
 
-                if compare_framesets(main_segment_frames, sum_segment_frames, cutoff):
-                    main_segment_vector[seg_idx] += 1
-                    match = True
+                min_frame_dist = min_frame_set_hash_distance(main_segment_frames, sum_segment_frames)
+                segment_distances[sum_seg_idx] = min_frame_dist
 
-                    if sum_segment_dict[summary.id][sum_seg_idx] == 0:
-                        sum_segment_dict[summary.id][sum_seg_idx] = seg_idx + 1
+            if any(segment_distances < cutoff):
+                main_segment_vector[seg_idx] += 1
 
-                    break
+                min_dist_idx = np.argmin(segment_distances)
+                sum_segment_dict[summary.id][min_dist_idx] = seg_idx + 1
+                print("x", end="")
+            else:
+                print(".", end="")
 
-            print("x", end="") if match else print(".", end="")
         print()
 
         [f.close() for f in main_segment_frames]
@@ -147,6 +145,7 @@ if __name__ == "__main__":
     parser.add_argument('dirs', type=lambda p: Path(p).resolve(strict=True), nargs='+')
     parser.add_argument('-r', '--recursive', action='store_true', help="search recursively for TV-*.mp4 files")
     parser.add_argument('-s', '--skip', action='store_true', help="skip scene matching if already exist")
+    parser.add_argument('--co', type=int, choices=range(1, 30), default=12, help="set hash similarity cutoff")
     parser.add_argument('--csv', action='store_true', help="store scene matching results in a csv file")
     args = parser.parse_args()
 
@@ -169,7 +168,7 @@ if __name__ == "__main__":
         videos = [VideoData(file) for file in files]
 
         print(f'\n[{idx + 1}/{len(videos_by_date)}] {date}')
-        result = process_videos(date, videos, args.skip, args.csv)
+        result = process_videos(date, videos, args.co, args.skip, args.csv)
 
         if result:
             main_vs, sum_vs = result

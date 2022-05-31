@@ -112,9 +112,9 @@ if __name__ == "__main__":
     print(f'\nVideo Segmentation ({len(frame_dirs)} videos)')
 
 
-    def callback_handler(result):
-        if result is not None and isinstance(result, Path):
-            print(f'{result.relative_to(result.parent.parent)} done')
+    def callback_handler(res):
+        if res is not None and isinstance(res, Path):
+            print(f'{res.relative_to(res.parent.parent)} done')
 
 
     if args.parallel:

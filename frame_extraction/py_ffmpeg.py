@@ -67,15 +67,21 @@ if __name__ == "__main__":
     if len(tv_files) > 1:
         print(f'Frame extraction for {len(tv_files)} videos ...')
 
+
+    def callback_handler(res):
+        if res is not None and isinstance(res, Path):
+            print(f'{result.name} done')
+
+
     if args.parallel:
         with mp.Pool(os.cpu_count()) as pool:
             [pool.apply_async(extract_frames_from_video, (file,),
                               kwds={'fps': args.fps, 'overwrite': args.overwrite, 'prune': args.prune},
-                              callback=lambda f: print(f'{f.name} done')) for file in tv_files]
+                              callback=callback_handler) for file in tv_files]
             pool.close()
             pool.join()
 
     else:
         for file in tv_files:
-            extract_frames_from_video(file, args.fps, args.overwrite, args.prune, args.skip)
-            print(f'{file.name} done')
+            result = extract_frames_from_video(file, args.fps, args.overwrite, args.prune, args.skip)
+            callback_handler(result)
