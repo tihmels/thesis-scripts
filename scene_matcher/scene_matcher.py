@@ -1,17 +1,18 @@
 #!/Users/tihmels/Scripts/thesis-scripts/conda-env/bin/python -u
 
 import argparse
-import imagehash
 import itertools
-import numpy as np
 import re
-from PIL import Image
 from datetime import datetime
 from functools import lru_cache
 from itertools import groupby
 from pathlib import Path
 
-from VideoData import VideoData, VideoStats, VideoType, get_vs_evaluation_df
+import imagehash
+import numpy as np
+from PIL import Image
+
+from VideoData import VideoData, VideoType, VideoStats, get_vs_evaluation_df
 
 TV_FILENAME_RE = r'TV-(\d{8})-(\d{4})-(\d{4}).webs.h264.mp4'
 
@@ -190,7 +191,8 @@ if __name__ == "__main__":
             df.index += idx
 
             bin_seg_vec = get_binary_segment_vector(main_vs)
-            np.savetxt(str(Path(videos[0].path.parent, "SEGVEC.txt")), bin_seg_vec, fmt='%i')
+            filename = f'{main_vs.id}-BINSEGVEC.txt'
+            np.savetxt(str(Path(main_vs.path.parent, filename)), bin_seg_vec, fmt='%i')
 
             output_path = Path(Path.home(), "TV", "statistics-co" + str(args.co) + ".csv")
             df.to_csv(str(output_path), mode='a', header=not output_path.exists())

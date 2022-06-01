@@ -60,6 +60,7 @@ class VideoType(Enum):
 class VideoStats:
     def __init__(self, vd: VideoData, vt: VideoType, segment_vector: np.array):
         self.id = vd.id
+        self.path = vd.path
         self.date = vd.date.strftime("%Y%m%d")
         self.type = vt.name
 
