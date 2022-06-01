@@ -1,16 +1,15 @@
 #!/Users/tihmels/Scripts/thesis-scripts/conda-env/bin/python -u
 
 import argparse
+import imagehash
 import itertools
+import numpy as np
 import re
+from PIL import Image
 from datetime import datetime
 from functools import lru_cache
 from itertools import groupby
 from pathlib import Path
-
-import imagehash
-import numpy as np
-from PIL import Image
 
 from VideoData import VideoData, VideoStats, VideoType, get_vs_evaluation_df
 
@@ -28,7 +27,7 @@ def min_frame_set_hash_distance(main_frames: [Image], sum_frames: [Image]):
     return min([frame_hash_distance(f1, f2) for f1, f2 in itertools.product(main_frames, sum_frames)])
 
 
-@lru_cache(maxsize=2048)
+@lru_cache(maxsize=1024)
 def get_image_cached(file):
     return get_image(file)
 
@@ -61,7 +60,8 @@ def process_videos(date: str, videos: [VideoData], cutoff: int, skip_existing=Fa
     summary_videos = sorted(list(filter(lambda v: v is not main_video, videos)), key=lambda s: s.date)
 
     main_segment_vector = np.zeros(main_video.n_segments)
-    sum_segment_dict = {summary.id: np.zeros(summary.n_segments) for summary in summary_videos}
+    sum_segment_dict = {summary.id: (np.zeros(summary.n_segments), np.full(summary.n_segments, np.inf)) for summary in
+                        summary_videos}
 
     print(
         f'Comparing {len(main_video.segments)} segments of {main_video.id}'
@@ -79,7 +79,7 @@ def process_videos(date: str, videos: [VideoData], cutoff: int, skip_existing=Fa
 
         for summary in summary_videos:
 
-            segment_distances = np.zeros(summary.n_segments)
+            segment_distances = np.full(summary.n_segments, np.inf)
 
             for sum_seg_idx, (sum_seg_start_idx, sum_seg_end_idx) in enumerate(summary.segments):
                 sum_frame_indices = np.round(np.linspace(sum_seg_start_idx + 5, sum_seg_end_idx - 5, 3)).astype(int)
@@ -91,8 +91,17 @@ def process_videos(date: str, videos: [VideoData], cutoff: int, skip_existing=Fa
             if any(segment_distances < cutoff):
                 main_segment_vector[seg_idx] += 1
 
-                min_dist_idx = np.argmin(segment_distances)
-                sum_segment_dict[summary.id][min_dist_idx] = seg_idx + 1
+                seg_min_dist_idx = np.argmin(segment_distances)
+                seg_min_dist = segment_distances[seg_min_dist_idx]
+
+                sum_seg_matched, sum_seg_dist = sum_segment_dict[summary.id]
+
+                if sum_seg_matched[seg_min_dist_idx] == 0 or sum_seg_dist[seg_min_dist_idx] > seg_min_dist:
+                    sum_seg_matched[seg_min_dist_idx] = seg_idx + 1
+                    sum_seg_dist[seg_min_dist_idx] = seg_min_dist
+
+                sum_segment_dict[summary.id] = (sum_seg_matched, sum_seg_dist)
+
                 print("x", end="")
             else:
                 print(".", end="")
@@ -102,8 +111,8 @@ def process_videos(date: str, videos: [VideoData], cutoff: int, skip_existing=Fa
         [f.close() for f in main_segment_frames]
 
     main_video_stats = VideoStats(main_video, VideoType.FULL, main_segment_vector)
-    summary_video_stats = [VideoStats(video, VideoType.SUM, sum_segment_dict[video.id]) for video in
-                           summary_videos]
+    summary_video_stats = [VideoStats(summary_video, VideoType.SUM, sum_segment_dict[summary_video.id][0]) for
+                           summary_video in summary_videos]
 
     print()
     main_video_stats.print()
