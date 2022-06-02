@@ -66,7 +66,13 @@ class VideoStats:
 
         data = np.array([*vd.segments], dtype=np.int32)
         data = np.column_stack((data, np.array([(s2 - s1 + 1) for s1, s2 in vd.segments], dtype=np.int32)))
-        data = np.column_stack((data, segment_vector.astype(np.int32)))
+
+        if vt == VideoType.FULL:
+            data = np.column_stack((data, segment_vector.astype(np.int32)))
+        else:
+            sum_seg_matched, sum_seg_dist = segment_vector
+            data = np.column_stack((data, sum_seg_matched.astype(int)))
+            data = np.column_stack((data, np.nan_to_num(sum_seg_dist, posinf=-1, neginf=-1).astype(int)))
 
         start_frame_paths = np.array(vd.frames)[[seg[0] for seg in vd.segments]]
         end_frame_paths = np.array(vd.frames)[[seg[1] for seg in vd.segments]]
@@ -78,8 +84,15 @@ class VideoStats:
         data = np.column_stack((data, center_frame_paths))
         data = np.column_stack((data, end_frame_paths))
 
-        self.df = pd.DataFrame(data=data,
-                               columns=['seg_start', 'seg_end', 'n_frames', 'match', 's_frame', 'c_frame', 'e_frame'])
+        if vt == VideoType.FULL:
+            self.df = pd.DataFrame(data=data,
+                                   columns=['seg_start', 'seg_end', 'n_frames', 'match', 's_frame', 'c_frame', 'e_frame'])
+        else:
+            self.df = pd.DataFrame(data=data,
+                                   columns=['seg_start', 'seg_end', 'n_frames', 'match', 'diff', 's_frame', 'c_frame', 'e_frame'])
+
+
+
 
     @property
     def n_segments(self):

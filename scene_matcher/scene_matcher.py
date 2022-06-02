@@ -112,7 +112,7 @@ def process_videos(date: str, videos: [VideoData], cutoff: int, skip_existing=Fa
         [f.close() for f in main_segment_frames]
 
     main_video_stats = VideoStats(main_video, VideoType.FULL, main_segment_vector)
-    summary_video_stats = [VideoStats(summary_video, VideoType.SUM, sum_segment_dict[summary_video.id][0]) for
+    summary_video_stats = [VideoStats(summary_video, VideoType.SUM, sum_segment_dict[summary_video.id]) for
                            summary_video in summary_videos]
 
     print()
@@ -160,7 +160,7 @@ if __name__ == "__main__":
     parser.add_argument('dirs', type=lambda p: Path(p).resolve(strict=True), nargs='+')
     parser.add_argument('-r', '--recursive', action='store_true', help="search recursively for TV-*.mp4 files")
     parser.add_argument('-s', '--skip', action='store_true', help="skip scene matching if already exist")
-    parser.add_argument('--co', type=int, choices=range(1, 30), default=12, help="set hash similarity cutoff")
+    parser.add_argument('--co', type=int, choices=range(1, 30), default=10, help="set hash similarity cutoff")
     parser.add_argument('--csv', action='store_true', help="store scene matching results in a csv file")
     args = parser.parse_args()
 
