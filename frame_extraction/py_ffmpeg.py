@@ -12,7 +12,7 @@ import ffmpeg
 TV_FILENAME_RE = r'TV-(\d{8})-(\d{4})-(\d{4}).webs.h264.mp4'
 
 
-def extract_frames_from_video(video: Path, fps=0.0, extract_audio=False, resize=(224, 224), overwrite=False,
+def extract_frames_from_video(video: Path, fps=0.0, resize=(224, 224), overwrite=False,
                               prune=False,
                               skip_existing=False):
     match = re.match(TV_FILENAME_RE, video.name)
@@ -21,8 +21,7 @@ def extract_frames_from_video(video: Path, fps=0.0, extract_audio=False, resize=
         print(f'{video} does not match TV pattern. Skip ...')
         return
 
-    output_dir = Path(video.parent, match.group(2))
-    #  output_dir = Path(video.parent, video.name.split(".")[0])
+    output_dir = Path(video.parent, video.name.split(".")[0], "frames")
 
     if skip_existing and output_dir.exists() and len(list(output_dir.glob("frame_*.jpg"))) != 0:
         print(f'{video} skipped ...')
@@ -30,7 +29,7 @@ def extract_frames_from_video(video: Path, fps=0.0, extract_audio=False, resize=
     elif prune and output_dir.exists():
         shutil.rmtree(output_dir)
 
-    output_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     stream = ffmpeg.input(video.absolute())
 
@@ -42,13 +41,6 @@ def extract_frames_from_video(video: Path, fps=0.0, extract_audio=False, resize=
 
     stream = stream.output(f'{output_dir}/frame_%05d.jpg')
     ffmpeg.run(stream, overwrite_output=overwrite, quiet=True)
-
-    if extract_audio:
-        input = ffmpeg.input(video.absolute(), acodec='pcm_s16le', ac='2')
-        audio = input.audio
-
-        out = audio.output(f'{output_dir}/sound.wav')
-        ffmpeg.run(out)
 
     return video
 
@@ -91,7 +83,7 @@ if __name__ == "__main__":
     if args.parallel:
         with mp.Pool(os.cpu_count()) as pool:
             [pool.apply_async(extract_frames_from_video, (file,),
-                              kwds={'fps': args.fps, 'extract_audio': args.audio, 'overwrite': args.overwrite,
+                              kwds={'fps': args.fps, 'overwrite': args.overwrite,
                                     'prune': args.prune, 'resize': args.size},
                               callback=callback_handler) for file in tv_files]
             pool.close()
@@ -99,6 +91,6 @@ if __name__ == "__main__":
 
     else:
         for file in tv_files:
-            result = extract_frames_from_video(file, args.fps, args.audio, args.size, args.overwrite, args.prune,
+            result = extract_frames_from_video(file, args.fps, args.size, args.overwrite, args.prune,
                                                args.skip)
             callback_handler(result)
