@@ -24,7 +24,7 @@ def frame_hash_distance(f1: Image, f2: Image):
     return hash1 - hash2
 
 
-def min_frame_set_hash_distance(main_frames: [Image], sum_frames: [Image]):
+def min_frameset_hash_distance(main_frames: [Image], sum_frames: [Image]):
     return min([frame_hash_distance(f1, f2) for f1, f2 in itertools.product(main_frames, sum_frames)])
 
 
@@ -86,7 +86,7 @@ def process_videos(date: str, videos: [VideoData], cutoff: int, skip_existing=Fa
                 sum_frame_indices = np.round(np.linspace(sum_seg_start_idx + 5, sum_seg_end_idx - 5, 3)).astype(int)
                 sum_segment_frames = [get_image_cached(frame) for frame in np.array(summary.frames)[sum_frame_indices]]
 
-                min_frame_dist = min_frame_set_hash_distance(main_segment_frames, sum_segment_frames)
+                min_frame_dist = min_frameset_hash_distance(main_segment_frames, sum_segment_frames)
                 segment_distances[sum_seg_idx] = min_frame_dist
 
             if any(segment_distances < cutoff):

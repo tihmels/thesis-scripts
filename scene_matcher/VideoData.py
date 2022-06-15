@@ -86,13 +86,12 @@ class VideoStats:
 
         if vt == VideoType.FULL:
             self.df = pd.DataFrame(data=data,
-                                   columns=['seg_start', 'seg_end', 'n_frames', 'match', 's_frame', 'c_frame', 'e_frame'])
+                                   columns=['seg_start', 'seg_end', 'n_frames', 'match', 's_frame', 'c_frame',
+                                            'e_frame'])
         else:
             self.df = pd.DataFrame(data=data,
-                                   columns=['seg_start', 'seg_end', 'n_frames', 'match', 'diff', 's_frame', 'c_frame', 'e_frame'])
-
-
-
+                                   columns=['seg_start', 'seg_end', 'n_frames', 'match', 'conf', 's_frame', 'c_frame',
+                                            'e_frame'])
 
     @property
     def n_segments(self):

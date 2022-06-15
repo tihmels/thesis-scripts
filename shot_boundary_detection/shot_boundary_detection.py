@@ -1,4 +1,4 @@
-#!/Users/tihmels/Scripts/thesis-scripts/conda-env/bin/python
+#!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python
 
 import argparse
 import logging
@@ -12,6 +12,7 @@ import numpy as np
 from PIL import Image
 
 from transnetv2 import TransNetV2
+from utils.fs_utils import subdirs
 
 
 def set_tf_loglevel(level):
@@ -81,13 +82,6 @@ def check_requirements(path: Path, skip_existing=False):
         return False
 
     return True
-
-
-def subdirs(root: str):
-    sub_folders = [f.path for f in os.scandir(root) if f.is_dir()]
-    for dir_name in list(sub_folders):
-        sub_folders.extend(subdirs(dir_name))
-    return [Path(f) for f in sub_folders]
 
 
 def mute():
