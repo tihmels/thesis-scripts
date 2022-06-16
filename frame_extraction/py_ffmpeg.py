@@ -45,7 +45,7 @@ def check_requirements(path: Path, skip_existing):
     if skip_existing:
         frame_dir = get_frame_dir(path)
 
-        if frame_dir.is_dir() and len(list(frame_dir.glob("frame_*.jpg"))) != 0:
+        if frame_dir.is_dir() and len(list(frame_dir.glob("frame_*.jpg"))) > 0:
             return False
 
     return True
