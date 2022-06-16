@@ -13,8 +13,7 @@ import numpy as np
 from PIL import Image
 
 from VideoData import VideoData, VideoType, VideoStats, get_vs_evaluation_df
-
-TV_FILENAME_RE = r'TV-(\d{8})-(\d{4})-(\d{4}).webs.h264.mp4'
+from utils.constants import TV_FILENAME_RE
 
 
 def frame_hash_distance(f1: Image, f2: Image):

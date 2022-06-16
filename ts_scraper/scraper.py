@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import logging
 from os.path import exists
 
 import pyppeteer.connection
@@ -30,15 +31,18 @@ def process_page(page):
 
 async def main():
     browser = await pyppeteer.connect(
-        browserURL='http://localhost:9222', slowMo=5)
+        browserURL='http://localhost:9222', slowMo=5, logLevel=logging.INFO)
 
-    page = await browser.newPage()
+    pages = await browser.pages()
+    page = pages[-1]
+
     await page.setViewport({'height': 900, 'width': 1200})
 
     await page.goto(URL, {'waitUntil': 'networkidle0'})
 
-    for i in range(12):
-        await asyncio.wait([page.evaluate("""{window.scrollBy(0, 900);}""", force_expr=True), page.waitFor(500)])
+    for i in range(15):
+        await asyncio.wait(
+            [page.evaluate("""{window.scrollBy(0, 900);}"""), page.waitFor(500)])
 
     content = await page.content()
 
