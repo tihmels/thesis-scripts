@@ -7,6 +7,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from utils.fs_utils import get_date_time, get_frame_dir, get_shot_file
+
 TV_DATEFORMAT = '%Y%m%d'
 
 
@@ -14,10 +16,10 @@ class VideoData:
     def __init__(self, path: Path):
         self.id: str = path.stem
         self.path: Path = path
-        self.date: datetime = datetime.strptime(path.parent.name, TV_DATEFORMAT)
-        self.frame_dir: Path = Path(path.parent, path.name.split('-')[2])
+        self.date: datetime = get_date_time(path)
+        self.frame_dir: Path = get_frame_dir(path)
         self.frames: [Path] = sorted(self.frame_dir.glob('frame_*.jpg'))
-        self.segments: [(int, int)] = self.read_segments_from_file(Path(self.frame_dir, 'shots.txt'))
+        self.segments: [(int, int)] = self.read_segments_from_file(get_shot_file(path))
 
     @property
     def n_frames(self):
@@ -146,6 +148,10 @@ class VideoStats:
 
         csv_df = self.df.copy(deep=True)
         csv_df.index += 1
+
+        if not dir_path.exists():
+            dir_path.mkdir(parents=True)
+
         csv_df.to_csv(Path(dir_path, self.id + "-" + self.type + suffix + ".csv"))
 
 

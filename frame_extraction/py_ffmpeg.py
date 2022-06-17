@@ -63,7 +63,6 @@ if __name__ == "__main__":
     parser.add_argument('--size', type=lambda s: list(map(int, s.split('x'))))
     parser.add_argument('--parallel', action='store_true',
                         help="execute frame extraction using parallel multiprocessing")
-    parser.add_argument('--audio', action='store_true')
     args = parser.parse_args()
 
     videos = []

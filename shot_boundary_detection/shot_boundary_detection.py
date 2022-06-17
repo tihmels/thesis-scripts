@@ -69,7 +69,7 @@ def process_video(video: Path):
         return e
 
 
-def check_requirements(video: Path, skip_existing):
+def check_requirements(video: Path, skip_existing: bool):
     match = re.match(TV_FILENAME_RE, video.name)
 
     if match is None or not video.is_file():
@@ -82,7 +82,7 @@ def check_requirements(video: Path, skip_existing):
         return False
 
     if skip_existing and get_shot_file(video).exists():
-        print(f'{video} has already shots detected. Skip ...')
+        print(f'{video.name} has already shots detected. Skip ...')
         return False
 
     return True

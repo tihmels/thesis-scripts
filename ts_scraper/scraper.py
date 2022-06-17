@@ -31,7 +31,7 @@ def process_page(page):
 
 async def main():
     browser = await pyppeteer.connect(
-        browserURL='http://localhost:9222', slowMo=5, logLevel=logging.INFO)
+        browserURL='http://localhost:9222', slowMo=3, logLevel=logging.INFO)
 
     pages = await browser.pages()
     page = pages[-1]
@@ -40,21 +40,27 @@ async def main():
 
     await page.goto(URL, {'waitUntil': 'networkidle0'})
 
-    for i in range(15):
-        await asyncio.wait(
-            [page.evaluate("""{window.scrollBy(0, 900);}"""), page.waitFor(500)])
+    links = {}
 
-    content = await page.content()
+    for i in range(12):
+        await page.evaluate("""{window.scrollBy(0, 800);}""")
+        await page.waitFor(1000)
 
-    soup = BeautifulSoup(content, "html.parser")
+        soup = BeautifulSoup(await page.content(), "html.parser")
+        divs = soup.select('div[data-bb-id]')
+        for div in divs:
+            key = div['data-bb-id']
+            links[key] = div
 
-    divs = soup.select('div[data-bb-id]')
+        print(len(links.keys()))
 
-    links = [div.findChild("a", href=True)['href'] for div in divs]
+    links = [div.findChild("a")['href'] for div in links.values()]
+
+    print("Downloading {} videos".format(len(links)))
 
     for link in links:
         url = "https://www.ardmediathek.de" + link
-        await page.goto(url)
+        await page.goto(url, {'waitUntil': 'networkidle0'})
 
         await page.waitForSelector("video.ardplayer-mediacanvas")
         await page.waitForSelector("button.ardplayer-button-settings")
