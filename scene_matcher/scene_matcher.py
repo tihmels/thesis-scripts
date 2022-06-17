@@ -48,17 +48,16 @@ def was_processed(video: VideoData):
     return False
 
 
-def process_videos(date: str, videos: [VideoData], cutoff: int, skip_existing=False, to_csv=False):
-    if len(videos) < 2:
+def process_videos(date: str, main_video: VideoData, summary_videos: [VideoData], cutoff: int, skip_existing=False,
+                   to_csv=False):
+    if len(summary_videos) < 2:
         print(f'Not enough video data available for {date}')
         return
 
+    # TODO: fix was_processed
     if skip_existing and all(was_processed(video) for video in videos):
         print(f'All {len(videos)} videos for {date} already processed. Skip ... ')
         return
-
-    main_video = max(videos, key=lambda v: v.n_frames)
-    summary_videos = sorted(list(filter(lambda v: v is not main_video, videos)), key=lambda s: s.date)
 
     main_segment_vector = np.zeros(main_video.n_segments)
     sum_segment_dict = {summary.id: (np.zeros(summary.n_segments), np.full(summary.n_segments, np.inf)) for summary in
@@ -182,13 +181,14 @@ if __name__ == "__main__":
 
     for idx, (date, video) in enumerate(videos_by_date.items()):
 
-        (rangeStart, rangeEnd) = date - timedelta(hours=8), date + timedelta(hours=16)
-        summaries = [video for date, video in summaries_by_date.items() if rangeStart <= date <= rangeEnd]
+        main_video = VideoData(video)
 
-        videos = [VideoData(v) for v in [video] + summaries]
+        (rangeStart, rangeEnd) = date - timedelta(hours=8), date + timedelta(hours=16)
+        summary_videos = [VideoData(video) for date, video in summaries_by_date.items() if
+                          rangeStart <= date <= rangeEnd]
 
         print(f'\n[{idx + 1}/{len(videos_by_date)}] {date}')
-        result = process_videos(date, videos, args.cutoff, args.skip, args.csv)
+        result = process_videos(date, main_video, summary_videos, args.cutoff, args.skip, args.csv)
 
         if result:
             main_vs, sum_vs = result
