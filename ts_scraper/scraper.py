@@ -9,36 +9,38 @@ import pyppeteer.connection
 import requests
 from bs4 import BeautifulSoup
 
-URL = "https://www.ardmediathek.de/sendung/tagesschau-in-100-sekunden/Y3JpZDovL2Rhc2Vyc3RlLmRlL3RzMTAwcw"
-PATH = "/Users/tihmels/TS/ts100/"
+from utils.constants import TS_100_URL, SUMMARY_VIDEOS_PATH
 
 
 def process_page(page):
     soup = BeautifulSoup(page, "html.parser")
 
     video = soup.find('video').find('source')
-    url = video['src']
-    name = url.split('/')[-1]
+    url = video['src'].replace("webm", "webs")
+    filename = url.split('/')[-1]
 
     r = requests.get(url)
 
-    file = '{}/{}'.format(PATH, name)
+    file = '{}/{}'.format(SUMMARY_VIDEOS_PATH, filename)
 
     if not exists(file):
         with open(file, 'wb') as fd:
             fd.write(r.content)
+            return True
+
+    return False
 
 
 async def main():
     browser = await pyppeteer.connect(
-        browserURL='http://localhost:9222', slowMo=3, logLevel=logging.INFO)
+        browserURL='http://localhost:9222', slowMo=4, logLevel=logging.INFO)
 
     pages = await browser.pages()
     page = pages[-1]
 
     await page.setViewport({'height': 900, 'width': 1200})
 
-    await page.goto(URL, {'waitUntil': 'networkidle0'})
+    await page.goto(TS_100_URL, {'waitUntil': 'networkidle0'})
 
     links = {}
 
@@ -58,15 +60,23 @@ async def main():
 
     print("Downloading {} videos".format(len(links)))
 
-    for link in links:
+    links.reverse()
+
+    for idx, link in enumerate(links):
         url = "https://www.ardmediathek.de" + link
-        await page.goto(url, {'waitUntil': 'networkidle0'})
+
+        print("[{}] {} :".format(idx, link), end=" ")
+
+        await page.goto(url)
 
         await page.waitForSelector("video.ardplayer-mediacanvas")
         await page.waitForSelector("button.ardplayer-button-settings")
         await page.waitForSelector("source")
 
-        process_page(await page.content())
+        if process_page(await page.content()):
+            print("Downloaded")
+        else:
+            print("Skipped")
 
     await browser.close()
 

@@ -65,17 +65,17 @@ if __name__ == "__main__":
                         help="execute frame extraction using parallel multiprocessing")
     args = parser.parse_args()
 
-    videos = []
+    video_files = []
 
     for file in args.files:
         if file.is_file() and check_requirements(file, args.skip):
-            videos.append(file)
+            video_files.append(file)
         elif file.is_dir():
-            [videos.append(f) for f in sorted(file.glob('*.mp4')) if check_requirements(f, args.skip)]
+            [video_files.append(f) for f in sorted(file.glob('*.mp4')) if check_requirements(f, args.skip)]
 
-    assert len(videos) != 0
+    assert len(video_files) != 0
 
-    print(f'Frame extraction for {len(videos)} videos ...')
+    print(f'Frame extraction for {len(video_files)} videos ...')
 
 
     def callback_handler(res):
@@ -88,11 +88,11 @@ if __name__ == "__main__":
             [pool.apply_async(extract_frames_from_video, (video,),
                               kwds={'fps': args.fps, 'overwrite': args.overwrite,
                                     'prune': args.prune, 'resize': args.size},
-                              callback=callback_handler) for video in videos]
+                              callback=callback_handler) for video in video_files]
             pool.close()
             pool.join()
 
     else:
-        for video in videos:
+        for video in video_files:
             result = extract_frames_from_video(video, args.fps, args.size, args.overwrite, args.prune)
             callback_handler(result)

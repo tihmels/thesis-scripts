@@ -101,7 +101,7 @@ if __name__ == "__main__":
     parser.add_argument('--parallel', action='store_true')
     args = parser.parse_args()
 
-    video_files = [file for file in args.dir.glob('*.mp4') if check_requirements(file, args.skip)]
+    video_files = [file for file in sorted(args.dir.glob('*.mp4')) if check_requirements(file, args.skip)]
 
     assert len(video_files) > 0
 

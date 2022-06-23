@@ -13,8 +13,8 @@ from PIL import Image
 from PIL.Image import Resampling
 
 from VideoData import VideoData, VideoType, VideoStats, get_vs_evaluation_df
-from utils.constants import TV_FILENAME_RE, MAIN_VIDEOS_PATH
-from utils.fs_utils import get_frame_dir, get_shot_file, get_date_time, get_summary_videos, get_data_dir
+from utils.constants import TV_FILENAME_RE, TS_PATH
+from utils.fs_utils import get_frame_dir, get_shot_file, get_date_time, get_summary_videos, get_data_dir, get_sm_dir
 
 
 def frame_hash_distance(f1: Image, f2: Image):
@@ -28,7 +28,7 @@ def min_frameset_hash_distance(main_frames: [Image], sum_frames: [Image]):
     return min([frame_hash_distance(f1, f2) for f1, f2 in itertools.product(main_frames, sum_frames)])
 
 
-@lru_cache(maxsize=1024)
+@lru_cache(maxsize=2048)
 def get_image_cached(file):
     return get_image(file)
 
@@ -37,12 +37,12 @@ def get_image(file):
     return Image.open(str(file)).convert('L').resize((9, 8), Resampling.LANCZOS)
 
 
-def was_processed(video: VideoData):
+def was_processed(path: Path, video: VideoData):
     date, timecode = video.date_str, video.timecode
     pattern = re.compile(r"^TV-" + re.escape(date) + r"-" + re.escape(timecode) + r"-\S*.csv$")
 
-    for file in video.path.parent.iterdir():
-        if file.is_file() and pattern.match(file.name):
+    for f in path.iterdir():
+        if f.is_file() and pattern.match(f.name):
             return True
 
     return False
@@ -50,13 +50,11 @@ def was_processed(video: VideoData):
 
 def process_videos(date: str, main_video: VideoData, summary_videos: [VideoData], cutoff: int, skip_existing=False,
                    to_csv=False):
-    if len(summary_videos) < 2:
-        print(f'Not enough video data available for {date}')
-        return
+    sm_dir = get_sm_dir(main_video.path)
 
-    # TODO: fix was_processed
-    if skip_existing and all(was_processed(video) for video in videos):
-        print(f'All {len(videos)} videos for {date} already processed. Skip ... ')
+    if skip_existing and sm_dir.exists() and all(
+            was_processed(sm_dir, video) for video in summary_videos):
+        print(f'All videos for {date} already processed. Skip ... ')
         return
 
     main_segment_vector = np.zeros(main_video.n_segments)
@@ -119,7 +117,7 @@ def process_videos(date: str, main_video: VideoData, summary_videos: [VideoData]
     [s.print() for s in summary_video_stats]
 
     if to_csv:
-        csv_dir = Path(get_data_dir(main_video.path), "sm")
+        csv_dir = get_sm_dir(main_video.path)
         main_video_stats.save_as_csv(csv_dir, "co" + str(cutoff))
         [summary.save_as_csv(csv_dir, "co" + str(cutoff)) for summary in summary_video_stats]
 
@@ -168,36 +166,38 @@ if __name__ == "__main__":
         if file.is_file() and check_requirements(file):
             video_files.append(file)
         elif file.is_dir():
-            video_files.extend([video for video in sorted(file.glob('*.mp4')) if check_requirements(video)])
+            video_files.extend([video for video in file.glob('*.mp4') if check_requirements(video)])
 
     assert len(video_files) > 0, "No TV-*.mp4 files could be found in " + str(args.dirs)
 
-    video_files.sort(key=get_date_time)
+    videos_by_date = {get_date_time(video): video for video in sorted(video_files)}
 
-    videos_by_date = {get_date_time(video): video for video in video_files}
-
-    summary_videos = [video for video in get_summary_videos() if check_requirements(video)]
+    summary_videos = [video for video in sorted(get_summary_videos()) if check_requirements(video)]
     summaries_by_date = {get_date_time(video): video for video in summary_videos}
 
     for idx, (date, video) in enumerate(videos_by_date.items()):
 
-        main_video = VideoData(video)
+        main_video_data = VideoData(video)
 
-        (rangeStart, rangeEnd) = date - timedelta(hours=8), date + timedelta(hours=16)
-        summary_videos = [VideoData(video) for date, video in summaries_by_date.items() if
-                          rangeStart <= date <= rangeEnd]
+        (rangeStart, rangeEnd) = date - timedelta(hours=4), date + timedelta(hours=20)
+        rangeStart = rangeStart.replace(second=0, microsecond=0, minute=0)
+        rangeEnd = rangeEnd.replace(second=0, microsecond=0, minute=0, hour=rangeEnd.hour + 1)
 
-        print(f'\n[{idx + 1}/{len(videos_by_date)}] {date}')
-        result = process_videos(date, main_video, summary_videos, args.cutoff, args.skip, args.csv)
+        summary_videos_data = [VideoData(video) for date, video in summaries_by_date.items() if
+                               rangeStart <= date <= rangeEnd]
+
+        print(
+            f'\n[{idx + 1}/{len(videos_by_date)}] {date.strftime("%Y-%m-%d")} {rangeStart.strftime("%H:%M")} < {date.strftime("%H:%M")} < {rangeEnd.strftime("%H:%M")}')
+        result = process_videos(date, main_video_data, summary_videos_data, args.cutoff, args.skip, args.csv)
 
         if result:
             main_vs, sum_vs = result
-            df = get_vs_evaluation_df([main_vs], sum_vs)
+            df = get_vs_evaluation_df(main_vs, sum_vs)
             df.index += idx
 
             bin_seg_vec = get_binary_segment_vector(main_vs)
-            filename = f'{main_vs.id}-BINSEGVEC.txt'
+            filename = f'SEGVEC.txt'
             np.savetxt(str(Path(get_data_dir(video), filename)), bin_seg_vec, fmt='%i')
 
-            output_file = Path(MAIN_VIDEOS_PATH, "statistics-co" + str(args.cutoff) + ".csv")
+            output_file = Path(TS_PATH, "statistics-co" + str(args.cutoff) + ".csv")
             df.to_csv(str(output_file), mode='a', header=not output_file.exists())
