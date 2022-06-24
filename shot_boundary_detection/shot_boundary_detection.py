@@ -13,19 +13,7 @@ from PIL import Image
 
 from transnetv2 import TransNetV2
 from utils.constants import TV_FILENAME_RE
-from utils.fs_utils import get_frame_dir, get_shot_file, get_data_dir
-
-
-def set_tf_loglevel(level):
-    if level >= logging.FATAL:
-        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    if level >= logging.ERROR:
-        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-    if level >= logging.WARNING:
-        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-    else:
-        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'
-    logging.getLogger('tensorflow').setLevel(level)
+from utils.fs_utils import get_frame_dir, get_shot_file, get_data_dir, set_tf_loglevel
 
 
 def get_frames_from_dir(directory: Path, mode: str = 'RGB', size: (int, int) = (48, 27)):
@@ -49,7 +37,6 @@ def shot_transition_detection(frames):
 
 
 def process_video(video: Path):
-
     frame_dir = get_frame_dir(video)
 
     try:
@@ -107,9 +94,10 @@ if __name__ == "__main__":
 
     print(f'\nVideo Segmentation ({len(video_files)} videos)')
 
+
     def callback_handler(res):
         if res is not None and isinstance(res, Path):
-            print(f'{res.relative_to(res.parent.parent)} done\n')
+            print(f'{res.relative_to(res.parent.parent)} done')
 
 
     if args.parallel:

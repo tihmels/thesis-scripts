@@ -6,7 +6,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from utils.fs_utils import get_date_time, get_frame_dir, get_shot_file, read_segments_from_file
+from utils.fs_utils import get_date_time, get_frame_dir, get_shot_file, read_segments_from_file, get_kf_dir, \
+    get_audio_dir
 
 TV_DATEFORMAT = '%Y%m%d'
 
@@ -17,7 +18,10 @@ class VideoData:
         self.path: Path = path
         self.date: datetime = get_date_time(path)
         self.frame_dir: Path = get_frame_dir(path)
+        self.kf_dir: Path = get_kf_dir(path)
+        self.audio_dir: Path = get_audio_dir(path)
         self.frames: [Path] = sorted(self.frame_dir.glob('frame_*.jpg'))
+        self.kfs: [Path] = sorted(self.kf_dir.glob('shot_*.jpg'))
         self.segments: [(int, int)] = read_segments_from_file(get_shot_file(path))
 
     @property

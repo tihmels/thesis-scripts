@@ -6,22 +6,17 @@ from pathlib import Path
 from utils.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE
 
 
-def read_segments_from_file(file):
-    shots = []
-
-    file = open(file, 'r')
-    for line in file.readlines():
-        first_index, last_index = [int(x.strip(' ')) for x in line.split(' ')]
-        shots.append((first_index, last_index))
-
-    return shots
+def get_audio_dir(video: Path):
+    return Path(get_data_dir(video), "audio")
 
 
 def get_sm_dir(video: Path):
     return Path(get_data_dir(video), "sm")
 
+
 def get_kf_dir(video: Path):
     return Path(get_data_dir(video), "kfs")
+
 
 def get_date_time(video: Path):
     date, time = video.name.split("-")[1:3]
@@ -44,8 +39,31 @@ def get_summary_videos():
     return [file for file in Path(SUMMARY_VIDEOS_PATH).glob("*.mp4") if re.match(TV_FILENAME_RE, file.name)]
 
 
+def read_segments_from_file(file):
+    shots = []
+
+    file = open(file, 'r')
+    for line in file.readlines():
+        first_index, last_index = [int(x.strip(' ')) for x in line.split(' ')]
+        shots.append((first_index, last_index))
+
+    return shots
+
+
 def subdirs(root: str):
     sub_folders = [f.path for f in os.scandir(root) if f.is_dir()]
     for dir_name in list(sub_folders):
         sub_folders.extend(subdirs(dir_name))
     return [Path(f) for f in sub_folders] + [Path(root)]
+
+
+def set_tf_loglevel(level):
+    if level >= logging.FATAL:
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    if level >= logging.ERROR:
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+    if level >= logging.WARNING:
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+    else:
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'
+    logging.getLogger('tensorflow').setLevel(level)
