@@ -44,7 +44,7 @@ class VideoData:
         return Path(self.keyframe_dir, "shot_" + str(idx) + ".jpg")
 
     def __str__(self):
-        return self.id
+        return str(self.path.relative_to(self.path.parent.parent))
 
 
 class VideoType(Enum):

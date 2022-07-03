@@ -1,4 +1,4 @@
-#!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python
+#!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
 
 import argparse
 import logging
@@ -11,15 +11,13 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from VideoData import VideoData
 from transnetv2 import TransNetV2
 from utils.constants import TV_FILENAME_RE
 from utils.fs_utils import get_frame_dir, get_shot_file, get_data_dir, set_tf_loglevel
 
 
 def get_frames_from_dir(directory: Path, mode: str = 'RGB', size: (int, int) = (48, 27)):
-    assert directory.is_dir(), f'{directory} is not a directory'
-    assert len(list(directory.glob('frame_*.jpg'))) > 0, f'{directory} does not contain any frame_*.jpg files'
-
     frames = sorted(directory.glob('frame_*.jpg'))
     return [Image.open(f).convert(mode).resize(size) for f in frames]
 
@@ -36,13 +34,11 @@ def shot_transition_detection(frames):
     return predictions, scenes, img
 
 
-def process_video(video: Path):
-    frame_dir = get_frame_dir(video)
-
+def process_video(vd: VideoData):
     try:
 
-        frames = get_frames_from_dir(frame_dir)
-        _, segments, img = shot_transition_detection(np.array([np.asarray(img) for img in frames]))
+        frames = get_frames_from_dir(vd.frame_dir)
+        _, segments, img = shot_transition_detection(np.array([np.array(img) for img in frames]))
 
         segments = segments[segments[:, 1] - segments[:, 0] > 10]
 
@@ -52,7 +48,6 @@ def process_video(video: Path):
         return video
 
     except Exception as e:
-        print(e)
         return e
 
 
@@ -92,7 +87,7 @@ if __name__ == "__main__":
 
     assert len(video_files) > 0
 
-    print(f'\nVideo Segmentation ({len(video_files)} videos)')
+    print(f'\nVideo Segmentation ({len(video_files)} videos)\n')
 
 
     def callback_handler(res):
@@ -103,12 +98,14 @@ if __name__ == "__main__":
     if args.parallel:
 
         with mp.Pool(os.cpu_count(), initializer=mute) as pool:
-            [pool.apply_async(process_video, (video,), callback=callback_handler) for video in video_files]
+            [pool.apply_async(process_video, (VideoData(video),), callback=callback_handler) for video in video_files]
 
             pool.close()
             pool.join()
 
     else:
-        for video in video_files:
-            result = process_video(video)
-            callback_handler(result)
+        for idx, video in enumerate(video_files):
+            vd = VideoData(video)
+            print(f'[{idx + 1}/{len(video_files)}] {vd}')
+            result = process_video(vd)
+            print()

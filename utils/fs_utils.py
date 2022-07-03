@@ -40,15 +40,18 @@ def get_summary_videos():
     return [file for file in Path(SUMMARY_VIDEOS_PATH).glob("*.mp4") if re.match(TV_FILENAME_RE, file.name)]
 
 
-def read_segments_from_file(file):
+def read_segments_from_file(file: Path):
     shots = []
 
-    file = open(file, 'r')
-    for line in file.readlines():
-        first_index, last_index = [int(x.strip(' ')) for x in line.split(' ')]
-        shots.append((first_index, last_index))
+    if file.exists():
 
-    return shots
+        file = open(file, 'r')
+        for line in file.readlines():
+            first_index, last_index = [int(x.strip(' ')) for x in line.split(' ')]
+            shots.append((first_index, last_index))
+        return shots
+    else:
+        return None
 
 
 def subdirs(root: str):
