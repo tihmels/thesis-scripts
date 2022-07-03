@@ -2,95 +2,59 @@
 
 import argparse
 import re
+import shutil
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
+from scipy import ndimage
 
 from VideoData import VideoData
 from utils.constants import TV_FILENAME_RE
-from utils.fs_utils import get_frame_dir, get_shot_file, get_date_time, get_kf_dir, read_segments_from_file
+from utils.fs_utils import get_frame_dir, get_shot_file, get_date_time, get_kf_dir, read_segments_from_file, \
+    print_progress_bar
 
 
-def convolution(image, kernel, padding=0, strides=1):
-    kernel = np.flipud(np.fliplr(kernel))
-
-    kernel_shape_x, kernel_shape_y = kernel.shape[0], kernel.shape[1]
-    img_shape_x, img_shape_y = image.shape[0], image.shape[1]
-
-    output_x = int(((img_shape_x - kernel_shape_x + 2 * padding) / strides) + 1)
-    output_y = int(((img_shape_y - kernel_shape_y + 2 * padding) / strides) + 1)
-
-    output = np.zeros((output_x, output_y))
-
-    if padding != 0:
-        image_padded = np.zeros((img_shape_x + padding * 2, img_shape_y + padding * 2))
-        image_padded[int(padding):int(-1 * padding), int(padding):int(-1 * padding)] = image
-    else:
-        image_padded = image
-
-    for y in range(img_shape_y):
-
-        if y > img_shape_y - kernel_shape_y:
-            break
-
-        if y % strides == 0:
-            for x in range(img_shape_x):
-                if x > img_shape_x - kernel_shape_x:
-                    break
-                try:
-                    if x % strides == 0:
-                        output[x, y] = (kernel * image_padded[x: x + kernel_shape_x, y: y + kernel_shape_y]).sum()
-                except:
-                    break
-
-    return output
+def mean(gradient):
+    numerator = np.sum(gradient)
+    denominator = gradient.shape[0]
+    return numerator / denominator
 
 
-def detect_keyframes(vd: VideoData, skip_existing: False):
+def std(gradient, m):
+    z_grad = np.square(gradient - m)
+    numerator = np.sum(z_grad)
+    denominator = gradient.shape[0]
+    return np.sqrt(numerator / denominator)
+
+
+def detect_keyframes(vd: VideoData):
     segments = vd.segments
 
-    keyframe_indices = []
+    is_summary = vd.path.parent.name == 'ts100'
 
-    for idx, (seg_start, seg_end) in enumerate(segments):
+    for seg_idx, (seg_start, seg_end) in enumerate(segments):
 
-        print(f'[{idx}/{len(segments)}|{seg_start}-{seg_end}]:', end=' ')
+        frames = [Image.open(frame).convert('L') for frame in vd.frames[seg_start:seg_end]]
+        # noinspection PyTypeChecker
+        frames = [np.array(frame, dtype="int32") for frame in frames]
 
-        if skip_existing and Path(vd.kf_dir, 'shot_' + str(idx) + '.jpg').is_file():
-            print(f'already extracted ...')
-            continue
-
-        frames = [Image.open(frame) for frame in vd.frames[seg_start:seg_end]]
-        np_frames = [np.asarray(frame.convert('L')) for frame in frames]
-
-        sobel_x = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]
-        sobel_y = [[1, 2, 1], [0, 0, 0], [-1, -2, -1]]
+        if is_summary:
+            frames = [frame[:220, :] for frame in frames]
 
         gradient_magnitudes = []
 
-        for frame in np_frames:
-            grad_x = convolution(frame, sobel_x, padding=2)
-            grad_y = convolution(frame, sobel_y, padding=2)
+        for frame in frames:
+            dx = ndimage.sobel(frame, 0, mode='constant')
+            dy = ndimage.sobel(frame, 1, mode='constant')
 
-            grad_mag = np.sqrt(np.square(grad_x) + np.square(grad_y))
-            gradient_magnitudes.append(grad_mag)
+            gm = np.sqrt(np.square(dx) + np.square(dy))
+            gradient_magnitudes.append(gm)
 
-        def mean(gradient):
-            numerator = np.sum(gradient)
-            denominator = gradient.shape[0]
-            return numerator / denominator
+        means = [mean(gm) for gm in gradient_magnitudes]
+        stds = [std(gm, mean) for gm, mean in zip(gradient_magnitudes, means)]
 
-        def std(gradient, mean):
-            z_grad = np.square(gradient - mean)
-            numerator = np.sum(z_grad)
-            denominator = gradient.shape[0]
-            return np.sqrt(numerator / denominator)
-
-        means = [mean(grad_mag) for grad_mag in gradient_magnitudes]
-        stds = [std(grad_mag, mean) for grad_mag, mean in
-                zip(gradient_magnitudes, means)]
-
-        zgms = [((grad_mag - mean) / std) for grad_mag, mean, std in zip(gradient_magnitudes, means, stds)]
+        zgms = [((gm - mean) / std) for gm, mean, std in zip(gradient_magnitudes, means, stds)]
 
         zgm_means = [mean(zgm) for zgm in zgms]
         zgm_stds = [std(zgm, mean) for zgm, mean in zip(zgms, zgm_means)]
@@ -98,11 +62,8 @@ def detect_keyframes(vd: VideoData, skip_existing: False):
         cvs = [(zgm_std / zgm_mean) for zgm_mean, zgm_std in zip(zgm_means, zgm_stds)]
 
         keyframe_idx = np.argmax(cvs)
-        keyframe_indices.append(keyframe_idx)
 
-        print(keyframe_idx + seg_start)
-
-        yield frames[keyframe_idx]
+        yield keyframe_idx + seg_start
 
 
 def check_requirements(path: Path, skip_existing: False):
@@ -114,7 +75,7 @@ def check_requirements(path: Path, skip_existing: False):
 
     frame_dir = get_frame_dir(path)
 
-    if not frame_dir.is_dir() or len(list(frame_dir.glob('frame_*.jpg'))) == 0:
+    if not frame_dir.is_dir() or not len(list(frame_dir.glob('frame_*.jpg'))) > 0:
         print(f'{file.name} no frames have been extracted.')
         return False
 
@@ -126,7 +87,7 @@ def check_requirements(path: Path, skip_existing: False):
 
     kf_dir = get_kf_dir(path)
 
-    if skip_existing and kf_dir.exists() and len(list(kf_dir.glob('shot_*.jpg'))) == len(
+    if skip_existing and kf_dir.is_dir() and len(list(kf_dir.glob('shot_*.jpg'))) == len(
             read_segments_from_file(shot_file)):
         print(f'{path.name} has already keyframes extracted. Skipping ...')
         return False
@@ -153,14 +114,16 @@ if __name__ == "__main__":
 
     video_files.sort(key=get_date_time)
 
-    print(f'Keyframe extraction for ({len(video_files)} videos)\n')
+    for vf_idx, vf in enumerate(video_files):
+        vd = VideoData(vf)
 
-    for idx, video in enumerate(video_files):
-        vd = VideoData(video)
+        print(f'[{vf_idx + 1}/{len(video_files)}] {vd}')
 
-        vd.kf_dir.mkdir(exist_ok=True)
+        shutil.rmtree(vd.keyframe_dir, ignore_errors=True)
+        vd.keyframe_dir.mkdir(parents=True)
 
-        print(f'({idx}/{len(video_files)}) {vd.id}')
+        for shot_idx, kf_idx in enumerate(detect_keyframes(vd)):
+            kf_path = vd.frames[kf_idx]
+            shutil.copy2(kf_path, Path(vd.keyframe_dir, kf_path.name))
 
-        for idx, kf in enumerate(detect_keyframes(vd, args.skip)):
-            kf.save(Path(vd.kf_dir, "shot_" + str(idx) + ".jpg"))
+            print_progress_bar(shot_idx + 1, len(vd.segments), length=30)

@@ -1,4 +1,4 @@
-#!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python
+#!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
 
 import argparse
 import multiprocessing as mp
@@ -10,11 +10,12 @@ from pathlib import Path
 import ffmpeg
 
 from utils.constants import TV_FILENAME_RE
-from utils.fs_utils import get_frame_dir
+from utils.fs_utils import get_frame_dir, get_date_time
 
 
 def extract_frames_from_video(video: Path, fps=0.0, resize=(224, 224), overwrite=False,
                               prune=False):
+
     frame_dir = get_frame_dir(video)
 
     if prune and frame_dir.exists():
@@ -36,7 +37,7 @@ def extract_frames_from_video(video: Path, fps=0.0, resize=(224, 224), overwrite
     return video
 
 
-def check_requirements(path: Path, skip_existing):
+def check_requirements(path: Path, skip_existing: bool):
     match = re.match(TV_FILENAME_RE, path.name)
 
     if match is None or not path.is_file():
@@ -71,16 +72,19 @@ if __name__ == "__main__":
         if file.is_file() and check_requirements(file, args.skip):
             video_files.append(file)
         elif file.is_dir():
-            [video_files.append(f) for f in sorted(file.glob('*.mp4')) if check_requirements(f, args.skip)]
+            video_files.extend([f for f in file.glob('*.mp4') if check_requirements(f, args.skip)])
 
     assert len(video_files) != 0
 
-    print(f'Frame extraction for {len(video_files)} videos ...')
+    video_files.sort(key=get_date_time)
 
+    print(f'Decoding {len(video_files)} videos\n')
 
     def callback_handler(res):
         if res is not None and isinstance(res, Path):
             print(f'{res.name} done')
+        else:
+            print(f'There was a problem ...')
 
 
     if args.parallel:
@@ -93,6 +97,8 @@ if __name__ == "__main__":
             pool.join()
 
     else:
-        for video in video_files:
+        for idx, video in enumerate(video_files):
+            print(f'[{idx + 1}/{len(video_files)}] {video.stem}', end=' ... ')
+
             result = extract_frames_from_video(video, args.fps, args.size, args.overwrite, args.prune)
-            callback_handler(result)
+            print('Done')

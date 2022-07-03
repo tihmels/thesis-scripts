@@ -18,10 +18,10 @@ class VideoData:
         self.path: Path = path
         self.date: datetime = get_date_time(path)
         self.frame_dir: Path = get_frame_dir(path)
-        self.kf_dir: Path = get_kf_dir(path)
+        self.keyframe_dir: Path = get_kf_dir(path)
         self.audio_dir: Path = get_audio_dir(path)
         self.frames: [Path] = sorted(self.frame_dir.glob('frame_*.jpg'))
-        self.kfs: [Path] = sorted(self.kf_dir.glob('shot_*.jpg'))
+        self.kfs: [Path] = sorted(self.keyframe_dir.glob('shot_*.jpg'))
         self.segments: [(int, int)] = read_segments_from_file(get_shot_file(path))
 
     @property
@@ -40,10 +40,11 @@ class VideoData:
     def date_str(self):
         return self.date.strftime("%Y%m%d")
 
+    def get_keyframe_file(self, idx):
+        return Path(self.keyframe_dir, "shot_" + str(idx) + ".jpg")
+
     def __str__(self):
-        return "[" + str(self.__dict__['date'].strftime('%Y%m%d')) + "] " + str(
-            self.__dict__['path'].id) + ": " + str(
-            self.__dict__['n_frames']) + " frames, " + str(len(self.__dict__['segments'])) + " segments"
+        return self.id
 
 
 class VideoType(Enum):
