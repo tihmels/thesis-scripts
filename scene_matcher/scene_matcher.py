@@ -3,6 +3,7 @@
 import argparse
 import itertools
 import re
+import shutil
 from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -29,12 +30,12 @@ def min_frameset_hash_distance(main_frames: [Image], sum_frames: [Image]):
 
 
 @lru_cache(maxsize=2048)
-def get_image_cached(file):
-    return get_image(file)
+def get_image_cached(path: Path):
+    return get_image(path)
 
 
-def get_image(file):
-    return Image.open(str(file)).convert('L').resize((9, 8), Resampling.LANCZOS)
+def get_image(path: Path):
+    return Image.open(str(path)).convert('L').resize((9, 8), Resampling.LANCZOS)
 
 
 def was_processed(path: Path, video: VideoData):
@@ -56,6 +57,9 @@ def process_videos(date: str, main_video: VideoData, summary_videos: [VideoData]
             was_processed(sm_dir, video) for video in summary_videos):
         print(f'All videos for {date} already processed. Skip ... ')
         return
+
+    shutil.rmtree(sm_dir, ignore_errors=True)
+    sm_dir.mkdir(parents=True)
 
     main_segment_vector = np.zeros(main_video.n_segments)
     sum_segment_dict = {summary.id: (np.zeros(summary.n_segments), np.full(summary.n_segments, np.inf)) for summary in
@@ -117,9 +121,8 @@ def process_videos(date: str, main_video: VideoData, summary_videos: [VideoData]
     [s.print() for s in summary_video_stats]
 
     if to_csv:
-        csv_dir = get_sm_dir(main_video.path)
-        main_video_stats.save_as_csv(csv_dir, "co" + str(cutoff))
-        [summary.save_as_csv(csv_dir, "co" + str(cutoff)) for summary in summary_video_stats]
+        main_video_stats.save_as_csv(sm_dir, "co" + str(cutoff))
+        [summary.save_as_csv(sm_dir, "co" + str(cutoff)) for summary in summary_video_stats]
 
     print(get_image_cached.cache_info())
     get_image_cached.cache_clear()
@@ -177,7 +180,7 @@ if __name__ == "__main__":
 
     for idx, (date, video) in enumerate(videos_by_date.items()):
 
-        date = date.replace(hour=20)
+        date = date.replace(minute=0)
 
         (rangeStart, rangeEnd) = date - timedelta(hours=4), date + timedelta(hours=20)
 

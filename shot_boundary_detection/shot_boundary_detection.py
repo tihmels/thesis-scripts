@@ -78,12 +78,18 @@ if __name__ == "__main__":
     set_tf_loglevel(logging.FATAL)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('dir', type=lambda p: Path(p).resolve(strict=True))
+    parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
     parser.add_argument('-s', '--skip', action='store_true', help="skip sbd if shots.txt already exist")
     parser.add_argument('--parallel', action='store_true')
     args = parser.parse_args()
 
-    video_files = [file for file in sorted(args.dir.glob('*.mp4')) if check_requirements(file, args.skip)]
+    video_files = []
+
+    for file in args.files:
+        if file.is_file() and check_requirements(file, args.skip):
+            video_files.append(file)
+        elif file.is_dir():
+            video_files.extend([video for video in file.glob('*.mp4') if check_requirements(video, args.skip)])
 
     assert len(video_files) > 0
 

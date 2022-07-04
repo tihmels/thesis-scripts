@@ -4,11 +4,23 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from utils.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE
+from utils.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE, AUDIO_FILENAME_RE
 
 
 def get_audio_dir(video: Path):
     return Path(get_data_dir(video), "audio")
+
+
+def get_audio_file(video: Path):
+    files = [f for f in get_audio_dir(video).glob('*.wav') if re.match(AUDIO_FILENAME_RE, f.name)]
+    if len(files) == 1:
+        return files[0]
+    else:
+        return None
+
+
+def get_audio_shots(video: Path):
+    return [audio for audio in get_audio_dir(video).glob('*.wav') if re.match(r'shot_\d*.wav', audio.name)]
 
 
 def get_sm_dir(video: Path):
@@ -47,8 +59,7 @@ def get_summary_videos():
 def read_segments_from_file(file: Path):
     shots = []
 
-    if file.exists():
-
+    if file.is_file():
         file = open(file, 'r')
         for line in file.readlines():
             first_index, last_index = [int(x.strip(' ')) for x in line.split(' ')]
