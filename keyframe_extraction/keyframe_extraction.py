@@ -59,9 +59,9 @@ def detect_keyframes(vd: VideoData):
 
         cvs = [np.divide(zgm_std, zgm_mean) for zgm_mean, zgm_std in zip(zgm_means, zgm_stds)]
 
-        keyframe_idx_argmax = np.argmax(cvs)
+        keyframe_idx = np.argmax(cvs)
 
-        yield keyframe_idx_argmax + seg_start_idx
+        yield keyframe_idx + seg_start_idx
 
 
 def check_requirements(path: Path, skip_existing: False):
