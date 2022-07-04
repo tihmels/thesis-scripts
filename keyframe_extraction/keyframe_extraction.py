@@ -111,12 +111,12 @@ if __name__ == "__main__":
 
     video_files.sort(key=get_date_time)
 
-    print(f'Extracting shot keyframes from {len(video_files)} videos ... \n')
+    print(f'Extracting shot keyframes from {len(video_files)} videos ...')
 
     for vf_idx, vf in enumerate(video_files):
         vd = VideoData(vf)
 
-        print(f'[{vf_idx + 1}/{len(video_files)}] {vd}')
+        print(f'\n[{vf_idx + 1}/{len(video_files)}] {vd}')
 
         shutil.rmtree(vd.keyframe_dir, ignore_errors=True)
         vd.keyframe_dir.mkdir(parents=True)
