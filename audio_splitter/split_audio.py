@@ -24,7 +24,7 @@ def process_video(vd: VideoData):
         audio_segment = audio[start_ms:end_ms]
         audio_segment.export(Path(vd.audio_dir, 'shot_' + str(seg_idx + 1) + '.wav', format='wav'))
 
-        print_progress_bar(seg_idx + 1, len(vd.segments), length=25)
+        print_progress_bar(seg_idx + 1, len(vd.segments), length=30)
 
 
 def check_requirements(path: Path, skip_existing=False):
