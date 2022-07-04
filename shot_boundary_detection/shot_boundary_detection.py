@@ -106,6 +106,7 @@ if __name__ == "__main__":
     else:
         for idx, video in enumerate(video_files):
             vd = VideoData(video)
+
             print(f'[{idx + 1}/{len(video_files)}] {vd}')
             result = process_video(vd)
             print()

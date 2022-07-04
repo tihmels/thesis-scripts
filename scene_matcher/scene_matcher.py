@@ -177,17 +177,19 @@ if __name__ == "__main__":
 
     for idx, (date, video) in enumerate(videos_by_date.items()):
 
-        main_video_data = VideoData(video)
+        date = date.replace(hour=20)
 
         (rangeStart, rangeEnd) = date - timedelta(hours=4), date + timedelta(hours=20)
-        rangeStart = rangeStart.replace(second=0, microsecond=0, minute=0)
-        rangeEnd = rangeEnd.replace(second=0, microsecond=0, minute=0, hour=rangeEnd.hour + 1)
 
         summary_videos_data = [VideoData(video) for date, video in summaries_by_date.items() if
                                rangeStart <= date <= rangeEnd]
 
+        main_video_data = VideoData(video)
+
         print(
-            f'\n[{idx + 1}/{len(videos_by_date)}] {date.strftime("%Y-%m-%d")} {rangeStart.strftime("%H:%M")} < {date.strftime("%H:%M")} < {rangeEnd.strftime("%H:%M")}')
+            f'\n[{idx + 1}/{len(videos_by_date)}] {date.strftime("%Y-%m-%d")}'
+            f' {rangeStart.strftime("%H:%M")} < {date.strftime("%H:%M")} < {rangeEnd.strftime("%H:%M")}')
+
         result = process_videos(date, main_video_data, summary_videos_data, args.cutoff, args.skip, args.csv)
 
         if result:
