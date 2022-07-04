@@ -36,6 +36,10 @@ def get_frame_dir(video: Path):
     return Path(get_data_dir(video), "frames")
 
 
+def get_feature_file(video: Path):
+    return Path(get_data_dir(video), "features.h5")
+
+
 def get_summary_videos():
     return [file for file in Path(SUMMARY_VIDEOS_PATH).glob("*.mp4") if re.match(TV_FILENAME_RE, file.name)]
 

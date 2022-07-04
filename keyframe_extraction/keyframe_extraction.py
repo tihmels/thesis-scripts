@@ -15,27 +15,14 @@ from utils.fs_utils import get_frame_dir, get_shot_file, get_date_time, get_kf_d
     print_progress_bar
 
 
-def mean(gradient):
-    numerator = np.sum(gradient)
-    denominator = gradient.shape[0]
-    return numerator / denominator
-
-
-def std(gradient, m):
-    z_grad = np.square(gradient - m)
-    numerator = np.sum(z_grad)
-    denominator = gradient.shape[0]
-    return np.sqrt(numerator / denominator)
-
-
 def detect_keyframes(vd: VideoData):
     segments = vd.segments
 
     is_summary = vd.path.parent.name == 'ts100'
 
-    for seg_idx, (seg_start, seg_end) in enumerate(segments):
+    for seg_idx, (seg_start_idx, seg_end_idx) in enumerate(segments):
 
-        frames = [Image.open(frame).convert('L') for frame in vd.frames[seg_start:seg_end]]
+        frames = [Image.open(frame).convert('L') for frame in vd.frames[seg_start_idx:seg_end_idx]]
         # noinspection PyTypeChecker
         frames = [np.array(frame, dtype="int32") for frame in frames]
 
@@ -45,25 +32,42 @@ def detect_keyframes(vd: VideoData):
         gradient_magnitudes = []
 
         for frame in frames:
-            dx = ndimage.sobel(frame, 0, mode='constant')
-            dy = ndimage.sobel(frame, 1, mode='constant')
+            dx = ndimage.sobel(frame, 1, mode='constant')
+            dy = ndimage.sobel(frame, 0, mode='constant')
 
-            gm = np.sqrt(np.square(dx) + np.square(dy))
+            gm = np.hypot(dx, dy)
             gradient_magnitudes.append(gm)
+
+        def mean(gradient):
+            numerator = np.sum(gradient)
+            denominator = gradient.shape[0]
+            return numerator / denominator
+
+        def std(gradient, mean):
+            z_grad = np.square(gradient - mean)
+            numerator = np.sum(z_grad)
+            denominator = gradient.shape[0]
+            return np.sqrt(numerator / denominator)
 
         means = [mean(gm) for gm in gradient_magnitudes]
         stds = [std(gm, mean) for gm, mean in zip(gradient_magnitudes, means)]
 
-        zgms = [((gm - mean) / std) for gm, mean, std in zip(gradient_magnitudes, means, stds)]
+        zgms = [np.divide(gm - mean, std) for gm, mean, std in zip(gradient_magnitudes, means, stds)]
 
         zgm_means = [mean(zgm) for zgm in zgms]
         zgm_stds = [std(zgm, mean) for zgm, mean in zip(zgms, zgm_means)]
 
-        cvs = [(zgm_std / zgm_mean) for zgm_mean, zgm_std in zip(zgm_means, zgm_stds)]
+        cvs = [np.divide(zgm_std, zgm_mean) for zgm_mean, zgm_std in zip(zgm_means, zgm_stds)]
 
-        keyframe_idx = np.argmax(cvs)
+        keyframe_idx_argmax = np.argmax(cvs)
+        # keyframe_idx_argmin = np.argmin(cvs)
 
-        yield keyframe_idx + seg_start
+        # Image.fromarray(frames[keyframe_idx_argmax]).convert('RGB').save(
+        #    "/Users/tihmels/Desktop/tmp/" + str(seg_idx) + "_max.jpg")
+        # Image.fromarray(frames[keyframe_idx_argmin]).convert('RGB').save(
+        #    "/Users/tihmels/Desktop/tmp/" + str(seg_idx) + "_min.jpg")
+
+        yield keyframe_idx_argmax + seg_start_idx
 
 
 def check_requirements(path: Path, skip_existing: False):
@@ -87,9 +91,8 @@ def check_requirements(path: Path, skip_existing: False):
 
     kf_dir = get_kf_dir(path)
 
-    if skip_existing and kf_dir.is_dir() and len(list(kf_dir.glob('shot_*.jpg'))) == len(
+    if skip_existing and kf_dir.is_dir() and len(list(kf_dir.glob('frame*.jpg'))) == len(
             read_segments_from_file(shot_file)):
-        print(f'{path.name} has already keyframes extracted. Skipping ...')
         return False
 
     return True
@@ -113,6 +116,8 @@ if __name__ == "__main__":
     assert len(video_files) > 0
 
     video_files.sort(key=get_date_time)
+
+    print(f'Extracting shot keyframes from {len(video_files)} videos ... \n')
 
     for vf_idx, vf in enumerate(video_files):
         vd = VideoData(vf)

@@ -21,7 +21,7 @@ class VideoData:
         self.keyframe_dir: Path = get_kf_dir(path)
         self.audio_dir: Path = get_audio_dir(path)
         self.frames: [Path] = sorted(self.frame_dir.glob('frame_*.jpg'))
-        self.kfs: [Path] = sorted(self.keyframe_dir.glob('shot_*.jpg'))
+        self.kfs: [Path] = sorted(self.keyframe_dir.glob('frame_*.jpg'))
         self.segments: [(int, int)] = read_segments_from_file(get_shot_file(path))
 
     @property
