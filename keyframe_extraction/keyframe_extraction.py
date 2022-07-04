@@ -60,12 +60,6 @@ def detect_keyframes(vd: VideoData):
         cvs = [np.divide(zgm_std, zgm_mean) for zgm_mean, zgm_std in zip(zgm_means, zgm_stds)]
 
         keyframe_idx_argmax = np.argmax(cvs)
-        # keyframe_idx_argmin = np.argmin(cvs)
-
-        # Image.fromarray(frames[keyframe_idx_argmax]).convert('RGB').save(
-        #    "/Users/tihmels/Desktop/tmp/" + str(seg_idx) + "_max.jpg")
-        # Image.fromarray(frames[keyframe_idx_argmin]).convert('RGB').save(
-        #    "/Users/tihmels/Desktop/tmp/" + str(seg_idx) + "_min.jpg")
 
         yield keyframe_idx_argmax + seg_start_idx
 
