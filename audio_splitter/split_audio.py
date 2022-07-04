@@ -40,10 +40,16 @@ def check_requirements(path: Path, skip_existing=False):
         print(f'{path.name} has no audio file extracted.')
         return False
 
+    shot_file = get_shot_file(path)
+
+    if not shot_file.is_file():
+        print(f'{path.name} has no detected shots.')
+        return False
+
     if skip_existing:
         audio_shots = get_audio_shots(path)
 
-        if len(audio_shots) == len(read_segments_from_file(get_shot_file(path))):
+        if len(audio_shots) == len(read_segments_from_file(shot_file)):
             return False
 
     return True
