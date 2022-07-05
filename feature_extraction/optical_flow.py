@@ -4,6 +4,7 @@ from collections import OrderedDict
 
 import torch
 
+import VideoData
 from feature_extraction.RAFT.core.raft import RAFT
 
 
@@ -16,15 +17,13 @@ def frame_preprocess(frame, device):
 
 def get_cpu_model(model):
     new_model = OrderedDict()
-    # get all layer's names from model
     for name in model:
-        # create new name and update new model
         new_name = name[7:]
         new_model[new_name] = model[name]
     return new_model
 
 
-def inference(args):
+def inference(vd: VideoData):
     # get the RAFT model
     model = RAFT(args)
     # load pretrained weights
@@ -35,27 +34,14 @@ def inference(args):
         if not os.path.exists("demo_frames"):
             os.mkdir("demo_frames")
 
-    if torch.cuda.is_available():
-        device = "cuda"
-        # parallel between available GPUs
-        model = torch.nn.DataParallel(model)
-        # load the pretrained weights into model
-        model.load_state_dict(pretrained_weights)
-        model.to(device)
-    else:
-        device = "cpu"
-        # change key names for CPU runtime
-        pretrained_weights = get_cpu_model(pretrained_weights)
-        # load the pretrained weights into model
-        model.load_state_dict(pretrained_weights)
+    device = "cpu"
+    # change key names for CPU runtime
+    pretrained_weights = get_cpu_model(pretrained_weights)
+    # load the pretrained weights into model
+    model.load_state_dict(pretrained_weights)
 
     # change model's mode to evaluation
     model.eval()
-
-    video_path = args.video
-    # capture the video and get the first frame
-    cap = cv2.VideoCapture(video_path)
-    ret, frame_1 = cap.read()
 
     # frame preprocessing
     frame_1 = frame_preprocess(frame_1, device)

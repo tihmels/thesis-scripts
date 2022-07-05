@@ -14,7 +14,7 @@ from utils.fs_utils import get_date_time, get_audio_dir, read_shots_from_file, g
 
 
 def split_audio(vd: VideoData):
-    audio = AudioSegment.from_wav(get_audio_file(vd.path))
+    audio = AudioSegment.from_wav(get_audio_file(vd))
 
     segments = vd.shots
 

@@ -3,53 +3,94 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
+from typing import Union
 
+from VideoData import VideoData
 from utils.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE, AUDIO_FILENAME_RE
 
-
-def get_audio_dir(video: Path):
-    return Path(get_data_dir(video), "audio")
+VideoType = Union[VideoData, Path]
 
 
-def get_audio_file(video: Path):
-    files = [f for f in get_audio_dir(video).glob('*.wav') if re.match(AUDIO_FILENAME_RE, f.name)]
-    if len(files) == 1:
-        return files[0]
+def get_data_dir(video: VideoType):
+    if isinstance(video, Path):
+        return Path(video.parent, video.name.split(".")[0])
     else:
-        return None
+        return get_data_dir(video.path)
 
 
-def get_audio_shots(video: Path):
-    return [audio for audio in get_audio_dir(video).glob('*.wav') if re.match(r'shot_\d*.wav', audio.name)]
+def get_audio_dir(video: VideoType):
+    if isinstance(video, Path):
+        return Path(get_data_dir(video), "audio")
+    else:
+        return get_audio_dir(video.path)
 
 
-def get_sm_dir(video: Path):
-    return Path(get_data_dir(video), "sm")
+def get_audio_file(video: VideoType):
+    if isinstance(video, Path):
+        files = [f for f in get_audio_dir(video).glob('*.wav') if re.match(AUDIO_FILENAME_RE, f.name)]
+        if len(files) == 1:
+            return files[0]
+        else:
+            return None
+    else:
+        return get_audio_file(video.path)
 
 
-def get_kf_dir(video: Path):
-    return Path(get_data_dir(video), "kfs")
+def get_audio_shots(video: VideoType):
+    if isinstance(video, Path):
+        return [audio for audio in get_audio_dir(video).glob('*.wav') if re.match(r'shot_\d*.wav', audio.name)]
+    else:
+        return get_audio_shots(video.path)
 
 
-def get_date_time(video: Path):
-    date, time = video.name.split("-")[1:3]
-    return datetime.strptime(date + time, "%Y%m%d%H%M")
+def get_sm_dir(video: VideoType):
+    if isinstance(video, Path):
+        return Path(get_data_dir(video), "sm")
+    else:
+        return get_sm_dir(video.path)
 
 
-def get_data_dir(video: Path):
-    return Path(video.parent, video.name.split(".")[0])
+def get_topic_file(video: VideoType):
+    if isinstance(video, Path):
+        return Path(get_data_dir(video), "topics.csv")
+    else:
+        return get_topic_file(video.path)
 
 
-def get_shot_file(video: Path):
-    return Path(get_data_dir(video), "shots.txt")
+def get_kf_dir(video: VideoType):
+    if isinstance(video, Path):
+        return Path(get_data_dir(video), "kfs")
+    else:
+        return get_kf_dir(video.path)
 
 
-def get_frame_dir(video: Path):
-    return Path(get_data_dir(video), "frames")
+def get_date_time(video: VideoType):
+    if isinstance(video, Path):
+        date, time = video.name.split("-")[1:3]
+        return datetime.strptime(date + time, "%Y%m%d%H%M")
+    else:
+        return get_date_time(video.path)
 
 
-def get_feature_file(video: Path):
-    return Path(get_data_dir(video), "features.h5")
+def get_shot_file(video: VideoType):
+    if isinstance(video, Path):
+        return Path(get_data_dir(video), "shots.txt")
+    else:
+        return get_shot_file(video.path)
+
+
+def get_frame_dir(video: VideoType):
+    if isinstance(video, Path):
+        return Path(get_data_dir(video), "frames")
+    else:
+        return get_frame_dir(video.path)
+
+
+def get_feature_file(video: VideoType):
+    if isinstance(video, Path):
+        return Path(get_data_dir(video), "features.h5")
+    else:
+        return get_feature_file(video.path)
 
 
 def get_summary_videos():
