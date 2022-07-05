@@ -8,8 +8,7 @@ from PIL import Image
 from torchvision import transforms
 from torchvision.models import resnet18
 
-from VideoData import VideoData
-from utils.fs_utils import get_date_time
+from VideoData import VideoData, get_date_time
 
 
 def calculate_features(vd: VideoData):

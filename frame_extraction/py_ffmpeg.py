@@ -9,8 +9,8 @@ from shutil import rmtree
 
 import ffmpeg
 
+from VideoData import get_frame_dir, get_date_time
 from utils.constants import TV_FILENAME_RE
-from utils.fs_utils import get_frame_dir, get_date_time
 
 
 def extract_frames_from_video(video: Path, fps=0.0, resize=(224, 224), overwrite=False,

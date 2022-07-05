@@ -7,10 +7,9 @@ import numpy as np
 from alive_progress import alive_bar
 from pydub import AudioSegment
 
-from VideoData import VideoData
+from VideoData import VideoData, get_audio_file, get_audio_dir, get_shot_file, get_audio_shots, read_shots_from_file, \
+    get_date_time
 from utils.constants import TV_FILENAME_RE
-from utils.fs_utils import get_date_time, get_audio_dir, read_shots_from_file, get_shot_file, \
-    get_audio_file, get_audio_shots
 
 
 def split_audio(vd: VideoData):

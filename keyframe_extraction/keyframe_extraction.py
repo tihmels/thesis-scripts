@@ -10,9 +10,9 @@ from PIL import Image
 from alive_progress import alive_bar
 from scipy import ndimage
 
-from VideoData import VideoData
+from VideoData import VideoData, get_frame_dir, get_frame_paths, get_shot_file, get_kf_dir, get_keyframe_paths, \
+    read_shots_from_file, get_date_time
 from utils.constants import TV_FILENAME_RE
-from utils.fs_utils import get_frame_dir, get_shot_file, get_date_time, get_kf_dir, read_shots_from_file
 
 
 def detect_keyframes(vd: VideoData):
@@ -64,7 +64,7 @@ def detect_keyframes(vd: VideoData):
         yield keyframe_idx + seg_start_idx
 
 
-def check_requirements(path: Path, skip_existing: False):
+def check_requirements(path: Path, skip_existing=False):
     match = re.match(TV_FILENAME_RE, path.name)
 
     if match is None or not path.is_file():
@@ -73,19 +73,19 @@ def check_requirements(path: Path, skip_existing: False):
 
     frame_dir = get_frame_dir(path)
 
-    if not frame_dir.is_dir() or not len(list(frame_dir.glob('frame_*.jpg'))) > 0:
+    if not frame_dir.is_dir() or not len(get_frame_paths(path)) > 0:
         print(f'{file.name} no frames have been extracted.')
         return False
 
     shot_file = get_shot_file(path)
 
-    if not shot_file.exists():
+    if not shot_file.is_file():
         print(f'{path.name} has no detected shots.')
         return False
 
     kf_dir = get_kf_dir(path)
 
-    if skip_existing and kf_dir.is_dir() and len(list(kf_dir.glob('frame_*.jpg'))) == len(
+    if skip_existing and kf_dir.is_dir() and len(get_keyframe_paths(path)) == len(
             read_shots_from_file(shot_file)):
         return False
 

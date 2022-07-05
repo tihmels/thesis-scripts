@@ -1,143 +1,15 @@
 import logging
 import os
 import re
-from datetime import datetime
 from pathlib import Path
-from typing import Union
 
-from VideoData import VideoData
-from utils.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE, AUDIO_FILENAME_RE
-
-VideoType = Union[VideoData, Path]
-
-
-def get_data_dir(video: VideoType):
-    if isinstance(video, Path):
-        return Path(video.parent, video.name.split(".")[0])
-    else:
-        return get_data_dir(video.path)
-
-
-def get_audio_dir(video: VideoType):
-    if isinstance(video, Path):
-        return Path(get_data_dir(video), "audio")
-    else:
-        return get_audio_dir(video.path)
-
-
-def get_audio_file(video: VideoType):
-    if isinstance(video, Path):
-        files = [f for f in get_audio_dir(video).glob('*.wav') if re.match(AUDIO_FILENAME_RE, f.name)]
-        if len(files) == 1:
-            return files[0]
-        else:
-            return None
-    else:
-        return get_audio_file(video.path)
-
-
-def get_audio_shots(video: VideoType):
-    if isinstance(video, Path):
-        return [audio for audio in get_audio_dir(video).glob('*.wav') if re.match(r'shot_\d*.wav', audio.name)]
-    else:
-        return get_audio_shots(video.path)
-
-
-def get_sm_dir(video: VideoType):
-    if isinstance(video, Path):
-        return Path(get_data_dir(video), "sm")
-    else:
-        return get_sm_dir(video.path)
-
-
-def get_topic_file(video: VideoType):
-    if isinstance(video, Path):
-        return Path(get_data_dir(video), "topics.csv")
-    else:
-        return get_topic_file(video.path)
-
-
-def get_kf_dir(video: VideoType):
-    if isinstance(video, Path):
-        return Path(get_data_dir(video), "kfs")
-    else:
-        return get_kf_dir(video.path)
-
-
-def get_date_time(video: VideoType):
-    if isinstance(video, Path):
-        date, time = video.name.split("-")[1:3]
-        return datetime.strptime(date + time, "%Y%m%d%H%M")
-    else:
-        return get_date_time(video.path)
-
-
-def get_shot_file(video: VideoType):
-    if isinstance(video, Path):
-        return Path(get_data_dir(video), "shots.txt")
-    else:
-        return get_shot_file(video.path)
-
-
-def get_frame_dir(video: VideoType):
-    if isinstance(video, Path):
-        return Path(get_data_dir(video), "frames")
-    else:
-        return get_frame_dir(video.path)
-
-
-def get_feature_file(video: VideoType):
-    if isinstance(video, Path):
-        return Path(get_data_dir(video), "features.h5")
-    else:
-        return get_feature_file(video.path)
+from utils.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE
 
 
 def get_summary_videos():
     return [file for file in Path(SUMMARY_VIDEOS_PATH).glob("*.mp4") if re.match(TV_FILENAME_RE, file.name)]
 
 
-def read_shots_from_file(file: Path):
-    shots = []
-
-    if file.is_file():
-        file = open(file, 'r')
-        for line in file.readlines():
-            first_index, last_index = [int(x.strip(' ')) for x in line.split(' ')]
-            shots.append((first_index, last_index))
-        return shots
-    else:
-        return None
-
-
-def subdirs(root: str):
-    sub_folders = [f.path for f in os.scandir(root) if f.is_dir()]
-    for dir_name in list(sub_folders):
-        sub_folders.extend(subdirs(dir_name))
-    return [Path(f) for f in sub_folders] + [Path(root)]
-
-
-# Print iterations progress
-def print_progress_bar(iteration, total, prefix='', suffix='', decimals=1, length=100, fill='█', printEnd="\r"):
-    """
-    Call in a loop to create terminal progress bar
-    @params:
-        iteration   - Required  : current iteration (Int)
-        total       - Required  : total iterations (Int)
-        prefix      - Optional  : prefix string (Str)
-        suffix      - Optional  : suffix string (Str)
-        decimals    - Optional  : positive number of decimals in percent complete (Int)
-        length      - Optional  : character length of bar (Int)
-        fill        - Optional  : bar fill character (Str)
-        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
-    """
-    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-    filledLength = int(length * iteration // total)
-    bar = fill * filledLength + '-' * (length - filledLength)
-    print(f'\r{prefix} |{bar}| {percent}% {suffix}', end=printEnd)
-    # Print New Line on Complete
-    if iteration == total:
-        print()
 
 
 def set_tf_loglevel(level):
