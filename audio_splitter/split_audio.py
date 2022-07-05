@@ -12,7 +12,7 @@ from utils.fs_utils import get_date_time, get_audio_dir, print_progress_bar, rea
     get_audio_file, get_audio_shots
 
 
-def process_video(vd: VideoData):
+def split_audio(vd: VideoData):
     audio = AudioSegment.from_wav(get_audio_file(vd.path))
 
     segments = vd.segments
@@ -24,7 +24,7 @@ def process_video(vd: VideoData):
         audio_segment = audio[start_ms:end_ms]
         audio_segment.export(Path(vd.audio_dir, 'shot_' + str(seg_idx + 1) + '.wav', format='wav'))
 
-        print_progress_bar(seg_idx + 1, len(vd.segments), length=30)
+        yield seg_idx
 
 
 def check_requirements(path: Path, skip_existing=False):
@@ -74,8 +74,11 @@ if __name__ == "__main__":
 
     video_files.sort(key=get_date_time)
 
+    print(f'Splitting audio shots from {len(video_files)} videos ... \n')
+
     for idx, vf in enumerate(video_files):
         vd = VideoData(vf)
 
-        print(f'\n[{idx + 1}/{len(video_files)}] {vd}')
-        process_video(vd)
+        for shot_idx in split_audio(vd):
+            print_progress_bar(shot_idx + 1, len(vd.segments), length=20, prefix=f'[{idx + 1}/{len(video_files)}]',
+                               suffix=f'{vd}')

@@ -111,18 +111,18 @@ if __name__ == "__main__":
 
     video_files.sort(key=get_date_time)
 
-    print(f'Extracting shot keyframes from {len(video_files)} videos ...')
+    print(f'Extracting shot keyframes from {len(video_files)} videos ... \n')
 
     for vf_idx, vf in enumerate(video_files):
         vd = VideoData(vf)
 
-        print(f'\n[{vf_idx + 1}/{len(video_files)}] {vd}')
+        # print(f'\n[{vf_idx + 1}/{len(video_files)}] {vd}')
 
         shutil.rmtree(vd.keyframe_dir, ignore_errors=True)
         vd.keyframe_dir.mkdir(parents=True)
 
         for shot_idx, kf_idx in enumerate(detect_keyframes(vd)):
-            kf_path = vd.frames[kf_idx]
-            shutil.copy2(kf_path, Path(vd.keyframe_dir, kf_path.name))
+            shutil.copy2(vd.frames[kf_idx], vd.keyframe_dir)
 
-            print_progress_bar(shot_idx + 1, len(vd.segments), length=30)
+            print_progress_bar(shot_idx + 1, len(vd.segments), length=20, prefix=f'[{vf_idx + 1}/{len(video_files)}]',
+                               suffix=f'{vd}')
