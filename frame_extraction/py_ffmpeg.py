@@ -4,8 +4,8 @@ import argparse
 import multiprocessing as mp
 import os
 import re
-import shutil
 from pathlib import Path
+from shutil import rmtree
 
 import ffmpeg
 
@@ -15,11 +15,10 @@ from utils.fs_utils import get_frame_dir, get_date_time
 
 def extract_frames_from_video(video: Path, fps=0.0, resize=(224, 224), overwrite=False,
                               prune=False):
-
     frame_dir = get_frame_dir(video)
 
-    if prune and frame_dir.exists():
-        shutil.rmtree(frame_dir)
+    if prune and frame_dir.is_dir():
+        rmtree(frame_dir)
 
     frame_dir.mkdir(parents=True, exist_ok=True)
 
@@ -79,6 +78,7 @@ if __name__ == "__main__":
     video_files.sort(key=get_date_time)
 
     print(f'Decoding {len(video_files)} videos\n')
+
 
     def callback_handler(res):
         if res is not None and isinstance(res, Path):

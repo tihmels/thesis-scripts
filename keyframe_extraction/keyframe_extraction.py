@@ -85,7 +85,7 @@ def check_requirements(path: Path, skip_existing: False):
 
     kf_dir = get_kf_dir(path)
 
-    if skip_existing and kf_dir.is_dir() and len(list(kf_dir.glob('frame*.jpg'))) == len(
+    if skip_existing and kf_dir.is_dir() and len(list(kf_dir.glob('frame_*.jpg'))) == len(
             read_shots_from_file(shot_file)):
         return False
 
