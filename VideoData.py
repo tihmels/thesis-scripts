@@ -36,7 +36,7 @@ class VideoData:
     @property
     def frames(self):
         if self._frames is None:
-            self._frames = get_frame_paths(self.path)
+            self._frames = sorted(get_frame_paths(self.path))
         return self._frames
 
     @property

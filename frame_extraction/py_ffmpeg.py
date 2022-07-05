@@ -102,6 +102,6 @@ if __name__ == "__main__":
 
             print(f'[{idx + 1}/{len(video_files)}] {vd}', end=' ... ')
 
-            result = extract_frames(vd, args.fps, args.size, args.overwrite, args.prune)
+            extract_frames(vd, args.fps, args.size, args.overwrite, args.prune)
 
             print('Done')

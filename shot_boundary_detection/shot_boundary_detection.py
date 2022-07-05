@@ -99,7 +99,7 @@ if __name__ == "__main__":
     if args.parallel:
 
         with mp.Pool(os.cpu_count(), initializer=mute) as pool:
-            [pool.apply_async(process_video, (VideoData(video),), callback=callback_handler) for video in video_files]
+            [pool.apply_async(process_video, (VideoData(vf),), callback=callback_handler) for vf in video_files]
 
             pool.close()
             pool.join()
@@ -109,5 +109,6 @@ if __name__ == "__main__":
             vd = VideoData(video)
 
             print(f'[{idx + 1}/{len(video_files)}] {vd}')
-            result = process_video(vd)
+
+            process_video(vd)
             print()
