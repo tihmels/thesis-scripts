@@ -9,7 +9,7 @@ import os
 import pandas as pd
 
 from utils.constants import AUDIO_FILENAME_RE
-from utils.fs_utils import get_date_time, get_frame_dir, get_shot_file, read_segments_from_file, get_kf_dir, \
+from utils.fs_utils import get_date_time, get_frame_dir, get_shot_file, read_shots_from_file, get_kf_dir, \
     get_audio_dir
 
 TV_DATEFORMAT = '%Y%m%d'
@@ -25,15 +25,15 @@ class VideoData:
         self.audio_dir: Path = get_audio_dir(path)
         self.frames: [Path] = sorted(self.frame_dir.glob('frame_*.jpg'))
         self.kfs: [Path] = sorted(self.keyframe_dir.glob('frame_*.jpg'))
-        self.segments: [(int, int)] = read_segments_from_file(get_shot_file(path))
+        self.shots: [(int, int)] = read_shots_from_file(get_shot_file(path))
 
     @property
     def n_frames(self):
         return len(self.frames)
 
     @property
-    def n_segments(self):
-        return len(self.segments)
+    def n_shots(self):
+        return len(self.shots)
 
     @property
     def timecode(self):
@@ -47,7 +47,7 @@ class VideoData:
         return Path(self.keyframe_dir, "shot_" + str(idx) + ".jpg")
 
     def __str__(self):
-        return str(self.path.relative_to(self.path.parent.parent))
+        return str(self.path.relative_to(self.path.parent.parent)).split('.')[0]
 
 
 class VideoType(Enum):
@@ -62,8 +62,8 @@ class VideoStats:
         self.date = vd.date.strftime("%Y%m%d")
         self.type = vt.name
 
-        data = np.array([*vd.segments], dtype=np.int32)
-        data = np.column_stack((data, np.array([(s2 - s1 + 1) for s1, s2 in vd.segments], dtype=np.int32)))
+        data = np.array([*vd.shots], dtype=np.int32)
+        data = np.column_stack((data, np.array([(s2 - s1 + 1) for s1, s2 in vd.shots], dtype=np.int32)))
 
         if vt == VideoType.FULL:
             data = np.column_stack((data, segment_vector.astype(np.int32)))
@@ -72,10 +72,10 @@ class VideoStats:
             data = np.column_stack((data, sum_seg_matched.astype(int)))
             data = np.column_stack((data, np.nan_to_num(sum_seg_dist, posinf=-1, neginf=-1).astype(int)))
 
-        start_frame_paths = np.array(vd.frames)[[seg[0] for seg in vd.segments]]
-        end_frame_paths = np.array(vd.frames)[[seg[1] for seg in vd.segments]]
+        start_frame_paths = np.array(vd.frames)[[seg[0] for seg in vd.shots]]
+        end_frame_paths = np.array(vd.frames)[[seg[1] for seg in vd.shots]]
 
-        segment_center_indices = [np.round((s1 + s2) / 2).astype(int) for s1, s2 in vd.segments]
+        segment_center_indices = [np.round((s1 + s2) / 2).astype(int) for s1, s2 in vd.shots]
         center_frame_paths = np.array(vd.frames)[segment_center_indices]
 
         data = np.column_stack((data, start_frame_paths))

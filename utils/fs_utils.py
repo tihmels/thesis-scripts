@@ -56,7 +56,7 @@ def get_summary_videos():
     return [file for file in Path(SUMMARY_VIDEOS_PATH).glob("*.mp4") if re.match(TV_FILENAME_RE, file.name)]
 
 
-def read_segments_from_file(file: Path):
+def read_shots_from_file(file: Path):
     shots = []
 
     if file.is_file():

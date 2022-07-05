@@ -2,21 +2,21 @@
 
 import argparse
 import re
-import shutil
 from pathlib import Path
+from shutil import copy2, rmtree
 
 import numpy as np
 from PIL import Image
+from alive_progress import alive_bar
 from scipy import ndimage
 
 from VideoData import VideoData
 from utils.constants import TV_FILENAME_RE
-from utils.fs_utils import get_frame_dir, get_shot_file, get_date_time, get_kf_dir, read_segments_from_file, \
-    print_progress_bar
+from utils.fs_utils import get_frame_dir, get_shot_file, get_date_time, get_kf_dir, read_shots_from_file
 
 
 def detect_keyframes(vd: VideoData):
-    segments = vd.segments
+    segments = vd.shots
 
     is_summary = vd.path.parent.name == 'ts100'
 
@@ -86,7 +86,7 @@ def check_requirements(path: Path, skip_existing: False):
     kf_dir = get_kf_dir(path)
 
     if skip_existing and kf_dir.is_dir() and len(list(kf_dir.glob('frame*.jpg'))) == len(
-            read_segments_from_file(shot_file)):
+            read_shots_from_file(shot_file)):
         return False
 
     return True
@@ -116,13 +116,11 @@ if __name__ == "__main__":
     for vf_idx, vf in enumerate(video_files):
         vd = VideoData(vf)
 
-        # print(f'\n[{vf_idx + 1}/{len(video_files)}] {vd}')
-
-        shutil.rmtree(vd.keyframe_dir, ignore_errors=True)
+        rmtree(vd.keyframe_dir, ignore_errors=True)
         vd.keyframe_dir.mkdir(parents=True)
 
-        for shot_idx, kf_idx in enumerate(detect_keyframes(vd)):
-            shutil.copy2(vd.frames[kf_idx], vd.keyframe_dir)
+        with alive_bar(vd.n_shots, ctrl_c=False, title=f'[{vf_idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
 
-            print_progress_bar(shot_idx + 1, len(vd.segments), length=20, prefix=f'[{vf_idx + 1}/{len(video_files)}]',
-                               suffix=f'{vd}')
+            for kf_idx in detect_keyframes(vd):
+                copy2(vd.frames[kf_idx], vd.keyframe_dir)
+                bar()

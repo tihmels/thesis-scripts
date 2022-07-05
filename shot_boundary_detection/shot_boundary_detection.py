@@ -64,7 +64,7 @@ def check_requirements(video: Path, skip_existing: bool):
         return False
 
     if skip_existing and get_shot_file(video).exists():
-        print(f'{video.name} has already shots detected. Skip ...')
+        # print(f'{video.name} has already shots detected. Skip ...')
         return False
 
     return True

@@ -61,18 +61,18 @@ def process_videos(date: str, main_video: VideoData, summary_videos: [VideoData]
     shutil.rmtree(sm_dir, ignore_errors=True)
     sm_dir.mkdir(parents=True)
 
-    main_segment_vector = np.zeros(main_video.n_segments)
-    sum_segment_dict = {summary.id: (np.zeros(summary.n_segments), np.full(summary.n_segments, np.inf)) for summary in
+    main_segment_vector = np.zeros(main_video.n_shots)
+    sum_segment_dict = {summary.id: (np.zeros(summary.n_shots), np.full(summary.n_shots, np.inf)) for summary in
                         summary_videos}
 
     print(
-        f'Comparing {len(main_video.segments)} segments of {main_video.id}'
+        f'Comparing {len(main_video.shots)} segments of {main_video.id}'
         f' with segments of {len(summary_videos)} summary videos \n')
 
-    for seg_idx, (seg_start_idx, seg_end_idx) in enumerate(main_video.segments):
+    for seg_idx, (seg_start_idx, seg_end_idx) in enumerate(main_video.shots):
 
         print('{:<45s}'.format(
-            "[S{}/{}]: F{} - F{} ({} frames)".format(seg_idx + 1, main_video.n_segments, seg_start_idx, seg_end_idx,
+            "[S{}/{}]: F{} - F{} ({} frames)".format(seg_idx + 1, main_video.n_shots, seg_start_idx, seg_end_idx,
                                                      seg_end_idx - seg_start_idx + 1)), end="")
 
         main_frame_indices = np.round(np.linspace(seg_start_idx + 5, seg_end_idx - 5, 5)).astype(int)
@@ -81,9 +81,9 @@ def process_videos(date: str, main_video: VideoData, summary_videos: [VideoData]
 
         for summary in summary_videos:
 
-            segment_distances = np.full(summary.n_segments, np.inf)
+            segment_distances = np.full(summary.n_shots, np.inf)
 
-            for sum_seg_idx, (sum_seg_start_idx, sum_seg_end_idx) in enumerate(summary.segments):
+            for sum_seg_idx, (sum_seg_start_idx, sum_seg_end_idx) in enumerate(summary.shots):
                 sum_frame_indices = np.round(np.linspace(sum_seg_start_idx + 5, sum_seg_end_idx - 5, 3)).astype(int)
                 sum_segment_frames = [get_image_cached(frame) for frame in np.array(summary.frames)[sum_frame_indices]]
 
