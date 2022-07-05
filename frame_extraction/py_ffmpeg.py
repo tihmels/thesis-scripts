@@ -9,20 +9,20 @@ from shutil import rmtree
 
 import ffmpeg
 
-from VideoData import get_frame_dir, get_date_time, get_frame_paths
+from VideoData import get_frame_dir, get_date_time, get_frame_paths, VideoData
 from utils.constants import TV_FILENAME_RE
 
 
-def extract_frames_from_video(video: Path, fps=0.0, resize=(224, 224), overwrite=False,
-                              prune=False):
-    frame_dir = get_frame_dir(video)
+def extract_frames(vd: VideoData, fps=0.0, resize=(224, 224), overwrite=False,
+                   prune=False):
+    frame_dir = vd.frame_dir
 
     if prune and frame_dir.is_dir():
         rmtree(frame_dir)
 
     frame_dir.mkdir(parents=True, exist_ok=True)
 
-    stream = ffmpeg.input(video.absolute())
+    stream = ffmpeg.input(vd.path)
 
     if fps > 0:
         stream = stream.filter('fps', fps=fps, round='up')
@@ -33,7 +33,7 @@ def extract_frames_from_video(video: Path, fps=0.0, resize=(224, 224), overwrite
     stream = stream.output(f'{frame_dir}/frame_%05d.jpg')
     ffmpeg.run(stream, overwrite_output=overwrite, quiet=True)
 
-    return video
+    return vd
 
 
 def check_requirements(path: Path, skip_existing: bool):
@@ -81,24 +81,27 @@ if __name__ == "__main__":
 
 
     def callback_handler(res):
-        if res is not None and isinstance(res, Path):
-            print(f'{res.name} done')
+        if res is not None and isinstance(res, VideoData):
+            print(f'{res} done')
         else:
             print(f'There was a problem ...')
 
 
     if args.parallel:
         with mp.Pool(os.cpu_count()) as pool:
-            [pool.apply_async(extract_frames_from_video, (video,),
+            [pool.apply_async(extract_frames, (VideoData(vf),),
                               kwds={'fps': args.fps, 'overwrite': args.overwrite,
                                     'prune': args.prune, 'resize': args.size},
-                              callback=callback_handler) for video in video_files]
+                              callback=callback_handler) for vf in video_files]
             pool.close()
             pool.join()
 
     else:
-        for idx, video in enumerate(video_files):
-            print(f'[{idx + 1}/{len(video_files)}] {video.stem}', end=' ... ')
+        for idx, vf in enumerate(video_files):
+            vd = VideoData(vf)
 
-            result = extract_frames_from_video(video, args.fps, args.size, args.overwrite, args.prune)
+            print(f'[{idx + 1}/{len(video_files)}] {vd}', end=' ... ')
+
+            result = extract_frames(vd, args.fps, args.size, args.overwrite, args.prune)
+
             print('Done')
