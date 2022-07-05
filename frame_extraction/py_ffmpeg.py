@@ -9,7 +9,7 @@ from shutil import rmtree
 
 import ffmpeg
 
-from VideoData import get_frame_dir, get_date_time
+from VideoData import get_frame_dir, get_date_time, get_frame_paths
 from utils.constants import TV_FILENAME_RE
 
 
@@ -45,7 +45,7 @@ def check_requirements(path: Path, skip_existing: bool):
     if skip_existing:
         frame_dir = get_frame_dir(path)
 
-        if frame_dir.is_dir() and len(list(frame_dir.glob("frame_*.jpg"))) > 0:
+        if frame_dir.is_dir() and len(get_frame_paths(path)) > 0:
             return False
 
     return True

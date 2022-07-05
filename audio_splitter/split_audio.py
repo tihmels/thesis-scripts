@@ -13,7 +13,7 @@ from utils.constants import TV_FILENAME_RE
 
 
 def split_audio(vd: VideoData):
-    audio = AudioSegment.from_wav(get_audio_file(vd))
+    audio = AudioSegment.from_wav(vd.audio_file)
 
     segments = vd.shots
 

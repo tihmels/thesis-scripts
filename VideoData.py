@@ -11,15 +11,45 @@ class VideoData:
         self.id: str = path.stem
         self.path: Path = path
         self.date: datetime = get_date_time(path)
-        self.frames: [Path] = sorted(get_frame_paths(path))
-        self.kfs: [Path] = sorted(get_keyframe_paths(path))
-        self.shots: [(int, int)] = read_shots_from_file(get_shot_file(path))
-        self.audio = get_audio_file(path)
-        self.audio_shots: [Path] = sorted(get_audio_shots(path))
         self.frame_dir: Path = get_frame_dir(path)
         self.keyframe_dir: Path = get_kf_dir(path)
         self.audio_dir: Path = get_audio_dir(path)
         self.sm_dir: Path = get_sm_dir(path)
+        self._frames: [Path] = None
+        self._kfs: [Path] = None
+        self._shots: [(int, int)] = None
+        self._audio_file = None
+        self._audio_shots: [Path] = None
+
+    @property
+    def shots(self):
+        if self._shots is None:
+            self._shots = read_shots_from_file(get_shot_file(self.path))
+        return self._shots
+
+    @property
+    def kfs(self):
+        if self._kfs is None:
+            self._kfs = sorted(get_keyframe_paths(self.path))
+        return self._kfs
+
+    @property
+    def frames(self):
+        if self._frames is None:
+            self._frames = get_frame_paths(self.path)
+        return self._frames
+
+    @property
+    def audio_file(self):
+        if self._audio_file is None:
+            self._audio_file = get_audio_file(self.path)
+        return self._audio_file
+
+    @property
+    def audio_shots(self):
+        if self._audio_shots is None:
+            self._audio_shots = sorted(get_audio_shots(self.path))
+        return self._audio_file
 
     @property
     def n_frames(self):

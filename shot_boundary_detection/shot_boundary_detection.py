@@ -11,15 +11,10 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from VideoData import VideoData, get_shot_file, get_data_dir, get_frame_dir
+from VideoData import VideoData, get_shot_file, get_data_dir, get_frame_dir, get_frame_paths
 from transnetv2 import TransNetV2
 from utils.constants import TV_FILENAME_RE
 from utils.fs_utils import set_tf_loglevel
-
-
-def get_frames_from_dir(directory: Path, mode: str = 'RGB', size: (int, int) = (48, 27)):
-    frames = sorted(directory.glob('frame_*.jpg'))
-    return [Image.open(f).convert(mode).resize(size) for f in frames]
 
 
 def shot_transition_detection(frames):
@@ -37,7 +32,7 @@ def shot_transition_detection(frames):
 def process_video(vd: VideoData):
     try:
 
-        frames = get_frames_from_dir(vd.frame_dir)
+        frames = [Image.open(frame).resize((48, 27)) for frame in vd.frames]
         _, segments, img = shot_transition_detection(np.array([np.array(img) for img in frames]))
 
         segments = segments[segments[:, 1] - segments[:, 0] > 10]
@@ -59,7 +54,7 @@ def check_requirements(video: Path, skip_existing: bool):
 
     frame_path = get_frame_dir(video)
 
-    if not frame_path.exists() or len(list(frame_path.glob('frame_*.jpg'))) == 0:
+    if not frame_path.exists() or not len(get_frame_paths(video)) > 0:
         print(f'{video.name} has no extracted frames.')
         return False
 
