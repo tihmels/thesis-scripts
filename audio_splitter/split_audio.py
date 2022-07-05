@@ -4,11 +4,12 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 import numpy as np
+from alive_progress import alive_bar
 from pydub import AudioSegment
 
 from VideoData import VideoData
 from utils.constants import TV_FILENAME_RE
-from utils.fs_utils import get_date_time, get_audio_dir, print_progress_bar, read_segments_from_file, get_shot_file, \
+from utils.fs_utils import get_date_time, get_audio_dir, read_segments_from_file, get_shot_file, \
     get_audio_file, get_audio_shots
 
 
@@ -24,7 +25,7 @@ def split_audio(vd: VideoData):
         audio_segment = audio[start_ms:end_ms]
         audio_segment.export(Path(vd.audio_dir, 'shot_' + str(seg_idx + 1) + '.wav', format='wav'))
 
-        yield seg_idx
+        yield
 
 
 def check_requirements(path: Path, skip_existing=False):
@@ -79,6 +80,8 @@ if __name__ == "__main__":
     for idx, vf in enumerate(video_files):
         vd = VideoData(vf)
 
-        for shot_idx in split_audio(vd):
-            print_progress_bar(shot_idx + 1, len(vd.segments), length=20, prefix=f'[{idx + 1}/{len(video_files)}]',
-                               suffix=f'{vd}')
+        with alive_bar(len(vd.segments), ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vd.id}',
+                       length=20) as bar:
+
+            for shot in split_audio(vd):
+                bar()
