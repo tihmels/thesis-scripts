@@ -5,16 +5,14 @@ from pathlib import Path
 
 import numpy as np
 from alive_progress import alive_bar
-from pydub import AudioSegment
 
-from VideoData import VideoData, get_audio_file, get_audio_dir, get_shot_file, get_audio_shots, read_shots_from_file, \
+from VideoData import VideoData, get_audio_file, get_audio_dir, get_shot_file, get_audio_shot_paths, read_shots_from_file, \
     get_date_time
 from utils.constants import TV_FILENAME_RE
 
 
 def split_audio(vd: VideoData):
-    audio = AudioSegment.from_wav(vd.audio_file)
-
+    audio = vd.audio
     segments = vd.shots
 
     for seg_idx, (seg_start_idx, seg_end_idx) in enumerate(segments):
@@ -47,7 +45,7 @@ def check_requirements(path: Path, skip_existing=False):
         return False
 
     if skip_existing:
-        audio_shots = get_audio_shots(path)
+        audio_shots = get_audio_shot_paths(path)
 
         if len(audio_shots) == len(read_shots_from_file(shot_file)):
             return False

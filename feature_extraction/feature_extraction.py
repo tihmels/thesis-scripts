@@ -5,8 +5,10 @@ from pathlib import Path
 
 import torch
 from PIL import Image
+from alive_progress import alive_bar
 from torchvision import transforms
 from torchvision.models import resnet18
+import skimage
 
 from VideoData import VideoData, get_date_time
 
@@ -69,7 +71,5 @@ if __name__ == "__main__":
     for idx, vf in enumerate(video_files):
         vd = VideoData(vf)
 
-        print(f'[{idx + 1}/{len(video_files)}] {vd}')
-
-        # with h5py.File(get_feature_file(vf), 'w') as h5f:
-        #     calculate_features(vd)
+        with alive_bar(vd.n_shots, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
+            bar()

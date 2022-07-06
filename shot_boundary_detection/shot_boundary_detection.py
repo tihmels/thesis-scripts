@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
     assert len(video_files) > 0
 
-    print(f'\nVideo Segmentation ({len(video_files)} videos)\n')
+    print(f'Video Segmentation ({len(video_files)} videos)\n')
 
 
     def callback_handler(res):

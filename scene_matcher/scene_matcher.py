@@ -13,7 +13,7 @@ import numpy as np
 from PIL import Image
 from PIL.Image import Resampling
 
-from VideoData import VideoData, get_sm_dir, get_frame_dir, get_shot_file, get_date_time, get_data_dir
+from VideoData import VideoData, get_sm_dir, get_frame_dir, get_shot_file, get_date_time, get_data_dir, get_frame_paths
 from VideoStats import VideoStats, VideoType, get_vs_evaluation_df
 from utils.constants import TV_FILENAME_RE, TS_PATH
 from utils.fs_utils import get_summary_videos
@@ -78,7 +78,7 @@ def process_videos(date: str, main_video: VideoData, summary_videos: [VideoData]
 
         main_frame_indices = np.round(np.linspace(seg_start_idx + 5, seg_end_idx - 5, 5)).astype(int)
         main_segment_frames = [get_image(frame) for frame in
-                               np.array(main_video.frames)[main_frame_indices]]
+                               np.array(get_frame_paths(main_video))[main_frame_indices]]
 
         for summary in summary_videos:
 
@@ -86,7 +86,8 @@ def process_videos(date: str, main_video: VideoData, summary_videos: [VideoData]
 
             for sum_seg_idx, (sum_seg_start_idx, sum_seg_end_idx) in enumerate(summary.shots):
                 sum_frame_indices = np.round(np.linspace(sum_seg_start_idx + 5, sum_seg_end_idx - 5, 3)).astype(int)
-                sum_segment_frames = [get_image_cached(frame) for frame in np.array(summary.frames)[sum_frame_indices]]
+                sum_segment_frames = [get_image_cached(frame) for frame in
+                                      np.array(get_frame_paths(summary))[sum_frame_indices]]
 
                 min_frame_dist = min_frameset_hash_distance(main_segment_frames, sum_segment_frames)
                 segment_distances[sum_seg_idx] = min_frame_dist
