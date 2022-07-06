@@ -20,8 +20,8 @@ class VideoData:
         self.sm_dir: Path = get_sm_dir(path)
         self._shots: [(int, int)] = None
         self._topics: [str] = None
-        self._frames = None
-        self._kfs = None
+        self._frames: [str] = None
+        self._kfs: [str] = None
         self._audio: AudioSegment = None
         self._audio_shots: [AudioSegment] = None
 

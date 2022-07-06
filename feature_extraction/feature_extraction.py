@@ -3,46 +3,14 @@
 import argparse
 from pathlib import Path
 
-import torch
 from PIL import Image
 from alive_progress import alive_bar
-from torchvision import transforms
-from torchvision.models import resnet18
-import skimage
 
 from VideoData import VideoData, get_date_time
 
 
 def calculate_features(vd: VideoData):
-    model = resnet18(pretrained=True)
-    model.eval()
-
-    layer = model._modules.get('avgpool')
-
-    transform = transforms.Compose([
-        transforms.Scale((224, 224)),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        transforms.ToTensor()
-    ])
-
-    frames = [transform(Image.open(frame)) for frame in vd.kfs]
-
-    for frame in frames:
-        prediction = model(frames).squeeze(0).softmax(0)
-        my_embedding = torch.zeros(512)
-
-        # 4. Define a function that will copy the output of a layer
-        def copy_data(m, i, o):
-            my_embedding.copy_(o.data)
-
-        # 5. Attach that function to our selected layer
-        h = layer.register_forward_hook(copy_data)
-        # 6. Run the model on our transformed image
-        model(frame)
-        # 7. Detach our copy function from the layer
-        h.remove()
-        # 8. Return the feature vector
-        print(my_embedding.numpy())
+    frames = [Image.open(frame) for frame in vd.kfs]
 
 
 def check_requirements(path: Path, skip_existing=False):
