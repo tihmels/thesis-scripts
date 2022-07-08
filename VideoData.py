@@ -128,8 +128,10 @@ def get_sm_dir(video: VideoPathType):
 
 
 def get_topic_file(video: VideoPathType):
-    if isinstance(video, Path):
+    if isinstance(video, Path) and video.parent.name == 'ts15':
         return Path(get_data_dir(video), "topics.csv")
+    elif isinstance(video, Path) and video.parent.name == 'ts100':
+        return Path(get_data_dir(video), "topics.json")
     else:
         return get_topic_file(video.path)
 
