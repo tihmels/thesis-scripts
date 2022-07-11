@@ -60,8 +60,6 @@ async def main():
 
     print("Downloading {} videos".format(len(links)))
 
-    links.reverse()
-
     for idx, link in enumerate(links):
         url = "https://www.ardmediathek.de" + link
 

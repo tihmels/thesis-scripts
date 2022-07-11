@@ -105,6 +105,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
     parser.add_argument('-s', '--skip', action='store_true', help="skip keyframe extraction if already exist")
+    parser.add_argument('--center', action='store_true', help="use shot center frame as keyframe ")
     parser.add_argument('--parallel', action='store_true')
     args = parser.parse_args()
 
@@ -130,6 +131,6 @@ if __name__ == "__main__":
 
         with alive_bar(vd.n_shots, ctrl_c=False, title=f'[{vf_idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
 
-            for kf_idx in detect_keyframes(vd):
+            for kf_idx in detect_keyframes(vd, get_center_kf_idx if args.center else get_magnitude_gradient_kf_idx):
                 copy2(vd.frames[kf_idx], vd.keyframe_dir)
                 bar()
