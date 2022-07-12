@@ -30,7 +30,7 @@ def extract_frames(vd: VideoData, fps=0.0, resize=(224, 224), overwrite=False,
     if resize:
         stream = stream.filter('scale', resize[0], resize[1])
 
-    stream = stream.output(f'{frame_dir}/frame_%05d.jpg')
+    stream = stream.output(f'{frame_dir}/frame_%05d.jpg', **{'qscale:v': 1, 'qmin': 1, 'qmax': 1})
     ffmpeg.run(stream, overwrite_output=overwrite, quiet=True)
 
     return vd

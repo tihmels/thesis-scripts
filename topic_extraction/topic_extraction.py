@@ -1,62 +1,56 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
 import json
-import os
 import re
 from argparse import ArgumentParser
 from pathlib import Path
 
-import contextualSpellCheck
 import numpy as np
 import skimage
-import spacy
 from PIL import Image
 from alive_progress import alive_bar
 from pytesseract import pytesseract, Output
 from skimage.filters.edges import sobel
 from skimage.filters.thresholding import try_all_threshold
+from spellchecker import SpellChecker
 
 from VideoData import get_date_time, VideoData, get_kf_dir, get_keyframe_paths, get_topic_file
 from utils.constants import TV_FILENAME_RE
 
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
+spell = SpellChecker(language='de')
+spell.word_frequency.load_text_file('/Users/tihmels/Desktop/test.txt')
+spell.word_frequency.load_words(['Windräder', 'Corona-Expertinnenrat', 'Hürden', 'Ausweitung'])
 
 
 def spellcheck(text):
-    nlp = spacy.load('de_dep_news_trf')
+    misspelled = spell.unknown(text)
 
-    contextualSpellCheck.add_to_pipe(nlp)
-    doc = nlp(text)
+    for word in misspelled:
+        # Get the one `most likely` answer
+        print(spell.correction(word))
 
-    tlist = []
+        # Get a list of `likely` options
+        print(spell.candidates(word))
 
-    for idx, token in enumerate(doc):
-
-        suggestions = doc[idx]._.score_spellCheck
-
-        if suggestions:
-            max_score_suggestion = max(suggestions, key=lambda x: x[1])
-
-            if max_score_suggestion[1] > 0.95:
-                tlist.append(max_score_suggestion[0])
-            else:
-                tlist.append(token.text)
-        else:
-            tlist.append(token.text)
-
-    return ' '.join(tlist)
+    return text
 
 
-def extract_topics(vd):
-    keyframes = [Image.open(frame).convert('L') for frame in vd.kfs]
+def extract_topics(vd, resize_factor=2):
+    first_shot_indices = [idx1 for idx1, idx2 in vd.shots]
+
+    keyframes = [Image.open(frame).convert('L') for frame in np.array(vd.frames)[first_shot_indices]]
+    keyframes = [frame.resize((frame.size[0] * resize_factor, frame.size[1] * resize_factor)) for frame in keyframes]
     keyframes = [np.array(frame) for frame in keyframes]
 
     for frame in keyframes:
-        caption_box = frame[-48:-18, -425:]
+        caption_box = frame[-48 * resize_factor:-18 * resize_factor, -425 * resize_factor:]
         thresh = skimage.filters.thresholding.threshold_li(caption_box)
         caption_box = caption_box > thresh
 
-        caption_data = pytesseract.image_to_data(caption_box, output_type=Output.DICT, lang='deu',
-                                                 config='--psm 7 --oem 1')
+        Image.fromarray(caption_box).save("/Users/tihmels/Desktop/test.png")
+
+        custom_oem_psm_config = r'--psm 4 --oem 1'
+        caption_data = pytesseract.image_to_data(caption_box, output_type=Output.DICT, lang='deu+eng',
+                                                 config=custom_oem_psm_config)
 
         yield caption_data
 
@@ -114,19 +108,19 @@ if __name__ == "__main__":
             translator = str.maketrans('', '', escapes)
 
             for shot_idx, text_data in enumerate(extract_topics(vd)):
-                text = ' '.join(text_data['text']).strip()
+                text_list = [word for word in text_data['text'] if word]
+                # text_list = spellcheck(text_list)
+
+                text = ' '.join(text_list).strip()
 
                 unescaped_text = text.translate(translator)
 
-                # print(f'Before: {unescaped_text}')
-                # unescaped_text = spellcheck(unescaped_text)
-                # print(f'After: {unescaped_text}')
-
                 topics[shot_idx] = unescaped_text
 
-                bar()
-
             json_object = json.dumps(topics, indent=4, ensure_ascii=False)
+            print(json_object)
 
             with open(get_topic_file(vd), 'w') as f:
                 json.dump(topics, f, ensure_ascii=False)
+
+            bar()
