@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import skimage
+import spacy
 from PIL import Image
 from alive_progress import alive_bar
 from pytesseract import pytesseract, Output
@@ -18,20 +19,21 @@ from utils.constants import TV_FILENAME_RE
 
 spell = SpellChecker(language='de')
 spell.word_frequency.load_text_file('/Users/tihmels/Desktop/test.txt')
-spell.word_frequency.load_words(['Windräder', 'Corona-Expertinnenrat', 'Hürden', 'Ausweitung'])
+spell.word_frequency.load_words(
+    ['Windräder', 'Corona-Expertinnenrat', 'Hürden', 'Ausweitung', 'Fußball-Bundesliga', 'Fallzahlen',
+     'Vorbereitungen'])
+
+spacy_de = spacy.load('de_core_news_sm')
 
 
-def spellcheck(text):
-    misspelled = spell.unknown(text)
+def spellcheck(word: str):
+    misspelled = spell.unknown(list(word))
 
-    for word in misspelled:
-        # Get the one `most likely` answer
-        print(spell.correction(word))
+    for w in misspelled:
+        print(w)
+        return spell.correction(w)
 
-        # Get a list of `likely` options
-        print(spell.candidates(word))
-
-    return text
+    return word
 
 
 def extract_topics(vd, resize_factor=2):
@@ -104,23 +106,30 @@ if __name__ == "__main__":
 
             topics = {}
 
-            escapes = ''.join([chr(char) for char in range(1, 32)])
-            translator = str.maketrans('', '', escapes)
-
             for shot_idx, text_data in enumerate(extract_topics(vd)):
-                text_list = [word for word in text_data['text'] if word]
-                # text_list = spellcheck(text_list)
 
-                text = ' '.join(text_list).strip()
+                words = np.array([word for word in text_data['text'] if word])
+                confidence_levels = np.array([conf for conf in text_data['conf'] if conf > 0])
 
-                unescaped_text = text.translate(translator)
+                # low_confidence_indices = np.argwhere(confidence_levels < 50)
 
-                topics[shot_idx] = unescaped_text
+                # for lc_idx in low_confidence_indices:
+                #    words[lc_idx] = spellcheck(words[lc_idx])
+
+                text = ' '.join(words).strip()
+
+                doc = spacy_de(text)
+                entities = doc.ents
+
+                if len(entities) == 1 and len(entities[0]) == len(doc):
+                    text = ""
+
+                topics[shot_idx] = text
+
+                bar()
 
             json_object = json.dumps(topics, indent=4, ensure_ascii=False)
             print(json_object)
 
             with open(get_topic_file(vd), 'w') as f:
                 json.dump(topics, f, ensure_ascii=False)
-
-            bar()
