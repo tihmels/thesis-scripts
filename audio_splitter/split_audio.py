@@ -4,11 +4,15 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 import numpy as np
+import pydub
 from alive_progress import alive_bar
 
-from VideoData import VideoData, get_audio_file, get_audio_dir, get_shot_file, get_audio_shot_paths, read_shots_from_file, \
+from VideoData import VideoData, get_audio_file, get_audio_dir, get_shot_file, get_audio_shot_paths, \
+    read_shots_from_file, \
     get_date_time
 from utils.constants import TV_FILENAME_RE
+
+pydub.AudioSegment.ffmpeg = '/usr/local/bin/ffmpeg'
 
 
 def split_audio(vd: VideoData):
@@ -20,7 +24,9 @@ def split_audio(vd: VideoData):
         end_ms = np.divide(seg_end_idx, 25) * 1000
 
         audio_segment = audio[start_ms:end_ms]
-        audio_segment.export(Path(vd.audio_dir, 'shot_' + str(seg_idx + 1) + '.wav', format='wav'))
+
+        audio_segment.export(
+            Path(vd.audio_dir, 'shot_' + str(seg_idx + 1) + '.wav'), format='wav')
 
         yield
 

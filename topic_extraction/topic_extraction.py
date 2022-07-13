@@ -18,7 +18,7 @@ from VideoData import get_date_time, VideoData, get_kf_dir, get_keyframe_paths, 
 from utils.constants import TV_FILENAME_RE
 
 spell = SpellChecker(language='de')
-spell.word_frequency.load_text_file('/Users/tihmels/Desktop/test.txt')
+spell.word_frequency.load_text_file('/Users/tihmels/TS/topics_dict.txt')
 spell.word_frequency.load_words(
     ['Windräder', 'Corona-Expertinnenrat', 'Hürden', 'Ausweitung', 'Fußball-Bundesliga', 'Fallzahlen',
      'Vorbereitungen'])
