@@ -65,16 +65,21 @@ async def main():
 
         print("[{}] {} :".format(idx, link), end=" ")
 
-        await page.goto(url)
+        try:
 
-        await page.waitForSelector("video.ardplayer-mediacanvas")
-        await page.waitForSelector("button.ardplayer-button-settings")
-        await page.waitForSelector("source")
+            await page.goto(url)
 
-        if process_page(await page.content()):
-            print("Downloaded")
-        else:
-            print("Skipped")
+            await page.waitForSelector("video.ardplayer-mediacanvas")
+            await page.waitForSelector("button.ardplayer-button-settings")
+            await page.waitForSelector("source")
+
+            if process_page(await page.content()):
+                print("Downloaded")
+            else:
+                print("Skipped")
+
+        except:
+            print(f'Problem with: {link}')
 
     await browser.close()
 
