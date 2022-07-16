@@ -188,6 +188,13 @@ def get_feature_file(video: VideoPathType):
         return get_feature_file(video.path)
 
 
+def get_transcript_file(video: VideoPathType):
+    if isinstance(video, Path):
+        return Path(get_data_dir(video), "transcript.json")
+    else:
+        return get_transcript_file(video.path)
+
+
 def read_topics_from_file(file: Path):
     topics = []
 

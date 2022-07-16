@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from VideoData import VideoData, get_shot_file, get_data_dir, get_frame_dir, get_frame_paths
+from VideoData import VideoData, get_shot_file, get_data_dir, get_frame_dir, get_frame_paths, get_date_time
 from transnetv2 import TransNetV2
 from utils.constants import TV_FILENAME_RE
 from utils.fs_utils import set_tf_loglevel
@@ -87,6 +87,8 @@ if __name__ == "__main__":
             video_files.extend([video for video in file.glob('*.mp4') if check_requirements(video, args.skip)])
 
     assert len(video_files) > 0
+
+    video_files.sort(key=get_date_time)
 
     print(f'Video Segmentation ({len(video_files)} videos)\n')
 

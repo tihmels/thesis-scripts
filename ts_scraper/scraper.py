@@ -13,15 +13,23 @@ from utils.constants import TS_100_URL, SUMMARY_VIDEOS_PATH
 
 
 def process_page(page):
+
+    print('TEST 3')
     soup = BeautifulSoup(page, "html.parser")
 
     video = soup.find('video').find('source')
     url = video['src'].replace("webm", "webs")
     filename = url.split('/')[-1]
 
-    r = requests.get(url)
+    print('TEST 4')
+
+    print(url)
+
+    r = requests.get(url, timeout=10)
 
     file = '{}/{}'.format(SUMMARY_VIDEOS_PATH, filename)
+
+    print('TEST 5')
 
     if not exists(file):
         with open(file, 'wb') as fd:
@@ -33,7 +41,7 @@ def process_page(page):
 
 async def main():
     browser = await pyppeteer.connect(
-        browserURL='http://localhost:9222', slowMo=4, logLevel=logging.INFO)
+        browserURL='http://localhost:9222', slowMo=3, logLevel=logging.INFO)
 
     pages = await browser.pages()
     page = pages[-1]
@@ -65,21 +73,20 @@ async def main():
 
         print("[{}] {} :".format(idx, link), end=" ")
 
-        try:
+        await page.goto(url)
 
-            await page.goto(url)
+        print('TEST 1')
 
-            await page.waitForSelector("video.ardplayer-mediacanvas")
-            await page.waitForSelector("button.ardplayer-button-settings")
-            await page.waitForSelector("source")
+        await page.waitForSelector("video.ardplayer-mediacanvas")
+        await page.waitForSelector("button.ardplayer-button-settings")
+        await page.waitForSelector("source")
 
-            if process_page(await page.content()):
-                print("Downloaded")
-            else:
-                print("Skipped")
+        print('TEST 2')
 
-        except:
-            print(f'Problem with: {link}')
+        if process_page(await page.content()):
+            print("Downloaded")
+        else:
+            print("Skipped")
 
     await browser.close()
 

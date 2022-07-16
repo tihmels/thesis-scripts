@@ -13,11 +13,10 @@ from VideoData import get_frame_dir, get_date_time, get_frame_paths, VideoData
 from utils.constants import TV_FILENAME_RE
 
 
-def extract_frames(vd: VideoData, fps=0.0, resize=(224, 224), overwrite=False,
-                   prune=False):
+def extract_frames(vd: VideoData, fps=0.0, resize=None):
     frame_dir = vd.frame_dir
 
-    if prune and frame_dir.is_dir():
+    if frame_dir.is_dir():
         rmtree(frame_dir)
 
     frame_dir.mkdir(parents=True, exist_ok=True)
@@ -31,7 +30,7 @@ def extract_frames(vd: VideoData, fps=0.0, resize=(224, 224), overwrite=False,
         stream = stream.filter('scale', resize[0], resize[1])
 
     stream = stream.output(f'{frame_dir}/frame_%05d.jpg', **{'qscale:v': 1, 'qmin': 1, 'qmax': 1})
-    ffmpeg.run(stream, overwrite_output=overwrite, quiet=True)
+    ffmpeg.run(stream, quiet=True)
 
     return vd
 
@@ -56,10 +55,8 @@ if __name__ == "__main__":
 
     parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+',
                         help="video files or directories containing video files for frame extraction ")
-    parser.add_argument('--fps', type=float, default=0.0, help="extract frames per second")
-    parser.add_argument('-o', '--overwrite', action='store_true', help="overwrite existing frame files")
-    parser.add_argument('-p', '--prune', action='store_true', help="prune all frame files if output directory exists")
     parser.add_argument('-s', '--skip', action='store_true', help="skip frame extraction if already exist")
+    parser.add_argument('--fps', type=float, default=0.0, help="extract frames per second")
     parser.add_argument('--size', type=lambda s: list(map(int, s.split('x'))))
     parser.add_argument('--parallel', action='store_true',
                         help="execute frame extraction using parallel multiprocessing")
@@ -102,6 +99,6 @@ if __name__ == "__main__":
 
             print(f'[{idx + 1}/{len(video_files)}] {vd}', end=' ... ')
 
-            extract_frames(vd, args.fps, args.size, args.overwrite, args.prune)
+            extract_frames(vd, args.fps, args.size)
 
             print('Done')
