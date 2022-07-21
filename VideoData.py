@@ -1,4 +1,5 @@
 import csv
+import json
 import re
 from datetime import datetime
 from pathlib import Path
@@ -33,8 +34,8 @@ class VideoData:
 
     @property
     def topics(self):
-        if self._topics is None and not self.is_summary:
-            self._topics = read_topics_from_file(get_topic_file(self.path))
+        if self._topics is None:
+            self._topics = read_topics_from_file(get_topic_file(self.path), is_summary(self))
         return self._topics
 
     @property
@@ -79,7 +80,7 @@ class VideoData:
 
     @property
     def is_summary(self):
-        return self.path.parent == 'ts100'
+        return is_summary(self)
 
     def __str__(self):
         return str(self.path.relative_to(self.path.parent.parent)).split('.')[0]
@@ -127,10 +128,17 @@ def get_sm_dir(video: VideoPathType):
         return get_sm_dir(video.path)
 
 
+def is_summary(video: VideoPathType):
+    if isinstance(video, Path):
+        return video.parent.name == 'ts100'
+    else:
+        return is_summary(video.path)
+
+
 def get_topic_file(video: VideoPathType):
-    if isinstance(video, Path) and video.parent.name == 'ts15':
+    if isinstance(video, Path) and not is_summary(video):
         return Path(get_data_dir(video), "topics.csv")
-    elif isinstance(video, Path) and video.parent.name == 'ts100':
+    elif isinstance(video, Path) and is_summary(video):
         return Path(get_data_dir(video), "topics.json")
     else:
         return get_topic_file(video.path)
@@ -195,15 +203,14 @@ def get_transcript_file(video: VideoPathType):
         return get_transcript_file(video.path)
 
 
-def read_topics_from_file(file: Path):
-    topics = []
-
+def read_topics_from_file(file: Path, is_summary: bool):
     with open(file, 'r') as file:
-        reader = csv.reader(file)
-        for row in reader:
-            topics.extend(row)
-
-    return topics
+        if is_summary:
+            data = json.load(file)
+            return data.items()
+        else:
+            reader = csv.reader(file)
+            return [row for row in reader]
 
 
 def read_shots_from_file(file: Path):
