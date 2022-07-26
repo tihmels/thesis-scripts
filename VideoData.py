@@ -202,6 +202,12 @@ def get_transcript_file(video: VideoPathType):
     else:
         return get_transcript_file(video.path)
 
+def get_story_file(video: VideoPathType):
+    if isinstance(video, Path):
+        return Path(get_data_dir(video), "stories.json")
+    else:
+        return get_story_file(video.path)
+
 
 def read_topics_from_file(file: Path, is_summary: bool):
     with open(file, 'r') as file:

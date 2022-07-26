@@ -1,20 +1,18 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
+import json
 import re
 from argparse import ArgumentParser
 from itertools import tee
 from pathlib import Path
 
 import Levenshtein
-import contextualSpellCheck
 import numpy as np
 import spacy
-from spacy import Language
+from spacy.language import Language
 from spacy_langdetect import LanguageDetector
 
-from VideoData import VideoData, get_shot_file, get_date_time, get_topic_file
+from VideoData import VideoData, get_shot_file, get_date_time, get_topic_file, get_story_file
 from utils.constants import TV_FILENAME_RE
-
-spacy_de = spacy.load('de_core_news_sm')
 
 
 @Language.factory("language_detector")
@@ -22,12 +20,11 @@ def get_lang_detector(nlp, name):
     return LanguageDetector()
 
 
+spacy_de = spacy.load('de_core_news_sm')
 spacy_de.add_pipe('language_detector', last=True)
-contextualSpellCheck.add_to_pipe(spacy_de)
 
 
 def pairwise(iterable):
-    # pairwise('ABCDEFG') --> AB BC CD DE EF FG
     a, b = tee(iterable)
     next(b, None)
     return zip(a, b)
@@ -38,8 +35,14 @@ def segment_ts15(vd: VideoData):
     yield
 
 
+def is_valid_text(text: str):
+    doc = spacy_de(text)
+    return doc._.language['language'] == 'de' and doc._.language['score'] >= 0.9
+
+
 def segment_ts100(vd: VideoData, lev_threshold=5):
-    topics = {shot_idx: topic for shot_idx, topic in vd.topics if topic}
+    topics = {shot_idx: topic for shot_idx, topic in vd.topics if topic and is_valid_text(topic)}
+    print(topics)
 
     levenshtein_distances = np.empty(len(topics))
     current_topic = ''
@@ -48,23 +51,34 @@ def segment_ts100(vd: VideoData, lev_threshold=5):
         levenshtein_distances[index] = Levenshtein.distance(current_topic, topic)
         current_topic = topic
 
+    print(levenshtein_distances)
+
     levenshtein_distances = np.where(levenshtein_distances > lev_threshold, 1, 0)
+    print(levenshtein_distances)
 
-    boundary_indices = [i for i, x in enumerate(levenshtein_distances) if x == 1]
-    boundary_indices.append(len(levenshtein_distances))
+    semantic_boundary_indices = [i for i, x in enumerate(levenshtein_distances) if x == 1]
+    semantic_boundary_indices.append(len(topics))
+    print(semantic_boundary_indices)
 
-    semantic_boundary_ranges = [(i1, i2 - 1) for i1, i2 in pairwise(boundary_indices)]
+    semantic_boundary_ranges = [(i1, i2 - 1) for i1, i2 in pairwise(semantic_boundary_indices)]
+    print(semantic_boundary_ranges)
 
-    shots = vd.shots
+    stories = []
 
-    for s1, s2 in semantic_boundary_ranges:
-        topic = topics.values()[s1]
-        scene_first_shot_idx = topics
-        scene_last_shot_idx = topics[s2]['shot_idx']
+    for first_shot_idx, last_shot_idx in semantic_boundary_ranges:
+        story_topic = list(topics.values())[last_shot_idx]
+        story_first_shot_idx = int(list(topics.keys())[first_shot_idx])
+        story_last_shot_idx = int(list(topics.keys())[last_shot_idx])
 
-        print(f'{topic}: {scene_first_shot_idx} - {scene_last_shot_idx}')
+        stories.append(
+            {'topic': story_topic,
+             'first_shot_idx': story_first_shot_idx,
+             'last_shot_idx': story_last_shot_idx,
+             'first_frame_idx': vd.shots[story_first_shot_idx][0],
+             'last_frame_idx': vd.shots[story_last_shot_idx][1]})
 
-    return levenshtein_distances
+
+    return stories
 
 
 def check_requirements(path: Path, skip_existing=False):
@@ -117,4 +131,7 @@ if __name__ == "__main__":
         vd = VideoData(vf)
 
         segmentor = segment_ts100 if vd.is_summary else segment_ts15
-        scenes = segmentor(vd)
+        stories = segmentor(vd)
+
+        with open(get_story_file(vd), 'w') as f:
+            json.dump(stories, f, indent=4, ensure_ascii=False)
