@@ -58,14 +58,12 @@ def get_magnitude_gradient_kf_idx(frames):
 def detect_keyframes(vd: VideoData, kf_func=get_magnitude_gradient_kf_idx):
     segments = vd.shots
 
-    is_summary = vd.path.parent.name == 'ts100'
-
     for seg_idx, (seg_start_idx, seg_end_idx) in enumerate(segments):
 
-        frames = [Image.open(frame).convert('L') for frame in vd.frames[seg_start_idx:seg_end_idx]]
+        frames = [Image.open(frame).convert('L') for frame in vd.frames[seg_start_idx + 5:seg_end_idx - 5]]
         frames = [np.array(frame) for frame in frames]
 
-        if is_summary:
+        if vd.is_summary:
             frames = [frame[:220, :] for frame in frames]
 
         keyframe_idx = kf_func(frames)

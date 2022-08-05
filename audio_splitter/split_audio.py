@@ -19,7 +19,7 @@ def split_audio(vd: VideoData):
     audio = vd.audio
     segments = vd.shots
 
-    for seg_idx, (seg_start_idx, seg_end_idx) in enumerate(segments):
+    for seg_idx, (seg_start_idx, seg_end_idx, _) in enumerate(segments):
         start_ms = np.divide(seg_start_idx, 25) * 1000
         end_ms = np.divide(seg_end_idx, 25) * 1000
 

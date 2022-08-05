@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 from PIL import Image
 
 from VideoData import VideoData, get_shot_file, get_data_dir, get_frame_dir, get_frame_paths, get_date_time
@@ -33,11 +34,19 @@ def process_video(vd: VideoData):
     try:
 
         frames = [Image.open(frame).resize((48, 27)) for frame in vd.frames]
-        _, segments, img = shot_transition_detection(np.array([np.array(img) for img in frames]))
+        frames = [np.array(frame) for frame in frames]
 
-        segments = segments[segments[:, 1] - segments[:, 0] > 10]
+        if vd.is_summary:
+            frames = [frame[:220, :] for frame in frames]
 
-        np.savetxt(get_shot_file(video).absolute(), segments, fmt="%d")
+        _, segments, img = shot_transition_detection(np.array(frames))
+
+        data = segments[segments[:, 1] - segments[:, 0] > 10]
+        data = np.c_[data, data[:, 1] - data[:, 0]]
+
+        df = pd.DataFrame(data=data)
+
+        df.to_csv(get_shot_file(video).absolute(), sep=' ', header=False)
         img.save(Path(get_data_dir(video), 'shots.png').absolute())
 
         return video

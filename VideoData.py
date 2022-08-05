@@ -202,6 +202,7 @@ def get_transcript_file(video: VideoPathType):
     else:
         return get_transcript_file(video.path)
 
+
 def get_story_file(video: VideoPathType):
     if isinstance(video, Path):
         return Path(get_data_dir(video), "stories.json")
@@ -225,8 +226,8 @@ def read_shots_from_file(file: Path):
     if file.is_file():
         file = open(file, 'r')
         for line in file.readlines():
-            first_index, last_index = [int(x.strip(' ')) for x in line.split(' ')]
-            shots.append((first_index, last_index))
+            idx, first_index, last_index, n_frames = [int(x.strip(' ')) for x in line.split(' ')]
+            shots.append((first_index, last_index, n_frames))
         return shots
     else:
         return None

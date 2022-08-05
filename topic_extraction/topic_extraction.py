@@ -36,25 +36,37 @@ def spellcheck(word: str):
     return word
 
 
-def extract_topics(vd, resize_factor=2):
-    first_shot_indices = [idx1 for idx1, idx2 in vd.shots]
+def extract_text_from_frame(frame, resize_factor=2):
+    caption_box = frame[-48 * resize_factor:-18 * resize_factor, -425 * resize_factor:]
+    thresh = skimage.filters.thresholding.threshold_li(caption_box)
+    caption_box = caption_box > thresh
 
-    keyframes = [Image.open(frame).convert('L') for frame in np.array(vd.frames)[first_shot_indices]]
-    keyframes = [frame.resize((frame.size[0] * resize_factor, frame.size[1] * resize_factor)) for frame in keyframes]
-    keyframes = [np.array(frame) for frame in keyframes]
+    custom_oem_psm_config = r'--psm 4 --oem 1'
+    caption_data = pytesseract.image_to_data(caption_box, output_type=Output.DICT, lang='deu+eng',
+                                             config=custom_oem_psm_config)
+    return caption_data
 
-    for frame in keyframes:
-        caption_box = frame[-48 * resize_factor:-18 * resize_factor, -425 * resize_factor:]
-        thresh = skimage.filters.thresholding.threshold_li(caption_box)
-        caption_box = caption_box > thresh
 
-        Image.fromarray(caption_box).save("/Users/tihmels/Desktop/test.png")
+def read_frame_as_array(path: Path, resize_factor=2):
+    frame = Image.open(path).convert('L')
+    frame = frame.resize((frame.size[0] * resize_factor, frame.size[1] * resize_factor))
+    return np.array(frame)
 
-        custom_oem_psm_config = r'--psm 4 --oem 1'
-        caption_data = pytesseract.image_to_data(caption_box, output_type=Output.DICT, lang='deu+eng',
-                                                 config=custom_oem_psm_config)
 
-        yield caption_data
+def extract_caption_data(vd: VideoData):
+    segments = vd.shots
+
+    for first_frame_idx, last_frame_idx, _ in segments:
+
+        center_frame_idx = int((last_frame_idx + first_frame_idx) / 2)
+        center_frame = read_frame_as_array(vd.frames[center_frame_idx])
+
+        center_caption_data = extract_text_from_frame(center_frame)
+
+        first_frame = read_frame_as_array(vd.frames[first_frame_idx])
+        first_caption_data = extract_text_from_frame(first_frame)
+
+        yield first_caption_data
 
 
 def check_requirements(path: Path, skip_existing=False):
@@ -106,15 +118,11 @@ if __name__ == "__main__":
 
             topics = {}
 
-            for shot_idx, text_data in enumerate(extract_topics(vd)):
+            for shot_idx, caption_data in enumerate(extract_caption_data(vd)):
 
-                words = np.array([word for word in text_data['text'] if word])
-                confidence_levels = np.array([conf for conf in text_data['conf'] if conf > 0])
-
-                # low_confidence_indices = np.argwhere(confidence_levels < 50)
-
-                # for lc_idx in low_confidence_indices:
-                #    words[lc_idx] = spellcheck(words[lc_idx])
+                confidence_indices = (np.array(caption_data['conf']) > 0).nonzero()
+                words = np.array([word for word in caption_data['text'] if word])
+                confidence_levels = np.array([conf for conf in caption_data['conf'] if conf > 0])
 
                 text = ' '.join(words).strip()
 

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import Levenshtein
 import numpy as np
+import pandas as pd
 import spacy
 from spacy.language import Language
 from spacy_langdetect import LanguageDetector
@@ -42,7 +43,6 @@ def is_valid_text(text: str):
 
 def segment_ts100(vd: VideoData, lev_threshold=5):
     topics = {shot_idx: topic for shot_idx, topic in vd.topics if topic and is_valid_text(topic)}
-    print(topics)
 
     levenshtein_distances = np.empty(len(topics))
     current_topic = ''
@@ -51,17 +51,12 @@ def segment_ts100(vd: VideoData, lev_threshold=5):
         levenshtein_distances[index] = Levenshtein.distance(current_topic, topic)
         current_topic = topic
 
-    print(levenshtein_distances)
-
     levenshtein_distances = np.where(levenshtein_distances > lev_threshold, 1, 0)
-    print(levenshtein_distances)
 
     semantic_boundary_indices = [i for i, x in enumerate(levenshtein_distances) if x == 1]
     semantic_boundary_indices.append(len(topics))
-    print(semantic_boundary_indices)
 
     semantic_boundary_ranges = [(i1, i2 - 1) for i1, i2 in pairwise(semantic_boundary_indices)]
-    print(semantic_boundary_ranges)
 
     stories = []
 
@@ -70,14 +65,30 @@ def segment_ts100(vd: VideoData, lev_threshold=5):
         story_first_shot_idx = int(list(topics.keys())[first_shot_idx])
         story_last_shot_idx = int(list(topics.keys())[last_shot_idx])
 
+        first_frame_idx = vd.shots[story_first_shot_idx][0]
+        last_frame_idx = vd.shots[story_last_shot_idx][1]
+        from_timestamp = np.divide(first_frame_idx, 25)
+        to_timestamp = np.divide(last_frame_idx, 25)
+
+        data = np.array(
+            [story_topic, first_shot_idx, last_shot_idx, first_frame_idx, last_frame_idx, from_timestamp, to_timestamp])
+
+        #stories.append(data)
         stories.append(
-            {'topic': story_topic,
+            {'story_topic': story_topic,
              'first_shot_idx': story_first_shot_idx,
              'last_shot_idx': story_last_shot_idx,
-             'first_frame_idx': vd.shots[story_first_shot_idx][0],
-             'last_frame_idx': vd.shots[story_last_shot_idx][1]})
+             'n_shots': story_last_shot_idx - story_first_shot_idx + 1,
+             'first_frame_idx': first_frame_idx,
+             'last_frame_idx': last_frame_idx,
+             'n_frames': last_frame_idx - first_frame_idx + 1,
+             'from_ss': from_timestamp,
+             'to_ss': to_timestamp,
+             'total_ss': np.round(to_timestamp - from_timestamp, 2)})
 
-
+    df = pd.DataFrame(data=[data],
+                      columns=['story_topic', 'first_shot_idx', 'last_shot_idx', 'first_frame_idx',
+                               'last_frame_idx', 'from_ss', 'to_ss'])
     return stories
 
 
@@ -131,7 +142,9 @@ if __name__ == "__main__":
         vd = VideoData(vf)
 
         segmentor = segment_ts100 if vd.is_summary else segment_ts15
-        stories = segmentor(vd)
+        story_df = segmentor(vd)
+
+        # story_df.to_csv(get_story_file(vd))
 
         with open(get_story_file(vd), 'w') as f:
-            json.dump(stories, f, indent=4, ensure_ascii=False)
+            json.dump(story_df, f, indent=4, ensure_ascii=False)
