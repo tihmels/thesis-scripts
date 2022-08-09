@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Union
 
+import pandas as pd
 from pydub import AudioSegment
 
 from utils.constants import AUDIO_FILENAME_RE, SHOT_FILENAME_RE
@@ -161,7 +162,7 @@ def get_date_time(video: VideoPathType):
 
 def get_shot_file(video: VideoPathType):
     if isinstance(video, Path):
-        return Path(get_data_dir(video), "shots.txt")
+        return Path(get_data_dir(video), "shots.csv")
     else:
         return get_shot_file(video.path)
 
@@ -221,13 +222,17 @@ def read_topics_from_file(file: Path, is_summary: bool):
 
 
 def read_shots_from_file(file: Path):
-    shots = []
+    df = pd.read_csv(file, usecols=['first_frame_idx', 'last_frame_idx', 'n_frames'])
+    return list(df.to_records(index=False))
 
-    if file.is_file():
-        file = open(file, 'r')
-        for line in file.readlines():
-            idx, first_index, last_index, n_frames = [int(x.strip(' ')) for x in line.split(' ')]
-            shots.append((first_index, last_index, n_frames))
-        return shots
-    else:
-        return None
+# def read_shots_from_file(file: Path):
+#     shots = []
+#
+#     if file.is_file():
+#         file = open(file, 'r')
+#         for line in file.readlines():
+#             idx, first_index, last_index, n_frames = [int(x.strip(' ')) for x in line.split(' ')]
+#             shots.append((first_index, last_index, n_frames))
+#         return shots
+#     else:
+#         return None

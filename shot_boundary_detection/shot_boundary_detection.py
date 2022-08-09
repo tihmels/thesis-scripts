@@ -42,16 +42,15 @@ def process_video(vd: VideoData):
         _, segments, img = shot_transition_detection(np.array(frames))
 
         data = segments[segments[:, 1] - segments[:, 0] > 10]
-        data = np.c_[data, data[:, 1] - data[:, 0]]
+        data = np.c_[data, data[:, 1] - data[:, 0] + 1]
 
-        df = pd.DataFrame(data=data)
-
-        df.to_csv(get_shot_file(video).absolute(), sep=' ', header=False)
-        img.save(Path(get_data_dir(video), 'shots.png').absolute())
+        df = pd.DataFrame(data=data, columns=['first_frame_idx', 'last_frame_idx', 'n_frames'])
+        df.index = df.index + 1
 
         return video
 
     except Exception as e:
+        print(e)
         return e
 
 
@@ -63,11 +62,11 @@ def check_requirements(video: Path, skip_existing: bool):
 
     frame_path = get_frame_dir(video)
 
-    if not frame_path.exists() or not len(get_frame_paths(video)) > 0:
+    if not frame_path.is_dir() or not len(get_frame_paths(video)) > 0:
         print(f'{video.name} has no extracted frames.')
         return False
 
-    if skip_existing and get_shot_file(video).exists():
+    if skip_existing and get_shot_file(video).is_file():
         # print(f'{video.name} has already shots detected. Skip ...')
         return False
 
