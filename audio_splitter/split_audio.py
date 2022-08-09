@@ -15,6 +15,11 @@ from utils.constants import TV_FILENAME_RE
 pydub.AudioSegment.ffmpeg = '/usr/local/bin/ffmpeg'
 
 
+def split_audio_2(vd: VideoData):
+    stories = vd.stories
+
+
+
 def split_audio(vd: VideoData):
     audio = vd.audio
     segments = vd.shots

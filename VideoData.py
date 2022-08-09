@@ -22,6 +22,7 @@ class VideoData:
         self.sm_dir: Path = get_sm_dir(path)
         self._shots: [(int, int)] = None
         self._topics: [str] = None
+        self._stories = None
         self._frames: [str] = None
         self._kfs: [str] = None
         self._audio: AudioSegment = None
@@ -37,6 +38,12 @@ class VideoData:
     def topics(self):
         if self._topics is None:
             self._topics = read_topics_from_file(get_topic_file(self.path), is_summary(self))
+        return self._topics
+
+    @property
+    def stories(self):
+        if self._stories is None:
+            self._stories = read_stories_from_file(get_story_file(self.path))
         return self._topics
 
     @property
@@ -206,9 +213,17 @@ def get_transcript_file(video: VideoPathType):
 
 def get_story_file(video: VideoPathType):
     if isinstance(video, Path):
-        return Path(get_data_dir(video), "stories.json")
+        return Path(get_data_dir(video), "stories.csv")
     else:
         return get_story_file(video.path)
+
+
+def read_stories_from_file(file: Path):
+    df = pd.read_csv(file, usecols=['news_title',
+                                    'first_frame_idx', 'last_frame_idx', 'n_frames',
+                                    'first_shot_idx', 'last_shot_idx', 'n_shots',
+                                    'from_ss', 'to_ss', 'total_ss'])
+    return df
 
 
 def read_topics_from_file(file: Path, is_summary: bool):

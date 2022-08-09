@@ -3,14 +3,21 @@
 import argparse
 from pathlib import Path
 
-from PIL import Image
 from alive_progress import alive_bar
 
 from VideoData import VideoData, get_date_time
 
 
-def calculate_features(vd: VideoData):
-    frames = [Image.open(frame) for frame in vd.kfs]
+def extract_shot_features(vd: VideoData):
+    shots = vd.shots
+
+    for shot_idx, (first_frame_idx, last_frame_idx, n_frames) in enumerate(shots):
+        print(first_frame_idx)
+        print(last_frame_idx)
+        print(n_frames)
+
+        print(vd.kfs[shot_idx])
+        yield
 
 
 def check_requirements(path: Path, skip_existing=False):
@@ -40,4 +47,5 @@ if __name__ == "__main__":
         vd = VideoData(vf)
 
         with alive_bar(vd.n_shots, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
-            bar()
+            for shot in extract_shot_features(vd):
+                bar()

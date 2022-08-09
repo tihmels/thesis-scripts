@@ -1,5 +1,4 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
-import json
 import re
 from argparse import ArgumentParser
 from itertools import tee
@@ -70,25 +69,34 @@ def segment_ts100(vd: VideoData, lev_threshold=5):
         from_timestamp = np.divide(first_frame_idx, 25)
         to_timestamp = np.divide(last_frame_idx, 25)
 
+        n_shots = story_last_shot_idx - story_first_shot_idx + 1
+        n_frames = last_frame_idx - first_frame_idx + 1
+        total_ss = np.round(to_timestamp - from_timestamp, 2)
+
         data = np.array(
-            [story_topic, first_shot_idx, last_shot_idx, first_frame_idx, last_frame_idx, from_timestamp, to_timestamp])
+            [story_topic, first_frame_idx, last_frame_idx, n_frames, story_first_shot_idx, story_last_shot_idx, n_shots,
+             from_timestamp, to_timestamp, total_ss])
 
-        #stories.append(data)
-        stories.append(
-            {'story_topic': story_topic,
-             'first_shot_idx': story_first_shot_idx,
-             'last_shot_idx': story_last_shot_idx,
-             'n_shots': story_last_shot_idx - story_first_shot_idx + 1,
-             'first_frame_idx': first_frame_idx,
-             'last_frame_idx': last_frame_idx,
-             'n_frames': last_frame_idx - first_frame_idx + 1,
-             'from_ss': from_timestamp,
-             'to_ss': to_timestamp,
-             'total_ss': np.round(to_timestamp - from_timestamp, 2)})
+        stories.append(data)
+        # stories.append(
+        #     {'story_topic': story_topic,
+        #      'first_shot_idx': story_first_shot_idx,
+        #      'last_shot_idx': story_last_shot_idx,
+        #      'n_shots': story_last_shot_idx - story_first_shot_idx + 1,
+        #      'first_frame_idx': first_frame_idx,
+        #      'last_frame_idx': last_frame_idx,
+        #      'n_frames': last_frame_idx - first_frame_idx + 1,
+        #      'from_ss': from_timestamp,
+        #      'to_ss': to_timestamp,
+        #      'total_ss': np.round(to_timestamp - from_timestamp, 2)})
 
-    df = pd.DataFrame(data=[data],
-                      columns=['story_topic', 'first_shot_idx', 'last_shot_idx', 'first_frame_idx',
-                               'last_frame_idx', 'from_ss', 'to_ss'])
+    df = pd.DataFrame(data=stories,
+                      columns=['news_title', 'first_frame_idx',
+                               'last_frame_idx', 'n_frames', 'first_shot_idx', 'last_shot_idx', 'n_shots', 'from_ss', 'to_ss', 'total_ss'])
+
+    df.index = df.index + 1
+    df.to_csv(get_story_file(vd))
+
     return stories
 
 
@@ -146,5 +154,5 @@ if __name__ == "__main__":
 
         # story_df.to_csv(get_story_file(vd))
 
-        with open(get_story_file(vd), 'w') as f:
-            json.dump(story_df, f, indent=4, ensure_ascii=False)
+        # with open(get_story_file(vd), 'w') as f:
+        #     json.dump(story_df, f, indent=4, ensure_ascii=False)
