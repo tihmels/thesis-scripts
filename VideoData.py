@@ -1,5 +1,4 @@
 import csv
-import json
 import re
 from datetime import datetime
 from pathlib import Path
@@ -21,7 +20,7 @@ class VideoData:
         self.audio_dir: Path = get_audio_dir(path)
         self.sm_dir: Path = get_sm_dir(path)
         self._shots: [(int, int)] = None
-        self._topics: [str] = None
+        self._captions: [str] = None
         self._stories = None
         self._frames: [str] = None
         self._kfs: [str] = None
@@ -35,16 +34,16 @@ class VideoData:
         return self._shots
 
     @property
-    def topics(self):
-        if self._topics is None:
-            self._topics = read_topics_from_file(get_topic_file(self.path), is_summary(self))
-        return self._topics
+    def captions(self):
+        if self._captions is None:
+            self._captions = read_captions_from_file(get_caption_file(self.path), is_summary(self))
+        return self._captions
 
     @property
     def stories(self):
         if self._stories is None:
             self._stories = read_stories_from_file(get_story_file(self.path))
-        return self._topics
+        return self._stories
 
     @property
     def kfs(self):
@@ -77,6 +76,10 @@ class VideoData:
     @property
     def n_shots(self):
         return len(self.shots)
+
+    @property
+    def n_stories(self):
+        return len(self.stories)
 
     @property
     def timecode(self):
@@ -143,13 +146,11 @@ def is_summary(video: VideoPathType):
         return is_summary(video.path)
 
 
-def get_topic_file(video: VideoPathType):
-    if isinstance(video, Path) and not is_summary(video):
-        return Path(get_data_dir(video), "topics.csv")
-    elif isinstance(video, Path) and is_summary(video):
-        return Path(get_data_dir(video), "topics.json")
+def get_caption_file(video: VideoPathType):
+    if isinstance(video, Path):
+        return Path(get_data_dir(video), "captions.csv")
     else:
-        return get_topic_file(video.path)
+        return get_caption_file(video.path)
 
 
 def get_kf_dir(video: VideoPathType):
@@ -222,16 +223,16 @@ def read_stories_from_file(file: Path):
     df = pd.read_csv(file, usecols=['news_title',
                                     'first_frame_idx', 'last_frame_idx', 'n_frames',
                                     'first_shot_idx', 'last_shot_idx', 'n_shots',
-                                    'from_ss', 'to_ss', 'total_ss'])
+                                    'from_ss', 'to_ss', 'total_ss'], keep_default_na=False)
     return df
 
 
-def read_topics_from_file(file: Path, is_summary: bool):
-    with open(file, 'r') as file:
-        if is_summary:
-            data = json.load(file)
-            return data.items()
-        else:
+def read_captions_from_file(file: Path, is_summary: bool):
+    if is_summary:
+        df = pd.read_csv(file, usecols=['shot_idx', 'text', 'confidence'], keep_default_na=False)
+        return list(df.to_records(index=False))
+    else:
+        with open(file, 'r') as file:
             reader = csv.reader(file)
             return [row for row in reader]
 

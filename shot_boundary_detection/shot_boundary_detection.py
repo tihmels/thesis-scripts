@@ -47,6 +47,9 @@ def process_video(vd: VideoData):
         df = pd.DataFrame(data=data, columns=['first_frame_idx', 'last_frame_idx', 'n_frames'])
         df.index = df.index + 1
 
+        df.to_csv(get_shot_file(video), index=False)
+        img.save(Path(get_data_dir(video), 'shots.png').absolute())
+
         return video
 
     except Exception as e:

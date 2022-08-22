@@ -1,5 +1,6 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
 import re
+import sys
 from argparse import ArgumentParser
 from pathlib import Path
 
@@ -16,7 +17,20 @@ pydub.AudioSegment.ffmpeg = '/usr/local/bin/ffmpeg'
 
 
 def split_audio_2(vd: VideoData):
-    stories = vd.stories
+    audio = vd.audio
+    stories = vd.stories[['first_frame_idx', 'last_frame_idx']].to_records(index=False)
+
+    for story_idx, (first_frame_idx, last_frame_idx) in enumerate(stories):
+        start_ms = np.divide(first_frame_idx, 25) * 1000
+        end_ms = np.divide(last_frame_idx, 25) * 1000
+
+        audio_segment = audio[start_ms:end_ms]
+
+        audio_segment.export(
+            Path(vd.audio_dir, 'story_' + str(story_idx + 1) + '.wav'), format='wav')
+
+        yield
+
 
 
 
@@ -88,6 +102,6 @@ if __name__ == "__main__":
     for idx, vf in enumerate(video_files):
         vd = VideoData(vf)
 
-        with alive_bar(vd.n_shots, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
-            for _ in split_audio(vd):
+        with alive_bar(vd.n_stories, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
+            for _ in  split_audio_2(vd):
                 bar()

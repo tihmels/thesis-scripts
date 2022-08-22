@@ -11,7 +11,7 @@ import spacy
 from spacy.language import Language
 from spacy_langdetect import LanguageDetector
 
-from VideoData import VideoData, get_shot_file, get_date_time, get_topic_file, get_story_file
+from VideoData import VideoData, get_shot_file, get_date_time, get_caption_file, get_story_file
 from utils.constants import TV_FILENAME_RE
 
 
@@ -41,28 +41,43 @@ def is_valid_text(text: str):
 
 
 def segment_ts100(vd: VideoData, lev_threshold=5):
-    topics = {shot_idx: topic for shot_idx, topic in vd.topics if topic and is_valid_text(topic)}
+    captions = {shot_idx: (caption, conf) for shot_idx, caption, conf in vd.captions}
 
-    levenshtein_distances = np.empty(len(topics))
-    current_topic = ''
+    levenshtein_distances = np.empty(vd.n_shots)
+    current_caption = ''
 
-    for index, topic in enumerate(topics.values()):
-        levenshtein_distances[index] = Levenshtein.distance(current_topic, topic)
-        current_topic = topic
+    for shot_idx in range(vd.n_shots):
+        caption, conf = captions[shot_idx]
+
+        if not caption and conf == 1.0:
+            caption = current_caption
+
+        levenshtein_distances[shot_idx] = Levenshtein.distance(current_caption, caption)
+        current_caption = caption
 
     levenshtein_distances = np.where(levenshtein_distances > lev_threshold, 1, 0)
 
     semantic_boundary_indices = [i for i, x in enumerate(levenshtein_distances) if x == 1]
-    semantic_boundary_indices.append(len(topics))
+    semantic_boundary_indices.append(len(captions))
 
     semantic_boundary_ranges = [(i1, i2 - 1) for i1, i2 in pairwise(semantic_boundary_indices)]
+
+    print(semantic_boundary_ranges)
 
     stories = []
 
     for first_shot_idx, last_shot_idx in semantic_boundary_ranges:
-        story_topic = list(topics.values())[last_shot_idx]
-        story_first_shot_idx = int(list(topics.keys())[first_shot_idx])
-        story_last_shot_idx = int(list(topics.keys())[last_shot_idx])
+
+        if first_shot_idx == last_shot_idx and captions[first_shot_idx][0] == "":
+            continue
+
+        story_captions = [captions.get(idx) for idx in range(first_shot_idx, last_shot_idx + 1)]
+
+        story_title = max(story_captions, key=lambda cap: cap[1])[0]
+
+        story_topic = list(captions.values())[last_shot_idx]
+        story_first_shot_idx = int(list(captions.keys())[first_shot_idx])
+        story_last_shot_idx = int(list(captions.keys())[last_shot_idx])
 
         first_frame_idx = vd.shots[story_first_shot_idx][0]
         last_frame_idx = vd.shots[story_last_shot_idx][1]
@@ -92,7 +107,8 @@ def segment_ts100(vd: VideoData, lev_threshold=5):
 
     df = pd.DataFrame(data=stories,
                       columns=['news_title', 'first_frame_idx',
-                               'last_frame_idx', 'n_frames', 'first_shot_idx', 'last_shot_idx', 'n_shots', 'from_ss', 'to_ss', 'total_ss'])
+                               'last_frame_idx', 'n_frames', 'first_shot_idx', 'last_shot_idx', 'n_shots', 'from_ss',
+                               'to_ss', 'total_ss'])
 
     df.index = df.index + 1
     df.to_csv(get_story_file(vd))
@@ -113,7 +129,7 @@ def check_requirements(path: Path, skip_existing=False):
         print(f'{path.name} has no detected shots.')
         return False
 
-    topic_file = get_topic_file(path)
+    topic_file = get_caption_file(path)
 
     if not topic_file.is_file():
         print(f'{path.name} has no topic file.')

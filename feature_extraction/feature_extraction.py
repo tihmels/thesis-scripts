@@ -12,11 +12,6 @@ def extract_shot_features(vd: VideoData):
     shots = vd.shots
 
     for shot_idx, (first_frame_idx, last_frame_idx, n_frames) in enumerate(shots):
-        print(first_frame_idx)
-        print(last_frame_idx)
-        print(n_frames)
-
-        print(vd.kfs[shot_idx])
         yield
 
 

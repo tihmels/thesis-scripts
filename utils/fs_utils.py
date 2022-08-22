@@ -10,8 +10,6 @@ def get_summary_videos():
     return [file for file in Path(SUMMARY_VIDEOS_PATH).glob("*.mp4") if re.match(TV_FILENAME_RE, file.name)]
 
 
-
-
 def set_tf_loglevel(level):
     if level >= logging.FATAL:
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
