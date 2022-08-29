@@ -10,7 +10,7 @@ from PIL import Image
 from alive_progress import alive_bar
 from scipy import ndimage
 
-from VideoData import VideoData, get_frame_dir, get_frame_paths, get_shot_file, get_kf_dir, get_keyframe_paths, \
+from VideoData import VideoData, get_frame_dir, get_frame_paths, get_shot_file, get_keyframe_dir, get_keyframe_paths, \
     read_shots_from_file, get_date_time
 from utils.constants import TV_FILENAME_RE
 
@@ -90,7 +90,7 @@ def check_requirements(path: Path, skip_existing=False):
         print(f'{path.name} has no detected shots.')
         return False
 
-    kf_dir = get_kf_dir(path)
+    kf_dir = get_keyframe_dir(path)
 
     if skip_existing and kf_dir.is_dir() and len(get_keyframe_paths(path)) == len(
             read_shots_from_file(shot_file)):

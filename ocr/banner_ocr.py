@@ -17,20 +17,14 @@ from skimage.filters.thresholding import try_all_threshold
 from VideoData import get_date_time, VideoData, get_caption_file, get_shot_file
 from utils.constants import TV_FILENAME_RE, TS_LOGO
 
-spacy_de = spacy.load('de_core_news_sm')
-
 TS_LOGO = np.array(Image.open(TS_LOGO).convert('L'))
 
-
-def read_frame_as_array(path: Path, resize_factor=4):
-    frame = Image.open(path).convert('L')
-    frame = frame.resize((frame.size[0] * resize_factor, frame.size[1] * resize_factor))
-    return np.array(frame)
+spacy_de = spacy.load('de_core_news_sm')
 
 
 def preprocess_caption_area(caption_area, is_nightly):
     if is_nightly:
-        binary = caption_area > 200
+        binary = caption_area > 205
         binary = skimage.morphology.binary_dilation(binary, footprint=skimage.morphology.diamond(1))
         return binary
     else:
@@ -47,23 +41,6 @@ def get_caption_area(frame, is_nightly, resize_factor=4):
         return frame[-48 * resize_factor:-18 * resize_factor, -425 * resize_factor:]
 
 
-def extract_caption_data(vd: VideoData, is_nightly):
-    segments = vd.shots
-
-    for first_frame_idx, last_frame_idx, _ in segments:
-        center_frame_path = vd.frames[int((first_frame_idx + last_frame_idx) / 2)]
-        center_frame = read_frame_as_array(center_frame_path)
-
-        caption_area = get_caption_area(center_frame, is_nightly)
-        caption_area = preprocess_caption_area(caption_area, is_nightly)
-
-        custom_oem_psm_config = r'--psm 4 --oem 1'
-        caption_data = pytesseract.image_to_data(caption_area, output_type=Output.DICT, lang='deu+eng',
-                                                 config=custom_oem_psm_config)
-
-        yield caption_data
-
-
 def is_nightly_version(vd: VideoData):
     ts_logo_area = (35, 225, 110, 250)
 
@@ -74,6 +51,27 @@ def is_nightly_version(vd: VideoData):
     max_corr = np.max(corr_coeff)
 
     return max_corr > 0.9
+
+
+def extract_caption_data(vd: VideoData, resize_factor=4):
+    segments = vd.shots
+    is_nightly = is_nightly_version(vd)
+
+    for first_frame_idx, last_frame_idx, _ in segments:
+        center_frame_path = vd.frames[int((first_frame_idx + last_frame_idx) / 2)]
+
+        center_frame = Image.open(center_frame_path).convert('L')
+        center_frame_resized = center_frame.resize((center_frame.size[0] * resize_factor, center_frame.size[1] * resize_factor))
+        center_frame_resized = np.array(center_frame_resized)
+
+        caption_area = get_caption_area(center_frame_resized, is_nightly)
+        caption_area = preprocess_caption_area(caption_area, is_nightly)
+
+        custom_oem_psm_config = r'--psm 4 --oem 1'
+        caption_data = pytesseract.image_to_data(caption_area, output_type=Output.DICT, lang='deu+eng',
+                                                 config=custom_oem_psm_config)
+
+        yield caption_data
 
 
 def check_requirements(path: Path, skip_existing=True):
@@ -122,34 +120,44 @@ if __name__ == "__main__":
     for vf_idx, vf in enumerate(video_files):
 
         vd = VideoData(vf)
-        is_nightly = is_nightly_version(vd)
 
         with alive_bar(vd.n_shots, ctrl_c=False, title=f'[{vf_idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
 
             captions = []
 
-            for shot_idx, caption_data in enumerate(extract_caption_data(vd, is_nightly)):
+            for shot_idx, caption_data in enumerate(extract_caption_data(vd)):
 
                 positive_confidence_indices = (np.array(caption_data['conf']) > 0.0).nonzero()
 
                 if len(positive_confidence_indices[0]) < 1:
-                    captions.append((shot_idx, "", 1.0))
+                    captions.append((shot_idx, "", -1))
                     bar()
+
                     continue
 
                 strings = np.array(caption_data['text'])[positive_confidence_indices]
                 strings_conf = np.array(caption_data['conf'])[positive_confidence_indices]
 
+                blocks = np.array(caption_data['block_num'])[positive_confidence_indices]
+                blocks_unique = np.unique(blocks, return_index=True)[1]
+
+                s = [strings[blocks_unique[i]:blocks_unique[i+1]] for i in range(0, len(blocks_unique) - 1)]
+                s.append(strings[blocks_unique[-1]:])
+
                 text = ' '.join(strings).strip()
                 text = ' '.join(re.split("\s+", text, flags=re.UNICODE))
+
+                mean_conf = np.mean(strings_conf) / 100
 
                 doc = spacy_de(text)
                 entities = doc.ents
 
-                if len(entities) == 1 and len(entities[0]) == len(doc):
-                    text = ""
+                # if len(entities) == 1 and len(entities[0]) == len(doc):
+                #     text = ''
 
-                mean_conf = np.mean(strings_conf) / 100
+                if mean_conf <= 0.8:
+                    text = ''
+
                 captions.append((shot_idx, text, mean_conf))
 
                 bar()

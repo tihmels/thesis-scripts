@@ -11,7 +11,7 @@ import spacy
 from spacy.language import Language
 from spacy_langdetect import LanguageDetector
 
-from VideoData import VideoData, get_shot_file, get_date_time, get_caption_file, get_story_file
+from VideoData import VideoData, get_shot_file, get_date_time, get_caption_file, get_scene_file
 from utils.constants import TV_FILENAME_RE
 
 
@@ -42,6 +42,12 @@ def is_valid_text(text: str):
 
 def segment_ts100(vd: VideoData, lev_threshold=5):
     captions = {shot_idx: (caption, conf) for shot_idx, caption, conf in vd.captions}
+
+    for i in range(1, len(captions) - 1):
+        shot_idx, text, conf = captions[i]
+
+        if not text or conf < 0.5:
+            captions[i] = (shot_idx, captions[i - 1][1], '')
 
     levenshtein_distances = np.empty(vd.n_shots)
     current_caption = ''
@@ -111,7 +117,7 @@ def segment_ts100(vd: VideoData, lev_threshold=5):
                                'to_ss', 'total_ss'])
 
     df.index = df.index + 1
-    df.to_csv(get_story_file(vd))
+    df.to_csv(get_scene_file(vd))
 
     return stories
 
@@ -144,7 +150,7 @@ def check_requirements(path: Path, skip_existing=False):
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
-    parser.add_argument('-s', '--skip', action='store_true', help="skip keyframe extraction if already exist")
+    parser.add_argument('-s', '--skip', action='store_true', help="skip scene segmentation if already exist")
     parser.add_argument('--parallel', action='store_true')
     args = parser.parse_args()
 

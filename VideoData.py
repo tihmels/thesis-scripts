@@ -16,14 +16,14 @@ class VideoData:
         self.path: Path = path
         self.date: datetime = get_date_time(path)
         self.frame_dir: Path = get_frame_dir(path)
-        self.keyframe_dir: Path = get_kf_dir(path)
+        self.keyframe_dir: Path = get_keyframe_dir(path)
         self.audio_dir: Path = get_audio_dir(path)
         self.sm_dir: Path = get_sm_dir(path)
         self._shots: [(int, int)] = None
-        self._captions: [str] = None
-        self._stories = None
-        self._frames: [str] = None
-        self._kfs: [str] = None
+        self._scenes = None
+        self._frames: [Path] = None
+        self._keyframes: [Path] = None
+        self._captions: [Path] = None
         self._audio: AudioSegment = None
         self._audio_shots: [AudioSegment] = None
 
@@ -40,16 +40,16 @@ class VideoData:
         return self._captions
 
     @property
-    def stories(self):
-        if self._stories is None:
-            self._stories = read_stories_from_file(get_story_file(self.path))
-        return self._stories
+    def scenes(self):
+        if self._scenes is None:
+            self._scenes = read_scenes_from_file(get_scene_file(self.path))
+        return self._scenes
 
     @property
-    def kfs(self):
-        if self._kfs is None:
-            self._kfs = sorted(get_keyframe_paths(self.path))
-        return self._kfs
+    def keyframes(self):
+        if self._keyframes is None:
+            self._keyframes = sorted(get_keyframe_paths(self.path))
+        return self._keyframes
 
     @property
     def frames(self):
@@ -79,7 +79,7 @@ class VideoData:
 
     @property
     def n_stories(self):
-        return len(self.stories)
+        return len(self.scenes)
 
     @property
     def timecode(self):
@@ -116,7 +116,7 @@ def get_audio_dir(video: VideoPathType):
 
 def get_audio_file(video: VideoPathType):
     if isinstance(video, Path):
-        files = [f for f in get_audio_dir(video).glob('*.wav') if re.match(AUDIO_FILENAME_RE, f.name)]
+        files = [file for file in get_audio_dir(video).glob('*.wav') if re.match(AUDIO_FILENAME_RE, file.name)]
         if len(files) == 1:
             return files[0]
         else:
@@ -153,11 +153,11 @@ def get_caption_file(video: VideoPathType):
         return get_caption_file(video.path)
 
 
-def get_kf_dir(video: VideoPathType):
+def get_keyframe_dir(video: VideoPathType):
     if isinstance(video, Path):
         return Path(get_data_dir(video), "kfs")
     else:
-        return get_kf_dir(video.path)
+        return get_keyframe_dir(video.path)
 
 
 def get_date_time(video: VideoPathType):
@@ -192,7 +192,7 @@ def get_frame_paths(video: VideoPathType):
 
 def get_keyframe_paths(video: VideoPathType):
     if isinstance(video, Path):
-        frame_dir = get_kf_dir(video)
+        frame_dir = get_keyframe_dir(video)
         return list(frame_dir.glob("frame_*.jpg"))
     else:
         return get_keyframe_paths(video.path)
@@ -212,14 +212,14 @@ def get_transcript_file(video: VideoPathType):
         return get_transcript_file(video.path)
 
 
-def get_story_file(video: VideoPathType):
+def get_scene_file(video: VideoPathType):
     if isinstance(video, Path):
         return Path(get_data_dir(video), "stories.csv")
     else:
-        return get_story_file(video.path)
+        return get_scene_file(video.path)
 
 
-def read_stories_from_file(file: Path):
+def read_scenes_from_file(file: Path):
     df = pd.read_csv(file, usecols=['news_title',
                                     'first_frame_idx', 'last_frame_idx', 'n_frames',
                                     'first_shot_idx', 'last_shot_idx', 'n_shots',
@@ -240,15 +240,3 @@ def read_captions_from_file(file: Path, is_summary: bool):
 def read_shots_from_file(file: Path):
     df = pd.read_csv(file, usecols=['first_frame_idx', 'last_frame_idx', 'n_frames'])
     return list(df.to_records(index=False))
-
-# def read_shots_from_file(file: Path):
-#     shots = []
-#
-#     if file.is_file():
-#         file = open(file, 'r')
-#         for line in file.readlines():
-#             idx, first_index, last_index, n_frames = [int(x.strip(' ')) for x in line.split(' ')]
-#             shots.append((first_index, last_index, n_frames))
-#         return shots
-#     else:
-#         return None

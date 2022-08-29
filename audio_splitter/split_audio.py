@@ -18,7 +18,7 @@ pydub.AudioSegment.ffmpeg = '/usr/local/bin/ffmpeg'
 
 def split_audio_2(vd: VideoData):
     audio = vd.audio
-    stories = vd.stories[['first_frame_idx', 'last_frame_idx']].to_records(index=False)
+    stories = vd.scenes[['first_frame_idx', 'last_frame_idx']].to_records(index=False)
 
     for story_idx, (first_frame_idx, last_frame_idx) in enumerate(stories):
         start_ms = np.divide(first_frame_idx, 25) * 1000

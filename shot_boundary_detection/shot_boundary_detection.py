@@ -45,9 +45,8 @@ def process_video(vd: VideoData):
         data = np.c_[data, data[:, 1] - data[:, 0] + 1]
 
         df = pd.DataFrame(data=data, columns=['first_frame_idx', 'last_frame_idx', 'n_frames'])
-        df.index = df.index + 1
 
-        df.to_csv(get_shot_file(video), index=False)
+        df.to_csv(get_shot_file(video))
         img.save(Path(get_data_dir(video), 'shots.png').absolute())
 
         return video
