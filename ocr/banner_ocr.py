@@ -61,7 +61,8 @@ def extract_caption_data(vd: VideoData, resize_factor=4):
         center_frame_path = vd.frames[int((first_frame_idx + last_frame_idx) / 2)]
 
         center_frame = Image.open(center_frame_path).convert('L')
-        center_frame_resized = center_frame.resize((center_frame.size[0] * resize_factor, center_frame.size[1] * resize_factor))
+        center_frame_resized = center_frame.resize(
+            (center_frame.size[0] * resize_factor, center_frame.size[1] * resize_factor))
         center_frame_resized = np.array(center_frame_resized)
 
         caption_area = get_caption_area(center_frame_resized, is_nightly)
@@ -136,18 +137,19 @@ if __name__ == "__main__":
                     continue
 
                 strings = np.array(caption_data['text'])[positive_confidence_indices]
-                strings_conf = np.array(caption_data['conf'])[positive_confidence_indices]
-
+                confidences = np.array(caption_data['conf'])[positive_confidence_indices]
                 blocks = np.array(caption_data['block_num'])[positive_confidence_indices]
-                blocks_unique = np.unique(blocks, return_index=True)[1]
 
-                s = [strings[blocks_unique[i]:blocks_unique[i+1]] for i in range(0, len(blocks_unique) - 1)]
+                blocks_unique = np.unique(blocks, return_index=True, return_counts=True)
+                blocks_unique = blocks_unique[1]
+
+                s = [strings[blocks_unique[i]:blocks_unique[i + 1]] for i in range(0, len(blocks_unique) - 1)]
                 s.append(strings[blocks_unique[-1]:])
 
                 text = ' '.join(strings).strip()
                 text = ' '.join(re.split("\s+", text, flags=re.UNICODE))
 
-                mean_conf = np.mean(strings_conf) / 100
+                mean_conf = np.mean(confidences) / 100
 
                 doc = spacy_de(text)
                 entities = doc.ents

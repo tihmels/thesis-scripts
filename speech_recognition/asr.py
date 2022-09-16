@@ -1,35 +1,33 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
-import json
-import os
 import re
-from argparse import ArgumentParser
 from pathlib import Path
 
-from VideoData import get_date_time, VideoData, get_audio_dir, get_audio_file, get_shot_file, get_transcript_file
-from utils.constants import TV_FILENAME_RE
+from huggingsound import SpeechRecognitionModel, FlashlightLMDecoder
 
-os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+from VideoData import VideoData, get_audio_dir, get_audio_file, get_shot_file, get_transcript_file
 
-from huggingsound import SpeechRecognitionModel, KenshoLMDecoder
+JG_1_MODEL_ID = 'jonatasgrosman/wav2vec2-large-xlsr-53-german'
+JG_2_MODEL_ID = 'jonatasgrosman/wav2vec2-xls-r-1b-german'
+FX_TENTACLE_ID = 'fxtentacle/wav2vec2-xls-r-1b-tevr'
 
-lm_path = "/Users/tihmels/Scripts/thesis-scripts/speech_recognition/model/lm.binary"
-unigrams_path = "/Users/tihmels/Scripts/thesis-scripts/speech_recognition/model/unigrams.txt"
+model = SpeechRecognitionModel(FX_TENTACLE_ID)
 
-JG_MODEL_ID = "jonatasgrosman/wav2vec2-large-xlsr-53-german"
-FB_MODEL_ID = "facebook/wav2vec2-large-xlsr-53-german"
-model = SpeechRecognitionModel(JG_MODEL_ID)
+LM_BIN_PATH = "./model/lm.binary"
+UNIGRAMS_PATH = "./model/unigrams.txt"
 
-decoder = KenshoLMDecoder(model.token_set, lm_path=lm_path, unigrams_path=unigrams_path)
+# decoder = FlashlightLMDecoder(model.token_set, lm_path=LM_BIN_PATH)
 
 
 def transcribe_audio(vd: VideoData):
-    audio_file = get_audio_file(vd)
+    audio_file = vd.audio
 
-    return model.transcribe([audio_file])[0]
+    transcriptions = model.transcribe([audio_file])
+
+    return transcriptions[0]
 
 
 def check_requirements(path: Path, skip_existing=False):
-    match = re.match(TV_FILENAME_RE, path.name)
+    match = re.match(r'TV-(\d{8})-(\d{4})-(\d{4}).webs.h264.mp4', path.name)
 
     if match is None or not path.is_file():
         print(f'{path.name} does not exist or does not match TV-*.mp4 pattern.')
@@ -57,30 +55,37 @@ def check_requirements(path: Path, skip_existing=False):
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser()
-    parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
-    parser.add_argument('-s', '--skip', action='store_true', help="skip keyframe extraction if already exist")
-    parser.add_argument('--parallel', action='store_true')
-    args = parser.parse_args()
+    # parser = ArgumentParser()
+    # parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
+    # parser.add_argument('-s', '--skip', action='store_true', help="skip keyframe extraction if already exist")
+    # parser.add_argument('--parallel', action='store_true')
+    # args = parser.parse_args()
+    #
+    # video_files = []
+    #
+    # for file in args.files:
+    #     if file.is_file() and check_requirements(file, args.skip):
+    #         video_files.append(file)
+    #     elif file.is_dir():
+    #         video_files.extend([video for video in file.glob('*.mp4') if check_requirements(video, args.skip)])
+    #
+    # assert len(video_files) > 0
+    #
+    # video_files.sort(key=get_date_time)
 
-    video_files = []
+    # print(f'Transcribing audio stream of {len(video_files)} videos ... \n')
 
-    for file in args.files:
-        if file.is_file() and check_requirements(file, args.skip):
-            video_files.append(file)
-        elif file.is_dir():
-            video_files.extend([video for video in file.glob('*.mp4') if check_requirements(video, args.skip)])
+    # for idx, vf in enumerate(video_files):
+    # vd = VideoData(vf)
 
-    assert len(video_files) > 0
+    # result = transcribe_audio(vd)
 
-    video_files.sort(key=get_date_time)
+    audio_file = 'test/story_2.wav'
+    transcriptions = model.transcribe([audio_file])
 
-    print(f'Transcribing audio stream of {len(video_files)} videos ... \n')
+    result = transcriptions[0]
 
-    for idx, vf in enumerate(video_files):
-        vd = VideoData(vf)
+    print(result)
 
-        result = transcribe_audio(vd)
-
-        with open(get_transcript_file(vd), 'w') as file:
-            json.dump(result, file, ensure_ascii=False)
+    # with open(get_transcript_file(vd), 'w') as file:
+    #    json.dump(result, file, ensure_ascii=False)
