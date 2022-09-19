@@ -4,7 +4,7 @@ from collections import OrderedDict
 
 import torch
 
-import VideoData
+from common import VideoData
 from feature_extraction.RAFT.core.raft import RAFT
 
 

@@ -7,7 +7,7 @@ from typing import Union
 import pandas as pd
 from pydub import AudioSegment
 
-from utils.constants import AUDIO_FILENAME_RE, SHOT_FILENAME_RE
+from common.constants import AUDIO_FILENAME_RE, SHOT_FILENAME_RE
 
 
 class VideoData:

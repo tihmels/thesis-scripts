@@ -10,9 +10,9 @@ from PIL import Image
 from alive_progress import alive_bar
 from scipy import ndimage
 
-from VideoData import VideoData, get_frame_dir, get_frame_paths, get_shot_file, get_keyframe_dir, get_keyframe_paths, \
+from common.VideoData import VideoData, get_frame_dir, get_frame_paths, get_shot_file, get_keyframe_dir, get_keyframe_paths, \
     read_shots_from_file, get_date_time
-from utils.constants import TV_FILENAME_RE
+from common.constants import TV_FILENAME_RE
 
 
 def get_center_kf_idx(frames):

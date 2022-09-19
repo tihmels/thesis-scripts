@@ -13,10 +13,10 @@ import numpy as np
 from PIL import Image
 from PIL.Image import Resampling
 
-from VideoData import VideoData, get_sm_dir, get_frame_dir, get_shot_file, get_date_time, get_data_dir, get_frame_paths
-from VideoStats import VideoStats, VideoType, get_vs_evaluation_df
-from utils.constants import TV_FILENAME_RE, TS_PATH
-from utils.fs_utils import get_summary_videos
+from common.VideoData import VideoData, get_sm_dir, get_frame_dir, get_shot_file, get_date_time, get_data_dir, get_frame_paths
+from common.VideoStats import VideoStats, VideoType, get_vs_evaluation_df
+from common.constants import TV_FILENAME_RE, TS_PATH
+from common.fs_utils import get_summary_videos
 
 
 def frame_hash_distance(f1: Image, f2: Image):

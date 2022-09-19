@@ -5,7 +5,7 @@ from pathlib import Path
 
 from alive_progress import alive_bar
 
-from VideoData import VideoData, get_date_time
+from common.VideoData import VideoData, get_date_time
 
 
 def extract_shot_features(vd: VideoData):

@@ -14,8 +14,8 @@ from skimage.feature import match_template
 from skimage.filters.edges import sobel
 from skimage.filters.thresholding import try_all_threshold
 
-from VideoData import get_date_time, VideoData, get_caption_file, get_shot_file
-from utils.constants import TV_FILENAME_RE, TS_LOGO
+from common.VideoData import get_date_time, VideoData, get_caption_file, get_shot_file
+from common.constants import TV_FILENAME_RE, TS_LOGO
 
 TS_LOGO = np.array(Image.open(TS_LOGO).convert('L'))
 

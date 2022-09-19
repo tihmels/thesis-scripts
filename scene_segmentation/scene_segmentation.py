@@ -11,8 +11,8 @@ import spacy
 from spacy.language import Language
 from spacy_langdetect import LanguageDetector
 
-from VideoData import VideoData, get_shot_file, get_date_time, get_caption_file, get_scene_file
-from utils.constants import TV_FILENAME_RE
+from common.VideoData import VideoData, get_shot_file, get_date_time, get_caption_file, get_scene_file
+from common.constants import TV_FILENAME_RE
 
 
 @Language.factory("language_detector")

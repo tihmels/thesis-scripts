@@ -3,7 +3,7 @@ import os
 import re
 from pathlib import Path
 
-from utils.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE
+from common.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE
 
 
 def get_summary_videos():

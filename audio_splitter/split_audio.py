@@ -1,6 +1,5 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
 import re
-import sys
 from argparse import ArgumentParser
 from pathlib import Path
 
@@ -8,10 +7,10 @@ import numpy as np
 import pydub
 from alive_progress import alive_bar
 
-from VideoData import VideoData, get_audio_file, get_audio_dir, get_shot_file, get_audio_shot_paths, \
+from common.VideoData import VideoData, get_audio_file, get_audio_dir, get_shot_file, get_audio_shot_paths, \
     read_shots_from_file, \
     get_date_time
-from utils.constants import TV_FILENAME_RE
+from common.constants import TV_FILENAME_RE
 
 pydub.AudioSegment.ffmpeg = '/usr/local/bin/ffmpeg'
 

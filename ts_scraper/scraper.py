@@ -9,7 +9,9 @@ import pyppeteer.connection
 import requests
 from bs4 import BeautifulSoup
 
-from utils.constants import TS_100_URL, SUMMARY_VIDEOS_PATH
+from common.constants import SUMMARY_VIDEOS_PATH
+
+TS_100_URL = "https://www.ardmediathek.de/sendung/tagesschau-in-100-sekunden/Y3JpZDovL2Rhc2Vyc3RlLmRlL3RzMTAwcw"
 
 
 def process_page(page):

@@ -12,10 +12,10 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-from VideoData import VideoData, get_shot_file, get_data_dir, get_frame_dir, get_frame_paths, get_date_time
+from common.VideoData import VideoData, get_shot_file, get_data_dir, get_frame_dir, get_frame_paths, get_date_time
 from transnetv2 import TransNetV2
-from utils.constants import TV_FILENAME_RE
-from utils.fs_utils import set_tf_loglevel
+from common.constants import TV_FILENAME_RE
+from common.fs_utils import set_tf_loglevel
 
 
 def shot_transition_detection(frames):
