@@ -151,11 +151,11 @@ if __name__ == "__main__":
                 headline, *sublines = rows
 
                 headline = ' '.join(headline).strip()
-                subline = ' '.join([row for sub in sublines for row in sub]).strip()
+                subline = ' '.join([sub for subline in sublines for sub in subline]).strip()
 
                 mean_conf = np.mean(confidences) / 100
 
-                captions.append((headline, subline, mean_conf))
+                captions.append((headline, subline, np.around(mean_conf, 2)))
 
                 bar()
 
