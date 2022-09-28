@@ -229,7 +229,7 @@ def read_scenes_from_file(file: Path):
 
 def read_captions_from_file(file: Path, is_summary: bool):
     if is_summary:
-        df = pd.read_csv(file, usecols=['shot_idx', 'text', 'confidence'], keep_default_na=False)
+        df = pd.read_csv(file, usecols=['headline', 'subline', 'confidence'], keep_default_na=False)
         return list(df.to_records(index=False))
     else:
         with open(file, 'r') as file:

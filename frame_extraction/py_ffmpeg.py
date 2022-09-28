@@ -55,7 +55,7 @@ if __name__ == "__main__":
 
     parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+',
                         help="video files or directories containing video files for frame extraction ")
-    parser.add_argument('-s', '--skip', action='store_true', help="skip frame extraction if already exist")
+    parser.add_argument('--overwrite', action='store_true', help='Re-extracts frames for all videos')
     parser.add_argument('--fps', type=float, default=0.0, help="extract frames per second")
     parser.add_argument('--size', type=lambda s: list(map(int, s.split('x'))))
     parser.add_argument('--parallel', action='store_true',
@@ -65,10 +65,10 @@ if __name__ == "__main__":
     video_files = []
 
     for file in args.files:
-        if file.is_file() and check_requirements(file, args.skip):
+        if file.is_file() and check_requirements(file, not args.overwrite):
             video_files.append(file)
         elif file.is_dir():
-            video_files.extend([f for f in file.glob('*.mp4') if check_requirements(f, args.skip)])
+            video_files.extend([f for f in file.glob('*.mp4') if check_requirements(f, not args.overwrite)])
 
     assert len(video_files) != 0
 
@@ -87,8 +87,7 @@ if __name__ == "__main__":
     if args.parallel:
         with mp.Pool(os.cpu_count()) as pool:
             [pool.apply_async(extract_frames, (VideoData(vf),),
-                              kwds={'fps': args.fps, 'overwrite': args.overwrite,
-                                    'prune': args.prune, 'resize': args.size},
+                              kwds={'fps': args.fps, 'resize': args.size},
                               callback=callback_handler) for vf in video_files]
             pool.close()
             pool.join()

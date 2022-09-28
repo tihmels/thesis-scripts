@@ -15,25 +15,23 @@ from common.constants import TV_FILENAME_RE
 pydub.AudioSegment.ffmpeg = '/usr/local/bin/ffmpeg'
 
 
-def split_audio_2(vd: VideoData):
+def split_audio_by_scenes(vd: VideoData):
     audio = vd.audio
-    stories = vd.scenes[['first_frame_idx', 'last_frame_idx']].to_records(index=False)
+    scenes = vd.scenes[['first_frame_idx', 'last_frame_idx']].to_records(index=False)
 
-    for story_idx, (first_frame_idx, last_frame_idx) in enumerate(stories):
+    for scene_idx, (first_frame_idx, last_frame_idx) in enumerate(scenes):
         start_ms = np.divide(first_frame_idx, 25) * 1000
         end_ms = np.divide(last_frame_idx, 25) * 1000
 
         audio_segment = audio[start_ms:end_ms]
 
         audio_segment.export(
-            Path(vd.audio_dir, 'story_' + str(story_idx + 1) + '.wav'), format='wav')
+            Path(vd.audio_dir, 'scene_' + str(scene_idx + 1) + '.wav'), format='wav')
 
         yield
 
 
-
-
-def split_audio(vd: VideoData):
+def split_audio_by_shots(vd: VideoData):
     audio = vd.audio
     segments = vd.shots
 
@@ -80,27 +78,26 @@ def check_requirements(path: Path, skip_existing=False):
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
-    parser.add_argument('-s', '--skip', action='store_true', help="skip keyframe extraction if already exist")
-    parser.add_argument('--parallel', action='store_true')
+    parser.add_argument('--overwrite', action='store_true', help="Re-split audio tracks for all videos")
     args = parser.parse_args()
 
     video_files = []
 
     for file in args.files:
-        if file.is_file() and check_requirements(file, args.skip):
+        if file.is_file() and check_requirements(file, not args.overwrite):
             video_files.append(file)
         elif file.is_dir():
-            video_files.extend([video for video in file.glob('*.mp4') if check_requirements(video, args.skip)])
+            video_files.extend([video for video in file.glob('*.mp4') if check_requirements(video, not args.overwrite)])
 
     assert len(video_files) > 0
 
     video_files.sort(key=get_date_time)
 
-    print(f'Splitting audio shots from {len(video_files)} videos ... \n')
+    print(f'Splitting audio tracks from {len(video_files)} videos ... \n')
 
     for idx, vf in enumerate(video_files):
         vd = VideoData(vf)
 
         with alive_bar(vd.n_stories, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
-            for _ in  split_audio_2(vd):
+            for _ in split_audio_by_scenes(vd):
                 bar()

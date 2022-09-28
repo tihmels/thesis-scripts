@@ -58,7 +58,8 @@ def extract_caption_data(vd: VideoData, resize_factor=4):
     is_nightly = is_nightly_version(vd)
 
     for first_frame_idx, last_frame_idx, _ in segments:
-        center_frame_path = vd.frames[int((first_frame_idx + last_frame_idx) / 2)]
+        center_frame_index = int(((first_frame_idx + last_frame_idx) / 2))
+        center_frame_path = vd.frames[center_frame_index]
 
         center_frame = Image.open(center_frame_path).convert('L')
         center_frame_resized = center_frame.resize(
@@ -75,7 +76,7 @@ def extract_caption_data(vd: VideoData, resize_factor=4):
         yield caption_data
 
 
-def check_requirements(path: Path, skip_existing=True):
+def check_requirements(path: Path, skip_existing):
     assert path.parent.name == 'ts100'
 
     match = re.match(TV_FILENAME_RE, path.name)
@@ -131,7 +132,7 @@ if __name__ == "__main__":
                 positive_confidence_indices = (np.array(caption_data['conf']) > 0.0).nonzero()
 
                 if len(positive_confidence_indices[0]) < 1:
-                    captions.append((shot_idx, "", -1))
+                    captions.append(("", "", -1))
                     bar()
 
                     continue
@@ -140,29 +141,23 @@ if __name__ == "__main__":
                 confidences = np.array(caption_data['conf'])[positive_confidence_indices]
                 blocks = np.array(caption_data['block_num'])[positive_confidence_indices]
 
-                blocks_unique = np.unique(blocks, return_index=True, return_counts=True)
-                blocks_unique = blocks_unique[1]
+                unique_blocks_indices = np.unique(blocks, return_index=True)[1]
 
-                s = [strings[blocks_unique[i]:blocks_unique[i + 1]] for i in range(0, len(blocks_unique) - 1)]
-                s.append(strings[blocks_unique[-1]:])
+                rows = [strings[unique_blocks_indices[i]:unique_blocks_indices[i + 1]] for i in
+                        range(0, len(unique_blocks_indices) - 1)]
+                rows.append(strings[unique_blocks_indices[-1]:])
+                rows = [row.tolist() for row in rows]
 
-                text = ' '.join(strings).strip()
-                text = ' '.join(re.split("\s+", text, flags=re.UNICODE))
+                headline, *sublines = rows
+
+                headline = ' '.join(headline).strip()
+                subline = ' '.join([row for sub in sublines for row in sub]).strip()
 
                 mean_conf = np.mean(confidences) / 100
 
-                doc = spacy_de(text)
-                entities = doc.ents
-
-                # if len(entities) == 1 and len(entities[0]) == len(doc):
-                #     text = ''
-
-                if mean_conf <= 0.8:
-                    text = ''
-
-                captions.append((shot_idx, text, mean_conf))
+                captions.append((headline, subline, mean_conf))
 
                 bar()
 
-            df = pd.DataFrame(data=captions, columns=['shot_idx', 'text', 'confidence'])
+            df = pd.DataFrame(data=captions, columns=['headline', 'subline', 'confidence'])
             df.to_csv(get_caption_file(vd), index=False)
