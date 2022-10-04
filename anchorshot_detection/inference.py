@@ -14,7 +14,7 @@ def detect_anchorshots(vd: VideoData):
     model = tf.keras.models.load_model(Path(Path(__file__).parent.resolve(), 'model', 'ts_anchorshot_model'))
     model.load_weights('tl_model_v1.weights.best.hdf5')
 
-    classes = ['anchor', 'non-anchor']
+    classes = ['anchor', 'news']
 
     keyframes = [tf.keras.preprocessing.image.load_img(img, target_size=(224, 224)) for img in vd.keyframes]
     keyframes = [tf.keras.preprocessing.image.img_to_array(img) for img in keyframes]

@@ -7,7 +7,10 @@ from keras_preprocessing.image import ImageDataGenerator
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.python.keras.callbacks import ModelCheckpoint
 
-batch_size = 32
+WIDTH = 224
+HEIGHT = 224
+BATCH_SIZE = 32
+EPOCHS = 15
 
 
 def generators(path, shape, preprocessing):
@@ -24,7 +27,7 @@ def generators(path, shape, preprocessing):
         seed=10,
         target_size=(height, width),
         classes=('anchor', 'non_anchor'),
-        batch_size=batch_size,
+        batch_size=BATCH_SIZE,
         subset='training'
     )
 
@@ -33,7 +36,7 @@ def generators(path, shape, preprocessing):
         seed=10,
         target_size=(height, width),
         classes=('anchor', 'non_anchor'),
-        batch_size=batch_size,
+        batch_size=BATCH_SIZE,
         subset='validation'
     )
 
@@ -72,11 +75,10 @@ def create_model(input_shape, n_classes, optimizer='rmsprop', fine_tune=0):
 
 base_dir = Path("/Users/tihmels/TS/ts-anchorset")
 
-training1_ds, validation1_ds = generators(base_dir, (224, 224), tf.keras.applications.vgg19.preprocess_input)
+training1_ds, validation1_ds = generators(base_dir, (HEIGHT, WIDTH), tf.keras.applications.vgg19.preprocess_input)
 
-input_shape = (224, 224, 3)
+input_shape = (HEIGHT, WIDTH, 3)
 n_classes = 2
-n_epochs = 5
 
 optim_1 = tf.keras.optimizers.Adam(learning_rate=0.001)
 optim_2 = tf.keras.optimizers.Adam(lr=0.0001)
@@ -85,20 +87,18 @@ vgg_model = create_model(input_shape, n_classes, optim_1)
 
 # ModelCheckpoint callback - save best weights
 tl_checkpoint_1 = ModelCheckpoint(filepath='tl_model_v1.weights.best.hdf5',
-                                  save_best_only=True,
-                                  verbose=1)
+                                  save_best_only=True)
 
 # EarlyStopping
 early_stop = EarlyStopping(monitor='val_loss',
-                           patience=10,
+                           patience=5,
                            restore_best_weights=True,
                            mode='min')
 
 vgg_model.fit(training1_ds,
-              epochs=n_epochs,
+              epochs=EPOCHS,
               validation_data=validation1_ds,
-              callbacks=[tl_checkpoint_1, early_stop],
-              verbose=1
+              callbacks=[tl_checkpoint_1, early_stop]
               )
 
 vgg_model.save(Path(Path(__file__).parent.resolve(), 'model', 'ts_anchorshot_model'))
