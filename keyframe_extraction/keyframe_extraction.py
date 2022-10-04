@@ -102,18 +102,17 @@ def check_requirements(path: Path, skip_existing=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
-    parser.add_argument('-s', '--skip', action='store_true', help="skip keyframe extraction if already exist")
+    parser.add_argument('--overwrite', action='store_true', help="Re-calculate keyframes for all videos")
     parser.add_argument('--center', action='store_true', help="use shot center frame as keyframe ")
-    parser.add_argument('--parallel', action='store_true')
     args = parser.parse_args()
 
     video_files = []
 
     for file in args.files:
-        if file.is_file() and check_requirements(file, args.skip):
+        if file.is_file() and check_requirements(file, not args.overwrite):
             video_files.append(file)
         elif file.is_dir():
-            video_files.extend([video for video in file.glob('*.mp4') if check_requirements(video, args.skip)])
+            video_files.extend([video for video in file.glob('*.mp4') if check_requirements(video, not args.overwrite)])
 
     assert len(video_files) > 0
 
