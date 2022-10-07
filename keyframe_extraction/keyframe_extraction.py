@@ -10,7 +10,8 @@ from PIL import Image
 from alive_progress import alive_bar
 from scipy import ndimage
 
-from common.VideoData import VideoData, get_frame_dir, get_frame_paths, get_shot_file, get_keyframe_dir, get_keyframe_paths, \
+from common.VideoData import VideoData, get_frame_dir, get_frame_paths, get_shot_file, get_keyframe_dir, \
+    get_keyframe_paths, \
     read_shots_from_file, get_date_time
 from common.constants import TV_FILENAME_RE
 
@@ -60,7 +61,8 @@ def detect_keyframes(vd: VideoData, kf_func=get_magnitude_gradient_kf_idx):
 
     for shot_idx, (first_frame_idx, last_frame_idx, _) in enumerate(shots):
 
-        frames = [Image.open(frame).convert('L') for frame in vd.frames[first_frame_idx + 5:last_frame_idx - 5]]
+        frames = [Image.open(frame).convert('L') for frame in
+                  vd.frames[first_frame_idx + 5:last_frame_idx - 5]]
         frames = [np.array(frame) for frame in frames]
 
         if vd.is_summary:

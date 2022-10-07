@@ -2,61 +2,62 @@
 
 import argparse
 import logging
-import multiprocessing as mp
 import os
 import re
 import sys
 from pathlib import Path
 
+import cv2
 import numpy as np
 import pandas as pd
-from PIL import Image
 
 from common.VideoData import VideoData, get_shot_file, get_data_dir, get_frame_dir, get_frame_paths, get_date_time
-from transnetv2 import TransNetV2
 from common.constants import TV_FILENAME_RE
 from common.fs_utils import set_tf_loglevel
+from transnetv2 import TransNetV2
+
+parser = argparse.ArgumentParser('Determine shot boundaries')
+parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
+parser.add_argument('--overwrite', action='store_true', help="Re-calculate shot boundaries for all videos")
+
+model = TransNetV2()
+
+
+def load_frames(paths, cvt_color=cv2.COLOR_BGR2RGB):
+    frames = [cv2.imread(str(frame)) for frame in paths]
+    frames = [cv2.cvtColor(frame, cvt_color) for frame in frames]
+
+    return frames
 
 
 def shot_transition_detection(frames):
-    model = TransNetV2()
-
     single_frame_predictions, all_frame_predictions = model.predict_frames(frames)
 
     predictions = np.stack([single_frame_predictions, all_frame_predictions], 1)
-    scenes = model.predictions_to_scenes(single_frame_predictions)
+    scenes = model.predictions_to_scenes(single_frame_predictions, threshold=0.2)
     img = model.visualize_predictions(frames, (single_frame_predictions, all_frame_predictions))
 
     return predictions, scenes, img
 
 
 def process_video(vd: VideoData):
-    try:
+    frames = load_frames(vd.frames)
+    frames = [cv2.resize(frame, (48, 27)) for frame in frames]
 
-        frames = [Image.open(frame).resize((48, 27)) for frame in vd.frames]
-        frames = [np.array(frame) for frame in frames]
+    _, segments, img = shot_transition_detection(np.array(frames))
 
-        if vd.is_summary:
-            frames = [frame[:220, :] for frame in frames]
+    data = segments[segments[:, 1] - segments[:, 0] > 10]
+    data = np.c_[data, data[:, 1] - data[:, 0] + 1]
 
-        _, segments, img = shot_transition_detection(np.array(frames))
+    df = pd.DataFrame(data=data, columns=['first_frame_idx', 'last_frame_idx', 'n_frames'])
 
-        data = segments[segments[:, 1] - segments[:, 0] > 10]
-        data = np.c_[data, data[:, 1] - data[:, 0] + 1]
+    df.to_csv(get_shot_file(vd))
+    img.save(Path(get_data_dir(vd), 'shots.png').absolute())
 
-        df = pd.DataFrame(data=data, columns=['first_frame_idx', 'last_frame_idx', 'n_frames'])
-
-        df.to_csv(get_shot_file(video))
-        img.save(Path(get_data_dir(video), 'shots.png').absolute())
-
-        return video
-
-    except Exception as e:
-        print(e)
-        return e
+    return vd
 
 
-def check_requirements(video: Path, skip_existing: bool):
+def check_requirements(video: Path, skip_existing):
     match = re.match(TV_FILENAME_RE, video.name)
 
     if match is None or not video.is_file():
@@ -78,15 +79,7 @@ def mute():
     sys.stdout = open(os.devnull, 'w')
 
 
-if __name__ == "__main__":
-    set_tf_loglevel(logging.FATAL)
-
-    parser = argparse.ArgumentParser('Determine shot boundaries')
-    parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
-    parser.add_argument('--overwrite', action='store_true', help="Re-calculate shot boundaries for all videos")
-    parser.add_argument('--parallel', action='store_true')
-    args = parser.parse_args()
-
+def main(args):
     video_files = []
 
     for file in args.files:
@@ -101,25 +94,16 @@ if __name__ == "__main__":
 
     print(f'Video Segmentation ({len(video_files)} videos)\n')
 
+    for idx, video in enumerate(video_files):
+        vd = VideoData(video)
 
-    def callback_handler(res):
-        if res is not None and isinstance(res, Path):
-            print(f'{res.relative_to(res.parent.parent)} done')
+        print(f'[{idx + 1}/{len(video_files)}] {vd}')
+
+        process_video(vd)
 
 
-    if args.parallel:
+if __name__ == "__main__":
+    set_tf_loglevel(logging.FATAL)
 
-        with mp.Pool(os.cpu_count(), initializer=mute) as pool:
-            [pool.apply_async(process_video, (VideoData(vf),), callback=callback_handler) for vf in video_files]
-
-            pool.close()
-            pool.join()
-
-    else:
-        for idx, video in enumerate(video_files):
-            vd = VideoData(video)
-
-            print(f'[{idx + 1}/{len(video_files)}] {vd}')
-
-            process_video(vd)
-            print()
+    args = parser.parse_args()
+    main(args)
