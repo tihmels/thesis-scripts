@@ -1,6 +1,5 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python
 
-import argparse
 import asyncio
 import logging
 from os.path import exists
@@ -84,9 +83,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    args = parser.parse_args()
-
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     result = loop.run_until_complete(main())

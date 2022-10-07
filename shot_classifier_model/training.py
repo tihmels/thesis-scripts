@@ -12,9 +12,9 @@ parser = ArgumentParser()
 parser.add_argument('-d', '--dataset', type=lambda p: Path(p).resolve(strict=True),
                     default="/Users/tihmels/TS/ts-dataset")
 parser.add_argument('-c', '--classes', type=str, default=[], nargs='+')
+parser.add_argument('-e', '--epochs', type=int, default=15, help="number of epochs")
 parser.add_argument('--bs', '--batch_size', type=int, default=32, help="batch size")
 parser.add_argument('--shape', type=lambda s: list(map(int, s.split('x'))), default="224x224", help="<width>x<height>")
-parser.add_argument('--epochs', type=int, default=15, help="number of epochs")
 parser.add_argument('--ft', '--finetune', type=int, default=0)
 
 
@@ -25,12 +25,10 @@ def generators(path, classes, target_size, batch_size, preprocessing):
         validation_split=0.2,
     )
 
-    height, width = target_size
-
     training_dataset = img_data_gen.flow_from_directory(
         path,
         seed=10,
-        target_size=(height, width),
+        target_size=target_size,
         classes=classes,
         batch_size=batch_size,
         subset='training'
@@ -39,7 +37,7 @@ def generators(path, classes, target_size, batch_size, preprocessing):
     validation_dataset = img_data_gen.flow_from_directory(
         path,
         seed=10,
-        target_size=(height, width),
+        target_size=target_size,
         classes=classes,
         batch_size=batch_size,
         subset='validation'
@@ -81,12 +79,12 @@ def create_model(input_shape, n_classes, optimizer, fine_tune=0):
 def main(args):
     base_dir = Path(args.dataset)
 
-    subdirectories = sorted(list([d.name for d in base_dir.glob("*") if d.is_dir()]))
+    subdirs = sorted(list([d.name for d in base_dir.glob("*") if d.is_dir()]))
 
-    classes = args.classes if len(args.classes) > 0 else subdirectories
+    classes = args.classes if len(args.classes) > 0 else subdirs
 
     assert all(
-        clazz in subdirectories for clazz in classes), f'each class need to be present as subdirectory in {base_dir}'
+        clazz in subdirs for clazz in classes), f'each class need to be present as subdirectory in {base_dir}'
 
     train_ds, val_ds = generators(base_dir, classes, args.shape, args.bs,
                                   tf.keras.applications.vgg19.preprocess_input)
