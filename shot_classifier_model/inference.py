@@ -1,16 +1,18 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
 
 import json
+import logging
 import re
 from argparse import ArgumentParser
 from pathlib import Path
 
 import numpy as np
-import tensorflow as tf
 from alive_progress import alive_bar
 
 from common.VideoData import get_keyframe_dir, get_date_time, VideoData
 from common.constants import TV_FILENAME_RE
+from common.fs_utils import set_tf_loglevel
+import tensorflow as tf
 
 model = tf.keras.models.load_model(Path(Path(__file__).resolve().parent, 'model', 'ts_anchor_model'))
 model.load_weights(Path(Path(__file__).resolve().parent, 'model', 'ts_anchor_v1.weights.best.hdf5'))

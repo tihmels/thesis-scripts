@@ -14,6 +14,8 @@ import pandas as pd
 from common.VideoData import VideoData, get_shot_file, get_data_dir, get_frame_dir, get_frame_paths, get_date_time
 from common.constants import TV_FILENAME_RE
 from common.fs_utils import set_tf_loglevel
+
+set_tf_loglevel(logging.FATAL)
 from transnetv2 import TransNetV2
 
 parser = argparse.ArgumentParser('Determine shot boundaries')
@@ -34,7 +36,7 @@ def shot_transition_detection(frames):
 
 
 def process_video(vd: VideoData):
-    frames = frames = [cv2.imread(str(frame)) for frame in vd.frames]
+    frames = [cv2.imread(str(frame)) for frame in vd.frames]
     frames = [cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) for frame in frames]
     frames = [cv2.resize(frame, (48, 27)) for frame in frames]
 
@@ -97,7 +99,5 @@ def main(args):
 
 
 if __name__ == "__main__":
-    set_tf_loglevel(logging.FATAL)
-
     args = parser.parse_args()
     main(args)
