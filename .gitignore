@@ -290,5 +290,5 @@ Temporary Items
 lm.binary
 unigram.txt
 
-anchorshot_detection/model/**
-anchorshot_detection/**/*.hdf5
+shot_classifier_model/model/**
+shot_classifier_model/**/*.hdf5
