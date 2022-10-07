@@ -123,7 +123,9 @@ if __name__ == "__main__":
 
         vd = VideoData(vf)
 
-        with alive_bar(vd.n_shots, ctrl_c=False, title=f'[{vf_idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
+        with alive_bar(vd.n_shots, ctrl_c=False,
+                       title=f'[{vf_idx + 1}/{len(video_files)}] {vd} ' + ('☾' if is_nightly_version(vd) else '☼'),
+                       length=20) as bar:
 
             captions = []
 
