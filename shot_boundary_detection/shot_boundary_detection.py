@@ -23,13 +23,6 @@ parser.add_argument('--overwrite', action='store_true', help="Re-calculate shot 
 model = TransNetV2()
 
 
-def load_frames(paths, cvt_color=cv2.COLOR_BGR2RGB):
-    frames = [cv2.imread(str(frame)) for frame in paths]
-    frames = [cv2.cvtColor(frame, cvt_color) for frame in frames]
-
-    return frames
-
-
 def shot_transition_detection(frames):
     single_frame_predictions, all_frame_predictions = model.predict_frames(frames)
 
@@ -41,7 +34,8 @@ def shot_transition_detection(frames):
 
 
 def process_video(vd: VideoData):
-    frames = load_frames(vd.frames)
+    frames = frames = [cv2.imread(str(frame)) for frame in vd.frames]
+    frames = [cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) for frame in frames]
     frames = [cv2.resize(frame, (48, 27)) for frame in frames]
 
     _, segments, img = shot_transition_detection(np.array(frames))
@@ -51,7 +45,7 @@ def process_video(vd: VideoData):
 
     df = pd.DataFrame(data=data, columns=['first_frame_idx', 'last_frame_idx', 'n_frames'])
 
-    df.to_csv(get_shot_file(vd))
+    df.to_csv(get_shot_file(vd), index=False)
     img.save(Path(get_data_dir(vd), 'shots.png').absolute())
 
     return vd

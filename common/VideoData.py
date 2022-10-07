@@ -153,6 +153,13 @@ def get_caption_file(video: VideoPathType):
         return get_caption_file(video.path)
 
 
+def get_shot_type_file(video: VideoPathType):
+    if isinstance(video, Path):
+        return Path(get_data_dir(video), "types.csv")
+    else:
+        return get_shot_type_file(video.path)
+
+
 def get_keyframe_dir(video: VideoPathType):
     if isinstance(video, Path):
         return Path(get_data_dir(video), "kfs")
