@@ -6,9 +6,9 @@ from pathlib import Path
 import ffmpeg
 
 from common.VideoData import get_frame_dir, get_date_time, get_frame_paths, VideoData
-from common.fs_utils import re_create_dir, filename_match
+from common.fs_utils import re_create_dir, fn_match
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser('Video frame extraction using ffmpeg')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="TS video files ")
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
                     help='Re-extracts frames for all videos')
@@ -39,7 +39,7 @@ def was_processed(path: Path):
 
 
 def main(args):
-    video_files = {file for file in args.files if filename_match(file)}
+    video_files = {file for file in args.files if fn_match(file)}
 
     if args.skip_existing:
         video_files = {file for file in video_files if not was_processed(file)}

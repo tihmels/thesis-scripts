@@ -8,8 +8,7 @@ import numpy as np
 import pandas as pd
 from alive_progress import alive_bar
 
-from common.VideoData import get_keyframe_dir, get_date_time, VideoData, get_shot_type_file, get_shot_file, \
-    read_shots_from_file
+from common.VideoData import get_keyframe_dir, get_date_time, VideoData, get_shot_type_file, get_shot_file
 from common.constants import TV_FILENAME_RE
 from shot_classifier_model.inference import classify_video_shots
 
@@ -32,8 +31,8 @@ def check_requirements(path: Path, skip_existing: bool):
 
     kf_dir = get_keyframe_dir(path)
 
-    if not kf_dir.is_dir() or len(list(kf_dir.glob("*.jpg"))) != len(read_shots_from_file(shot_file)):
-        return False
+    # if not kf_dir.is_dir() or len(list(kf_dir.glob("*.jpg"))) != len(read_shots_from_file(shot_file)):
+    #    return False
 
     return True
 

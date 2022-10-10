@@ -7,7 +7,7 @@ from shutil import rmtree
 from common.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE
 
 
-def filename_match(path: Path):
+def fn_match(path: Path):
     match = re.match(TV_FILENAME_RE, path.name)
 
     if match is None:
