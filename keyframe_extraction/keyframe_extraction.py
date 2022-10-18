@@ -14,6 +14,7 @@ from common.VideoData import VideoData, get_frame_dir, get_frame_paths, get_shot
     get_keyframe_paths, \
     read_shots_from_file, get_date_time
 from common.constants import TV_FILENAME_RE
+from common.fs_utils import re_create_dir
 
 
 def get_center_kf_idx(frames):
@@ -74,10 +75,7 @@ def detect_keyframes(vd: VideoData, kf_func=get_magnitude_gradient_kf_idx):
 
 
 def check_requirements(path: Path, skip_existing=False):
-    match = re.match(TV_FILENAME_RE, path.name)
-
-    if match is None or not path.is_file():
-        print(f'{path.name} does not exist or does not match TV-*.mp4 pattern.')
+    if re.match(TV_FILENAME_RE, file.name) is None:
         return False
 
     frame_dir = get_frame_dir(path)
@@ -125,8 +123,7 @@ if __name__ == "__main__":
     for vf_idx, vf in enumerate(video_files):
         vd = VideoData(vf)
 
-        rmtree(vd.keyframe_dir, ignore_errors=True)
-        vd.keyframe_dir.mkdir(parents=True)
+        re_create_dir(vd.keyframe_dir)
 
         with alive_bar(vd.n_shots, ctrl_c=False, title=f'[{vf_idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
 

@@ -226,6 +226,16 @@ def get_scene_file(video: VideoPathType):
         return get_scene_file(video.path)
 
 
+def get_xml_transcript(video: VideoPathType):
+    if isinstance(video, Path):
+        date = video.name.split("-")[1]
+        xml_file = [file for file in get_data_dir(video).iterdir() if
+                    re.match(r'TV-' + date + r'-(\d{5}).xml', file.name)]
+        return xml_file[0]
+    else:
+        return get_xml_transcript(video.path)
+
+
 def read_scenes_from_file(file: Path):
     df = pd.read_csv(file, usecols=['news_title',
                                     'first_frame_idx', 'last_frame_idx', 'n_frames',

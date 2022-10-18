@@ -43,32 +43,28 @@ def process_video(vd: VideoData):
     _, segments, img = shot_transition_detection(np.array(frames))
 
     data = segments[segments[:, 1] - segments[:, 0] > 10]
-    data = np.c_[data, data[:, 1] - data[:, 0] + 1]
 
-    df = pd.DataFrame(data=data, columns=['first_frame_idx', 'last_frame_idx', 'n_frames'])
+    df = pd.DataFrame(data=data, columns=['first_frame_idx', 'last_frame_idx'])
 
     df.to_csv(get_shot_file(vd), index=False)
     img.save(Path(get_data_dir(vd), 'shots.png').absolute())
 
-    return vd
 
-
-def check_requirements(video: Path, skip_existing):
-    match = re.match(TV_FILENAME_RE, video.name)
-
-    if match is None or not video.is_file():
+def check_requirements(video: Path):
+    if not re.match(TV_FILENAME_RE, video.name):
         return False
 
     frame_path = get_frame_dir(video)
 
     if not frame_path.is_dir() or not len(get_frame_paths(video)) > 0:
-        print(f'{video.name} has no extracted frames.')
-        return False
-
-    if skip_existing and get_shot_file(video).is_file():
+        print(f'{video} has no extracted frames.')
         return False
 
     return True
+
+
+def was_processed(video: Path):
+    return get_shot_file(video).is_file()
 
 
 def mute():
@@ -76,19 +72,16 @@ def mute():
 
 
 def main(args):
-    video_files = []
+    video_files = {file for file in args.files if check_requirements(file)}
 
-    for file in args.files:
-        if file.is_file() and check_requirements(file, not args.overwrite):
-            video_files.append(file)
-        elif file.is_dir():
-            video_files.extend([video for video in file.glob('*.mp4') if check_requirements(video, not args.overwrite)])
+    if args.skip_existing:
+        video_files = {file for file in video_files if not was_processed(file)}
 
     assert len(video_files) > 0
 
-    video_files.sort(key=get_date_time)
+    video_files = sorted(video_files, key=get_date_time)
 
-    print(f'Video Segmentation ({len(video_files)} videos)\n')
+    print(f'Executing shot boundary detection for {len(video_files)} videos ...\n')
 
     for idx, video in enumerate(video_files):
         vd = VideoData(video)

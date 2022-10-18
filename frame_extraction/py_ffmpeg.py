@@ -1,12 +1,14 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
 
 import argparse
+import re
 from pathlib import Path
 
 import ffmpeg
 
 from common.VideoData import get_frame_dir, get_date_time, get_frame_paths, VideoData
-from common.fs_utils import re_create_dir, fn_match
+from common.constants import TV_FILENAME_RE
+from common.fs_utils import re_create_dir
 
 parser = argparse.ArgumentParser('Video frame extraction using ffmpeg')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="TS video files ")
@@ -29,17 +31,17 @@ def extract_frames(vd: VideoData, fps=0.0, resize=None):
     ffmpeg.run(stream, quiet=True)
 
 
-def was_processed(path: Path):
-    frame_dir = get_frame_dir(path)
+def was_processed(video: Path):
+    frame_dir = get_frame_dir(video)
 
-    if frame_dir.is_dir() and len(get_frame_paths(path)) > 0:
+    if frame_dir.is_dir() and len(get_frame_paths(video)) > 0:
         return True
 
     return False
 
 
 def main(args):
-    video_files = {file for file in args.files if fn_match(file)}
+    video_files = {file for file in args.files if re.match(TV_FILENAME_RE, file.name)}
 
     if args.skip_existing:
         video_files = {file for file in video_files if not was_processed(file)}
