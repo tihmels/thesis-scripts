@@ -12,12 +12,12 @@ from common.VideoData import VideoData, get_audio_file, get_audio_dir, get_shot_
     get_date_time
 from common.constants import TV_FILENAME_RE
 
+pydub.AudioSegment.ffmpeg = '/usr/local/bin/ffmpeg'
+
 parser = ArgumentParser()
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
                     help="Re-split audio tracks for all videos")
-
-pydub.AudioSegment.ffmpeg = '/usr/local/bin/ffmpeg'
 
 
 def split_audio_by_scenes(vd: VideoData):

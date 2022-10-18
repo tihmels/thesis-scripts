@@ -1,10 +1,12 @@
+#!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
+
 import argparse
 import re
 from datetime import datetime
 from pathlib import Path
 from xml.dom.minidom import parse
 
-from common.VideoData import get_date_time, VideoData, get_xml_transcript
+from common.VideoData import get_date_time, VideoData, get_xml_transcript, get_data_dir
 from common.constants import TV_FILENAME_RE
 
 parser = argparse.ArgumentParser('Video frame extraction using ffmpeg')
@@ -19,6 +21,8 @@ def extract_captions(dom):
     spans = dom.getElementsByTagName("tt:span")
 
     text = ' '.join([span.firstChild.nodeValue for span in spans if span.getAttribute('style') == 'textWhite'])
+
+    # text = ' '.join([span.firstChild.nodeValue for span in spans])
 
     return text.strip()
 
@@ -46,11 +50,11 @@ def process_video(vd: VideoData):
 
     intervals, captions = parse_xml(dom)
 
-    for interval, caption in zip(intervals, captions):
-        start, end = interval[0].isoformat(), interval[1].isoformat()
-        print("[" + start + " - " + end + "]" + " " + caption)
-
-    print()
+    with open(Path(get_data_dir(vd), 'transcript.txt'), 'w') as f:
+        for interval, caption in zip(intervals, captions):
+            start, end = interval[0].isoformat(), interval[1].isoformat()
+            f.write("[" + start + " - " + end + "]" + " " + caption)
+            f.write('\n')
 
 
 def was_processed(file):
@@ -58,6 +62,8 @@ def was_processed(file):
 
 
 def check_requirements(file: Path):
+    assert file.parent.name == 'ts15'
+
     if re.match(TV_FILENAME_RE, file.name) is None:
         return False
 
