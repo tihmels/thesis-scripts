@@ -20,7 +20,8 @@ from transnetv2 import TransNetV2
 
 parser = argparse.ArgumentParser('Determine shot boundaries')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
-parser.add_argument('--overwrite', action='store_true', help="Re-calculate shot boundaries for all videos")
+parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
+                    help="Re-calculate shot boundaries for all videos")
 
 model = TransNetV2()
 
@@ -83,8 +84,8 @@ def main(args):
 
     print(f'Executing shot boundary detection for {len(video_files)} videos ...\n')
 
-    for idx, video in enumerate(video_files):
-        vd = VideoData(video)
+    for idx, vf in enumerate(video_files):
+        vd = VideoData(vf)
 
         print(f'[{idx + 1}/{len(video_files)}] {vd}')
 

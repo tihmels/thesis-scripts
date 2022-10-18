@@ -12,6 +12,11 @@ from common.VideoData import VideoData, get_audio_file, get_audio_dir, get_shot_
     get_date_time
 from common.constants import TV_FILENAME_RE
 
+parser = ArgumentParser()
+parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
+parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
+                    help="Re-split audio tracks for all videos")
+
 pydub.AudioSegment.ffmpeg = '/usr/local/bin/ffmpeg'
 
 
@@ -26,7 +31,7 @@ def split_audio_by_scenes(vd: VideoData):
         audio_segment = audio[start_ms:end_ms]
 
         audio_segment.export(
-            Path(vd.audio_dir, 'scene_' + str(scene_idx + 1) + '.wav'), format='wav')
+            Path(vd.audio_dir, 'story_' + str(scene_idx + 1) + '.wav'), format='wav')
 
         yield
 
@@ -47,51 +52,43 @@ def split_audio_by_shots(vd: VideoData):
         yield
 
 
-def check_requirements(path: Path, skip_existing=False):
-    match = re.match(TV_FILENAME_RE, path.name)
-
-    if match is None or not path.is_file():
-        print(f'{path.name} does not exist or does not match TV-*.mp4 pattern.')
+def check_requirements(video: Path):
+    if not re.match(TV_FILENAME_RE, video.name):
         return False
 
-    audio_dir = get_audio_dir(path)
+    audio_dir = get_audio_dir(video)
 
-    if not audio_dir.is_dir() or get_audio_file(path) is None:
-        print(f'{path.name} has no audio file extracted.')
+    if not audio_dir.is_dir() or get_audio_file(video) is None:
+        print(f'{video.name} has no audio file extracted.')
         return False
 
-    shot_file = get_shot_file(path)
+    shot_file = get_shot_file(video)
 
     if not shot_file.is_file():
-        print(f'{path.name} has no detected shots.')
+        print(f'{video.name} has no detected shots.')
         return False
-
-    if skip_existing:
-        audio_shots = get_audio_shot_paths(path)
-
-        if len(audio_shots) == len(read_shots_from_file(shot_file)):
-            return False
 
     return True
 
 
-if __name__ == "__main__":
-    parser = ArgumentParser()
-    parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
-    parser.add_argument('--overwrite', action='store_true', help="Re-split audio tracks for all videos")
-    args = parser.parse_args()
+def was_processed(video: Path):
+    audio_shots = get_audio_shot_paths(video)
 
-    video_files = []
+    if len(audio_shots) == len(read_shots_from_file(video)):
+        return True
 
-    for file in args.files:
-        if file.is_file() and check_requirements(file, not args.overwrite):
-            video_files.append(file)
-        elif file.is_dir():
-            video_files.extend([video for video in file.glob('*.mp4') if check_requirements(video, not args.overwrite)])
+    return False
+
+
+def main(args):
+    video_files = {file for file in args.files if check_requirements(file)}
+
+    if args.skip_existing:
+        video_files = {file for file in video_files if not was_processed(file)}
 
     assert len(video_files) > 0
 
-    video_files.sort(key=get_date_time)
+    video_files = sorted(video_files, key=get_date_time)
 
     print(f'Splitting audio tracks from {len(video_files)} videos ... \n')
 
@@ -101,3 +98,8 @@ if __name__ == "__main__":
         with alive_bar(vd.n_stories, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
             for _ in split_audio_by_scenes(vd):
                 bar()
+
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+    main(args)
