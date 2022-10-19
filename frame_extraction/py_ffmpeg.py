@@ -47,7 +47,7 @@ def main(args):
     if args.skip_existing:
         video_files = {file for file in video_files if not was_processed(file)}
 
-    assert len(video_files) > 0, 'There are no video files left for processing.'
+    assert len(video_files) > 0, 'No suitable video files have been found.'
 
     video_files = sorted(video_files, key=get_date_time)
 

@@ -2,9 +2,7 @@
 
 import argparse
 import logging
-import os
 import re
-import sys
 from pathlib import Path
 
 import cv2
@@ -18,8 +16,8 @@ from common.fs_utils import set_tf_loglevel
 set_tf_loglevel(logging.FATAL)
 from transnetv2 import TransNetV2
 
-parser = argparse.ArgumentParser('Determine shot boundaries')
-parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
+parser = argparse.ArgumentParser('Shot Boundary Detection (SBD)')
+parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
                     help="Re-calculate shot boundaries for all videos")
 
@@ -36,7 +34,7 @@ def shot_transition_detection(frames):
     return predictions, scenes, img
 
 
-def process_video(vd: VideoData):
+def detect_shot_boundaries(vd: VideoData):
     frames = [cv2.imread(str(frame)) for frame in vd.frames]
     frames = [cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) for frame in frames]
     frames = [cv2.resize(frame, (48, 27)) for frame in frames]
@@ -47,8 +45,7 @@ def process_video(vd: VideoData):
 
     df = pd.DataFrame(data=data, columns=['first_frame_idx', 'last_frame_idx'])
 
-    df.to_csv(get_shot_file(vd), index=False)
-    img.save(Path(get_data_dir(vd), 'shots.png').absolute())
+    return df, img
 
 
 def check_requirements(video: Path):
@@ -58,7 +55,7 @@ def check_requirements(video: Path):
     frame_path = get_frame_dir(video)
 
     if not frame_path.is_dir() or not len(get_frame_paths(video)) > 0:
-        print(f'{video} has no extracted frames.')
+        print(f'{video.name} has no extracted frames.')
         return False
 
     return True
@@ -68,28 +65,29 @@ def was_processed(video: Path):
     return get_shot_file(video).is_file()
 
 
-def mute():
-    sys.stdout = open(os.devnull, 'w')
-
-
 def main(args):
     video_files = {file for file in args.files if check_requirements(file)}
 
     if args.skip_existing:
         video_files = {file for file in video_files if not was_processed(file)}
 
-    assert len(video_files) > 0
+    assert len(video_files) > 0, 'No suitable video files have been found.'
 
     video_files = sorted(video_files, key=get_date_time)
 
-    print(f'Executing shot boundary detection for {len(video_files)} videos ...\n')
+    print(f'Detecting shot boundaries for {len(video_files)} videos ...', end='\n\n')
 
     for idx, vf in enumerate(video_files):
         vd = VideoData(vf)
 
         print(f'[{idx + 1}/{len(video_files)}] {vd}')
 
-        process_video(vd)
+        df, img = detect_shot_boundaries(vd)
+
+        df.to_csv(get_shot_file(vd), index=False)
+        img.save(Path(get_data_dir(vd), 'shots.png').absolute())
+
+        print(f'{str(len(df))} Shots 'u'\u2713')
 
 
 if __name__ == "__main__":
