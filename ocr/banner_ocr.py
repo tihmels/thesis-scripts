@@ -14,8 +14,13 @@ from skimage.feature import match_template
 from skimage.filters.edges import sobel
 from skimage.filters.thresholding import try_all_threshold
 
-from common.VideoData import get_date_time, VideoData, get_caption_file, get_shot_file
+from common.VideoData import get_date_time, VideoData, get_caption_file, get_shot_file, is_summary
 from common.constants import TV_FILENAME_RE, TS_LOGO
+
+parser = ArgumentParser(description='Extracts banner captions from ts100 videos')
+parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+',
+                    help='ts100 video files or directories to search for ts100 files')
+parser.add_argument('--overwrite', action='store_false', dest='skip_existing', help='Re-extracts banner captions for all videos')
 
 TS_LOGO = np.array(Image.open(TS_LOGO).convert('L'))
 
@@ -76,46 +81,35 @@ def extract_caption_data(vd: VideoData, resize_factor=4):
         yield caption_data
 
 
-def check_requirements(path: Path, skip_existing):
-    assert path.parent.name == 'ts100'
+def check_requirements(video: Path):
+    assert is_summary(video)
 
-    match = re.match(TV_FILENAME_RE, path.name)
-
-    if match is None or not path.is_file():
-        print(f'{path.name} does not exist or does not match TV-*.mp4 pattern.')
+    if not re.match(TV_FILENAME_RE, video.name):
+        print(f'{video.name} does not match TV-*.mp4 pattern.')
         return False
 
-    shot_file = get_shot_file(path)
+    shot_file = get_shot_file(video)
 
     if not shot_file.is_file():
-        print(f'{path.name} has no detected shots.')
-        return False
-
-    if skip_existing and get_caption_file(path).exists():
+        print(f'{video.name} has no detected shots.')
         return False
 
     return True
 
 
-if __name__ == "__main__":
-    parser = ArgumentParser(description='Extracts banner captions from ts100 videos')
-    parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+',
-                        help='ts100 video files or directories to search for ts100 files')
-    parser.add_argument('--overwrite', action='store_true', help='Re-extracts banner captions for all videos')
-    args = parser.parse_args()
+def was_processed(video: Path):
+    return get_caption_file(video).is_file()
 
-    video_files = []
 
-    for file in args.files:
-        if file.is_file() and check_requirements(file, not args.overwrite):
-            video_files.append(file)
-        elif file.is_dir():
-            video_files.extend(
-                [mp4_file for mp4_file in file.glob('*.mp4') if check_requirements(mp4_file, not args.overwrite)])
+def main(args):
+    video_files = {file for file in args.files if check_requirements(file)}
 
-    assert len(video_files) > 0, 'No suitable files found'
+    if args.skip_existing:
+        video_files = {file for file in video_files if not was_processed(file)}
 
-    video_files.sort(key=get_date_time)
+    assert len(video_files) > 0
+
+    video_files = sorted(video_files, key=get_date_time)
 
     print(f'Extracting banner captions from {len(video_files)} videos ... \n')
 
@@ -163,3 +157,8 @@ if __name__ == "__main__":
 
             df = pd.DataFrame(data=captions, columns=['headline', 'subline', 'confidence'])
             df.to_csv(get_caption_file(vd), index=False)
+
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+    main(args)

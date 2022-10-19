@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from xml.dom.minidom import parse
 
-from common.VideoData import get_date_time, VideoData, get_xml_transcript, get_data_dir
+from common.VideoData import get_date_time, VideoData, get_xml_transcript, get_data_dir, is_summary
 from common.constants import TV_FILENAME_RE
 
 parser = argparse.ArgumentParser('Video frame extraction using ffmpeg')
@@ -44,9 +44,9 @@ def parse_xml(dom):
 
 
 def process_video(vd: VideoData):
-    transcript = get_xml_transcript(vd)
+    xml_transcript = get_xml_transcript(vd)
 
-    dom = parse(str(transcript))
+    dom = parse(str(xml_transcript))
 
     intervals, captions = parse_xml(dom)
 
@@ -61,14 +61,14 @@ def was_processed(file):
     return False
 
 
-def check_requirements(file: Path):
-    assert file.parent.name == 'ts15'
+def check_requirements(video: Path):
+    assert not is_summary(video)
 
-    if re.match(TV_FILENAME_RE, file.name) is None:
+    if not re.match(TV_FILENAME_RE, video.name):
         return False
 
-    if not get_xml_transcript(file).is_file():
-        print(f'{file.name} has no xml transcript file')
+    if not get_xml_transcript(video):
+        print(f'{video.name} has no XML transcript file')
         return False
 
     return True
@@ -83,8 +83,6 @@ def main(args):
     assert len(video_files) > 0
 
     video_files = sorted(video_files, key=get_date_time)
-
-    print(f'Decoding {len(video_files)} videos', end='\n\n')
 
     for idx, vf in enumerate(video_files):
         vd = VideoData(vf)

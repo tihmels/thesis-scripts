@@ -1,5 +1,7 @@
 import csv
 import re
+import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Union
@@ -116,11 +118,8 @@ def get_audio_dir(video: VideoPathType):
 
 def get_audio_file(video: VideoPathType):
     if isinstance(video, Path):
-        files = [file for file in get_audio_dir(video).glob('*.wav') if re.match(AUDIO_FILENAME_RE, file.name)]
-        if len(files) == 1:
-            return files[0]
-        else:
-            return None
+        audio_files = [file for file in get_audio_dir(video).glob('*.wav') if re.match(AUDIO_FILENAME_RE, file.name)]
+        return audio_files[0] if audio_files else None
     else:
         return get_audio_file(video.path)
 
@@ -214,9 +213,25 @@ def get_feature_file(video: VideoPathType):
 
 def get_transcript_file(video: VideoPathType):
     if isinstance(video, Path):
-        return Path(get_data_dir(video), "transcript.json")
+        return Path(get_data_dir(video), "transcript.txt")
     else:
         return get_transcript_file(video.path)
+
+
+def read_transcript_from_file(file: Path):
+    with open(file, 'r') as f:
+        lines = f.readlines()
+
+        transcript = []
+
+        for line in lines:
+            start = datetime.strptime(line[1:9], '%H:%M:%S').time()
+            end = datetime.strptime(line[12:20], '%H:%M:%S').time()
+            caption = line[22:-1]
+
+            transcript.append((start, end, caption))
+
+        return transcript
 
 
 def get_scene_file(video: VideoPathType):
@@ -229,9 +244,9 @@ def get_scene_file(video: VideoPathType):
 def get_xml_transcript(video: VideoPathType):
     if isinstance(video, Path):
         date = video.name.split("-")[1]
-        xml_file = [file for file in get_data_dir(video).iterdir() if
-                    re.match(r'TV-' + date + r'-(\d{5}).xml', file.name)]
-        return xml_file[0]
+        xml_files = [file for file in get_data_dir(video).iterdir() if
+                     re.match(r'TV-' + date + r'-(\d{5}).xml', file.name)]
+        return xml_files[0] if xml_files else None
     else:
         return get_xml_transcript(video.path)
 
