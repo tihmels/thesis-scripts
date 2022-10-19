@@ -11,11 +11,11 @@ from common.constants import TV_FILENAME_RE
 from common.fs_utils import re_create_dir
 
 parser = argparse.ArgumentParser('Video frame extraction using ffmpeg')
-parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="TS video files ")
+parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
-                    help='Re-extracts frames for all videos')
-parser.add_argument('--fps', type=float, default=0.0, help="extract frames per second")
-parser.add_argument('--size', type=lambda s: list(map(int, s.split('x'))))
+                    help='Re-extract frames for all videos')
+parser.add_argument('--fps', type=float, default=0.0, help="Frames per second to extract")
+parser.add_argument('--size', type=lambda s: list(map(int, s.split('x'))), help="Scale frames to size (e.g. 224x224)")
 
 
 def extract_frames(vd: VideoData, fps=0.0, resize=None):
@@ -35,6 +35,7 @@ def was_processed(video: Path):
     frame_dir = get_frame_dir(video)
 
     if frame_dir.is_dir() and len(get_frame_paths(video)) > 0:
+        print(f'{video.name} has already frames extracted.')
         return True
 
     return False
@@ -46,11 +47,11 @@ def main(args):
     if args.skip_existing:
         video_files = {file for file in video_files if not was_processed(file)}
 
-    assert len(video_files) > 0
+    assert len(video_files) > 0, 'There are no video files left for processing.'
 
     video_files = sorted(video_files, key=get_date_time)
 
-    print(f'Decoding {len(video_files)} videos', end='\n\n')
+    print(f'Extracting frames from {len(video_files)} videos ...', end='\n\n')
 
     for idx, vf in enumerate(video_files):
         vd = VideoData(vf)
