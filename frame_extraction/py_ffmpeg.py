@@ -11,7 +11,7 @@ from common.constants import TV_FILENAME_RE
 from common.fs_utils import re_create_dir
 
 parser = argparse.ArgumentParser('Video frame extraction using ffmpeg')
-parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")
+parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help='Tagesschau video file(s)')
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
                     help='Re-extract frames for all videos')
 parser.add_argument('--fps', type=float, default=0.0, help="Frames per second to extract")

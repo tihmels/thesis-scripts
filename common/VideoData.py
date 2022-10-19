@@ -199,8 +199,8 @@ def get_frame_paths(video: VideoPathType):
 
 def get_keyframe_paths(video: VideoPathType):
     if isinstance(video, Path):
-        frame_dir = get_keyframe_dir(video)
-        return list(frame_dir.glob("frame_*.jpg"))
+        kf_dir = get_keyframe_dir(video)
+        return list(kf_dir.glob("frame_*.jpg"))
     else:
         return get_keyframe_paths(video.path)
 
@@ -255,5 +255,5 @@ def read_captions_from_file(file: Path, is_summary: bool):
 
 
 def read_shots_from_file(file: Path):
-    df = pd.read_csv(file, usecols=['first_frame_idx', 'last_frame_idx', 'n_frames'])
+    df = pd.read_csv(file, usecols=['first_frame_idx', 'last_frame_idx'])
     return list(df.to_records(index=False))
