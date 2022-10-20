@@ -11,7 +11,7 @@ import spacy
 from spacy.language import Language
 from spacy_langdetect import LanguageDetector
 
-from common.VideoData import VideoData, get_shot_file, get_date_time, get_banner_caption_file, get_scene_file
+from common.VideoData import VideoData, get_shot_file, get_date_time, get_banner_caption_file, get_story_file
 from common.constants import TV_FILENAME_RE
 
 
@@ -117,7 +117,7 @@ def segment_ts100(vd: VideoData, lev_threshold=5):
                                'to_ss', 'total_ss'])
 
     df.index = df.index + 1
-    df.to_csv(get_scene_file(vd))
+    df.to_csv(get_story_file(vd))
 
     return stories
 

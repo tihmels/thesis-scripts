@@ -44,7 +44,7 @@ class VideoData:
     @property
     def scenes(self):
         if self._scenes is None:
-            self._scenes = read_scenes_from_file(get_scene_file(self.path))
+            self._scenes = read_scenes_from_file(get_story_file(self.path))
         return self._scenes
 
     @property
@@ -260,14 +260,14 @@ def read_transcript_from_file(file: Path):
         return transcript
 
 
-def get_scene_file(video: VideoPathType):
+def get_story_file(video: VideoPathType) -> Path:
     if isinstance(video, Path):
         return Path(get_data_dir(video), "stories.csv")
     else:
-        return get_scene_file(video.path)
+        return get_story_file(video.path)
 
 
-def get_xml_transcript(video: VideoPathType):
+def get_xml_transcript(video: VideoPathType) -> Path:
     if isinstance(video, Path):
         date = video.name.split("-")[1]
         xml_files = [file for file in get_data_dir(video).iterdir() if

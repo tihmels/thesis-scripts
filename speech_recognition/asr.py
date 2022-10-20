@@ -5,6 +5,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 import whisper
+from alive_progress import alive_bar
 
 from common.VideoData import VideoData, get_audio_dir, get_audio_file, get_shot_file, get_date_time, \
     get_story_audio_files
