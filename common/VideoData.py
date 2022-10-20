@@ -237,11 +237,11 @@ def get_keyframe_paths(video: VideoPathType):
         return get_keyframe_paths(video.path)
 
 
-def get_transcript_file(video: VideoPathType):
+def get_main_transcript_file(video: VideoPathType):
     if isinstance(video, Path):
         return Path(get_data_dir(video), "transcript.txt")
     else:
-        return get_transcript_file(video.path)
+        return get_main_transcript_file(video.path)
 
 
 def read_transcript_from_file(file: Path):

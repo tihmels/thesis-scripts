@@ -3,6 +3,7 @@
 import argparse
 import shutil
 from pathlib import Path
+
 from PIL import Image
 from imagehash import average_hash
 
@@ -18,7 +19,6 @@ def main(args):
         hash = average_hash(image, hash_size=12)
 
         shutil.copy(file, str(hash) + ".jpg")
-
 
 
 if __name__ == "__main__":

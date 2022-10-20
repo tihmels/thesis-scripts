@@ -7,15 +7,6 @@ from shutil import rmtree
 from common.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE
 
 
-def fn_match(path: Path):
-    match = re.match(TV_FILENAME_RE, path.name)
-
-    if match is None:
-        return False
-
-    return True
-
-
 def re_create_dir(path: Path):
     if path.is_dir():
         rmtree(path)

@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 from fuzzywuzzy import fuzz
 
-from common.VideoData import VideoData, get_date_time, read_transcript_from_file, get_transcript_file
+from common.VideoData import VideoData, get_date_time, read_transcript_from_file, get_main_transcript_file
 
 parser = argparse.ArgumentParser()
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")
@@ -37,7 +37,7 @@ def main(args):
     for idx, vf in enumerate(video_files):
         vd = VideoData(vf)
 
-        transcripts = read_transcript_from_file(get_transcript_file(vd))
+        transcripts = read_transcript_from_file(get_main_transcript_file(vd))
 
         for t_idx, (start, end, caption) in enumerate(transcripts):
 

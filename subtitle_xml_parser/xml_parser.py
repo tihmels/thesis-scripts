@@ -6,7 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from xml.dom.minidom import parse
 
-from common.VideoData import get_date_time, VideoData, get_xml_transcript, get_data_dir, is_summary
+from common.VideoData import get_date_time, VideoData, get_xml_transcript, get_data_dir, is_summary, \
+    get_main_transcript_file
 from common.constants import TV_FILENAME_RE
 
 parser = argparse.ArgumentParser('Video frame extraction using ffmpeg')
@@ -57,8 +58,8 @@ def process_video(vd: VideoData):
             f.write('\n')
 
 
-def was_processed(file):
-    return False
+def was_processed(video):
+    return get_main_transcript_file(video).is_file()
 
 
 def check_requirements(video: Path):

@@ -7,9 +7,9 @@ import numpy as np
 import pydub
 from alive_progress import alive_bar
 
-from common.VideoData import VideoData, get_audio_file, get_audio_dir, get_shot_file, get_shot_audio_paths, \
+from common.VideoData import VideoData, get_audio_dir, get_shot_file, \
     read_shots_from_file, \
-    get_date_time
+    get_date_time, get_main_audio_file, get_shot_audio_files
 from common.constants import TV_FILENAME_RE
 
 pydub.AudioSegment.ffmpeg = '/usr/local/bin/ffmpeg'
@@ -58,7 +58,7 @@ def check_requirements(video: Path):
 
     audio_dir = get_audio_dir(video)
 
-    if not audio_dir.is_dir() or get_audio_file(video) is None:
+    if not audio_dir.is_dir() or get_main_audio_file(video) is None:
         print(f'{video.name} has no audio file extracted.')
         return False
 
@@ -72,12 +72,9 @@ def check_requirements(video: Path):
 
 
 def was_processed(video: Path):
-    audio_shots = get_shot_audio_paths(video)
+    audio_shots = get_shot_audio_files(video)
 
-    if len(audio_shots) == len(read_shots_from_file(video)):
-        return True
-
-    return False
+    return len(audio_shots) == len(read_shots_from_file(video))
 
 
 def main(args):
