@@ -2,38 +2,28 @@
 
 import re
 from argparse import ArgumentParser
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import whisper
-from alive_progress import alive_bar
 
-from common.VideoData import VideoData, get_audio_dir, get_audio_file, get_shot_file, get_date_time, \
-    get_story_audio_files
+from common.VideoData import VideoData, get_audio_dir, get_shot_file, get_date_time, \
+    get_main_audio_file, get_main_transcript_file
 from common.constants import TV_FILENAME_RE
 
-parser = ArgumentParser()
-parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
+parser = ArgumentParser('Automatic Speech Recognition')
+parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help='Tagesschau video file(s)')
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
 model = whisper.load_model("large", in_memory=True)
 
 
-def transcribe_audio(audio_file: Path):
-    result = model.transcribe(str(audio_file), language='de', fp16=False)
-
-    return result['text']
+def transcribe_audio_file(audio_file: Path):
+    return model.transcribe(str(audio_file), language='de', fp16=False)
 
 
-def process_video(vd: VideoData):
-    trans_dir = vd.transcripts_dir
-
-    for audio_file in get_story_audio_files(vd):
-        text = transcribe_audio(audio_file)
-
-        file = Path(trans_dir, audio_file.stem + ".txt")
-
-        with open(file, 'w') as f:
-            f.writelines(text.strip())
+def sec_to_time(seconds):
+    return (datetime.min + timedelta(seconds=seconds)).time()
 
 
 def check_requirements(video: Path):
@@ -42,7 +32,7 @@ def check_requirements(video: Path):
 
     audio_dir = get_audio_dir(video)
 
-    if not audio_dir.is_dir() or get_audio_file(video) is None:
+    if not audio_dir.is_dir() or get_main_audio_file(video) is None:
         print(f'{video.name} has no audio file extracted.')
         return False
 
@@ -56,7 +46,7 @@ def check_requirements(video: Path):
 
 
 def was_processed(video: Path):
-    return False
+    return get_main_transcript_file(video).is_file()
 
 
 def main(args):
@@ -69,14 +59,23 @@ def main(args):
 
     video_files = sorted(video_files, key=get_date_time)
 
-    print(f'Transcribing audio streams of {len(video_files)} videos ... \n')
+    print(f'Transcribing audio of {len(video_files)} videos ... \n')
 
     for idx, vf in enumerate(video_files):
         vd = VideoData(vf)
 
-        vd.transcripts_dir.mkdir(exist_ok=True)
+        audio_file = get_main_audio_file(vd)
 
-        process_video(vd)
+        result = transcribe_audio_file(audio_file)
+
+        transcripts = [(sec_to_time(int(segment['start'])),
+                        sec_to_time(int(segment['end'])),
+                        segment['text']) for segment in result['segments']]
+
+        with open(get_main_transcript_file(vd), 'w') as file:
+            for (start, end, text) in transcripts:
+                file.write("[" + start.isoformat() + " - " + end.isoformat() + "]" + " " + text.strip())
+                file.write('\n')
 
 
 if __name__ == "__main__":

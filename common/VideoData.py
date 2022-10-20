@@ -26,8 +26,6 @@ class VideoData:
         self._frames: [Path] = None
         self._keyframes: [Path] = None
         self._captions: [Path] = None
-        self._audio: AudioSegment = None
-        self._audio_shots: [AudioSegment] = None
 
     @property
     def shots(self):
@@ -101,11 +99,16 @@ class VideoData:
 
 VideoPathType = Union[VideoData, Path]
 
-AUDIO_DIR = 'audios'
+AUDIO_DIR = 'audio'
 FRAME_DIR = 'frames'
 KF_DIR = 'keyframes'
 TRANSCRIPT_DIR = 'transcripts'
 SM_DIR = 'sm'
+
+TRANSCRIPT_FILENAME = 'transcript.txt'
+CAPTIONS_FILENAME = 'captions.csv'
+SHOT_FILENAME = 'shots.csv'
+SHOT_CLASS_FILENAME = 'classifications.csv'
 
 
 def get_date_time(video: VideoPathType):
@@ -193,21 +196,21 @@ def get_story_audio_files(video: VideoPathType) -> [Path]:
 
 def get_banner_caption_file(video: VideoPathType) -> Path:
     if isinstance(video, Path):
-        return Path(get_data_dir(video), "captions.csv")
+        return Path(get_data_dir(video), CAPTIONS_FILENAME)
     else:
         return get_banner_caption_file(video.path)
 
 
 def get_shot_classification_file(video: VideoPathType) -> Path:
     if isinstance(video, Path):
-        return Path(get_data_dir(video), "classifications.csv")
+        return Path(get_data_dir(video), SHOT_CLASS_FILENAME)
     else:
         return get_shot_classification_file(video.path)
 
 
 def get_shot_file(video: VideoPathType) -> Path:
     if isinstance(video, Path):
-        return Path(get_data_dir(video), "shots.csv")
+        return Path(get_data_dir(video), SHOT_FILENAME)
     else:
         return get_shot_file(video.path)
 
@@ -239,7 +242,7 @@ def get_keyframe_paths(video: VideoPathType):
 
 def get_main_transcript_file(video: VideoPathType):
     if isinstance(video, Path):
-        return Path(get_data_dir(video), "transcript.txt")
+        return Path(get_data_dir(video), TRANSCRIPT_FILENAME)
     else:
         return get_main_transcript_file(video.path)
 
