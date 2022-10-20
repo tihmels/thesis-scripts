@@ -1,7 +1,5 @@
 import csv
 import re
-import sys
-import time
 from datetime import datetime
 from pathlib import Path
 from typing import Union
@@ -9,7 +7,8 @@ from typing import Union
 import pandas as pd
 from pydub import AudioSegment
 
-from common.constants import AUDIO_FILENAME_RE, SHOT_FILENAME_RE
+from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT_AUDIO_FILENAME_RE, \
+    STORY_TRANSCRIPT_FILENAME_RE
 
 
 class VideoData:
@@ -20,6 +19,7 @@ class VideoData:
         self.frame_dir: Path = get_frame_dir(path)
         self.keyframe_dir: Path = get_keyframe_dir(path)
         self.audio_dir: Path = get_audio_dir(path)
+        self.transcripts_dir: Path = get_transcription_dir(path)
         self.sm_dir: Path = get_sm_dir(path)
         self._shots: [(int, int)] = None
         self._scenes = None
@@ -38,7 +38,7 @@ class VideoData:
     @property
     def captions(self):
         if self._captions is None:
-            self._captions = read_captions_from_file(get_caption_file(self.path), is_summary(self))
+            self._captions = read_captions_from_file(get_banner_caption_file(self.path), is_summary(self))
         return self._captions
 
     @property
@@ -62,13 +62,13 @@ class VideoData:
     @property
     def audio(self):
         if self._audio is None:
-            self._audio = AudioSegment.from_wav(get_audio_file(self.path))
+            self._audio = AudioSegment.from_wav(get_main_audio_file(self.path))
         return self._audio
 
     @property
     def audio_shots(self):
         if self._audio_shots is None:
-            self._audio_shots = [AudioSegment.from_wav(file) for file in sorted(get_audio_shot_paths(self.path))]
+            self._audio_shots = [AudioSegment.from_wav(file) for file in sorted(get_shot_audio_files(self.path))]
         return self._audio
 
     @property
@@ -101,39 +101,59 @@ class VideoData:
 
 VideoPathType = Union[VideoData, Path]
 
+AUDIO_DIR = 'audios'
+FRAME_DIR = 'frames'
+KF_DIR = 'keyframes'
+TRANSCRIPT_DIR = 'transcripts'
+SM_DIR = 'sm'
 
-def get_data_dir(video: VideoPathType):
+
+def get_date_time(video: VideoPathType):
+    if isinstance(video, Path):
+        date, time = video.name.split("-")[1:3]
+        return datetime.strptime(date + time, "%Y%m%d%H%M")
+    else:
+        return get_date_time(video.path)
+
+
+def get_data_dir(video: VideoPathType) -> Path:
     if isinstance(video, Path):
         return Path(video.parent, video.name.split(".")[0])
     else:
         return get_data_dir(video.path)
 
 
-def get_audio_dir(video: VideoPathType):
+def get_audio_dir(video: VideoPathType) -> Path:
     if isinstance(video, Path):
-        return Path(get_data_dir(video), "audio")
+        return Path(get_data_dir(video), AUDIO_DIR)
     else:
         return get_audio_dir(video.path)
 
 
-def get_audio_file(video: VideoPathType):
+def get_frame_dir(video: VideoPathType) -> Path:
     if isinstance(video, Path):
-        audio_files = [file for file in get_audio_dir(video).glob('*.wav') if re.match(AUDIO_FILENAME_RE, file.name)]
-        return audio_files[0] if audio_files else None
+        return Path(get_data_dir(video), FRAME_DIR)
     else:
-        return get_audio_file(video.path)
+        return get_frame_dir(video.path)
 
 
-def get_audio_shot_paths(video: VideoPathType):
+def get_keyframe_dir(video: VideoPathType) -> Path:
     if isinstance(video, Path):
-        return [audio for audio in get_audio_dir(video).glob('*.wav') if re.match(SHOT_FILENAME_RE, audio.name)]
+        return Path(get_data_dir(video), KF_DIR)
     else:
-        return get_audio_shot_paths(video.path)
+        return get_keyframe_dir(video.path)
+
+
+def get_transcription_dir(video: VideoPathType) -> Path:
+    if isinstance(video, Path):
+        return Path(get_data_dir(video), TRANSCRIPT_DIR)
+    else:
+        return get_frame_dir(video.path)
 
 
 def get_sm_dir(video: VideoPathType):
     if isinstance(video, Path):
-        return Path(get_data_dir(video), "sm")
+        return Path(get_data_dir(video), SM_DIR)
     else:
         return get_sm_dir(video.path)
 
@@ -145,53 +165,66 @@ def is_summary(video: VideoPathType):
         return is_summary(video.path)
 
 
-def get_caption_file(video: VideoPathType):
+def get_main_audio_file(video: VideoPathType) -> Path:
+    if isinstance(video, Path):
+        audio_dir = get_audio_dir(video)
+        audio_files = [file for file in audio_dir.glob('*.wav') if re.match(TV_AUDIO_FILENAME_RE, file.name)]
+
+        return audio_files[0] if audio_files else None
+    else:
+        return get_main_audio_file(video.path)
+
+
+def get_shot_audio_files(video: VideoPathType) -> [Path]:
+    if isinstance(video, Path):
+        audio_dir = get_audio_dir(video)
+        return sorted([audio for audio in audio_dir.glob('*.wav') if re.match(SHOT_AUDIO_FILENAME_RE, audio.name)])
+    else:
+        return get_shot_audio_files(video.path)
+
+
+def get_story_audio_files(video: VideoPathType) -> [Path]:
+    if isinstance(video, Path):
+        audio_dir = get_audio_dir(video)
+        return sorted([audio for audio in audio_dir.glob('*.wav') if re.match(STORY_AUDIO_FILENAME_RE, audio.name)])
+    else:
+        return get_story_audio_files(video.path)
+
+
+def get_banner_caption_file(video: VideoPathType) -> Path:
     if isinstance(video, Path):
         return Path(get_data_dir(video), "captions.csv")
     else:
-        return get_caption_file(video.path)
+        return get_banner_caption_file(video.path)
 
 
-def get_shot_type_file(video: VideoPathType):
+def get_shot_classification_file(video: VideoPathType) -> Path:
     if isinstance(video, Path):
-        return Path(get_data_dir(video), "types.csv")
+        return Path(get_data_dir(video), "classifications.csv")
     else:
-        return get_shot_type_file(video.path)
+        return get_shot_classification_file(video.path)
 
 
-def get_keyframe_dir(video: VideoPathType):
-    if isinstance(video, Path):
-        return Path(get_data_dir(video), "kfs")
-    else:
-        return get_keyframe_dir(video.path)
-
-
-def get_date_time(video: VideoPathType):
-    if isinstance(video, Path):
-        date, time = video.name.split("-")[1:3]
-        return datetime.strptime(date + time, "%Y%m%d%H%M")
-    else:
-        return get_date_time(video.path)
-
-
-def get_shot_file(video: VideoPathType):
+def get_shot_file(video: VideoPathType) -> Path:
     if isinstance(video, Path):
         return Path(get_data_dir(video), "shots.csv")
     else:
         return get_shot_file(video.path)
 
 
-def get_frame_dir(video: VideoPathType):
+def get_story_transcripts(video: VideoPathType) -> [Path]:
     if isinstance(video, Path):
-        return Path(get_data_dir(video), "frames")
+        trans_dir = get_transcription_dir(video)
+        return sorted([transcript for transcript in trans_dir.glob('*.txt') if
+                       re.match(STORY_TRANSCRIPT_FILENAME_RE, transcript.name)])
     else:
-        return get_frame_dir(video.path)
+        return get_story_audio_files(video.path)
 
 
-def get_frame_paths(video: VideoPathType):
+def get_frame_paths(video: VideoPathType) -> [Path]:
     if isinstance(video, Path):
         frame_dir = get_frame_dir(video)
-        return list(frame_dir.glob("frame_*.jpg"))
+        return sorted(frame_dir.glob("frame_*.jpg"))
     else:
         return get_frame_paths(video.path)
 
@@ -199,16 +232,9 @@ def get_frame_paths(video: VideoPathType):
 def get_keyframe_paths(video: VideoPathType):
     if isinstance(video, Path):
         kf_dir = get_keyframe_dir(video)
-        return list(kf_dir.glob("frame_*.jpg"))
+        return sorted(kf_dir.glob("frame_*.jpg"))
     else:
         return get_keyframe_paths(video.path)
-
-
-def get_feature_file(video: VideoPathType):
-    if isinstance(video, Path):
-        return Path(get_data_dir(video), "features.h5")
-    else:
-        return get_feature_file(video.path)
 
 
 def get_transcript_file(video: VideoPathType):

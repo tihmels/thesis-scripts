@@ -14,7 +14,7 @@ from skimage.feature import match_template
 from skimage.filters.edges import sobel
 from skimage.filters.thresholding import try_all_threshold
 
-from common.VideoData import get_date_time, VideoData, get_caption_file, get_shot_file, is_summary
+from common.VideoData import get_date_time, VideoData, get_banner_caption_file, get_shot_file, is_summary
 from common.constants import TV_FILENAME_RE, TS_LOGO
 
 parser = ArgumentParser(description='Extracts banner captions from ts100 videos')
@@ -98,7 +98,7 @@ def check_requirements(video: Path):
 
 
 def was_processed(video: Path):
-    return get_caption_file(video).is_file()
+    return get_banner_caption_file(video).is_file()
 
 
 def main(args):
@@ -156,7 +156,7 @@ def main(args):
                 bar()
 
             df = pd.DataFrame(data=captions, columns=['headline', 'subline', 'confidence'])
-            df.to_csv(get_caption_file(vd), index=False)
+            df.to_csv(get_banner_caption_file(vd), index=False)
 
 
 if __name__ == "__main__":

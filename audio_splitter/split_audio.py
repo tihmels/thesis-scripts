@@ -7,7 +7,7 @@ import numpy as np
 import pydub
 from alive_progress import alive_bar
 
-from common.VideoData import VideoData, get_audio_file, get_audio_dir, get_shot_file, get_audio_shot_paths, \
+from common.VideoData import VideoData, get_audio_file, get_audio_dir, get_shot_file, get_shot_audio_paths, \
     read_shots_from_file, \
     get_date_time
 from common.constants import TV_FILENAME_RE
@@ -72,7 +72,7 @@ def check_requirements(video: Path):
 
 
 def was_processed(video: Path):
-    audio_shots = get_audio_shot_paths(video)
+    audio_shots = get_shot_audio_paths(video)
 
     if len(audio_shots) == len(read_shots_from_file(video)):
         return True

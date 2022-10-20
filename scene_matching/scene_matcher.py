@@ -15,7 +15,7 @@ from PIL.Image import Resampling
 
 from common.VideoData import VideoData, get_sm_dir, get_frame_dir, get_shot_file, get_date_time, get_data_dir, get_frame_paths
 from common.VideoStats import VideoStats, VideoType, get_vs_evaluation_df
-from common.constants import TV_FILENAME_RE, TS_PATH
+from common.constants import TV_FILENAME_RE, BASE_PATH
 from common.fs_utils import get_summary_videos
 
 
@@ -206,5 +206,5 @@ if __name__ == "__main__":
             filename = f'SEGVEC.txt'
             np.savetxt(str(Path(get_data_dir(video), filename)), bin_seg_vec, fmt='%i')
 
-            output_file = Path(TS_PATH, "statistics-co" + str(args.cutoff) + ".csv")
+            output_file = Path(BASE_PATH, "statistics-co" + str(args.cutoff) + ".csv")
             df.to_csv(str(output_file), mode='a', header=not output_file.exists())

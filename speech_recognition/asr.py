@@ -1,91 +1,83 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
+
 import re
+from argparse import ArgumentParser
 from pathlib import Path
 
-from huggingsound import SpeechRecognitionModel, FlashlightLMDecoder
+import whisper
 
-from VideoData import VideoData, get_audio_dir, get_audio_file, get_shot_file, get_transcript_file
+from common.VideoData import VideoData, get_audio_dir, get_audio_file, get_shot_file, get_date_time, \
+    get_story_audio_files
+from common.constants import TV_FILENAME_RE
 
-JG_1_MODEL_ID = 'jonatasgrosman/wav2vec2-large-xlsr-53-german'
-JG_2_MODEL_ID = 'jonatasgrosman/wav2vec2-xls-r-1b-german'
-FX_TENTACLE_ID = 'fxtentacle/wav2vec2-xls-r-1b-tevr'
+parser = ArgumentParser()
+parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
+parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
-model = SpeechRecognitionModel(FX_TENTACLE_ID)
-
-LM_BIN_PATH = "./model/lm.binary"
-UNIGRAMS_PATH = "./model/unigrams.txt"
-
-# decoder = FlashlightLMDecoder(model.token_set, lm_path=LM_BIN_PATH)
+model = whisper.load_model("large", in_memory=True)
 
 
-def transcribe_audio(vd: VideoData):
-    audio_file = vd.audio
+def transcribe_audio(audio_file: Path):
+    result = model.transcribe(str(audio_file), language='de', fp16=False)
 
-    transcriptions = model.transcribe([audio_file])
-
-    return transcriptions[0]
+    return result['text']
 
 
-def check_requirements(path: Path, skip_existing=False):
-    match = re.match(r'TV-(\d{8})-(\d{4})-(\d{4}).webs.h264.mp4', path.name)
+def process_video(vd: VideoData):
+    trans_dir = vd.transcripts_dir
 
-    if match is None or not path.is_file():
-        print(f'{path.name} does not exist or does not match TV-*.mp4 pattern.')
+    for audio_file in get_story_audio_files(vd):
+        text = transcribe_audio(audio_file)
+
+        file = Path(trans_dir, audio_file.stem + ".txt")
+
+        with open(file, 'w') as f:
+            f.writelines(text.strip())
+
+
+def check_requirements(video: Path):
+    if not re.match(TV_FILENAME_RE, video.name):
         return False
 
-    audio_dir = get_audio_dir(path)
+    audio_dir = get_audio_dir(video)
 
-    if not audio_dir.is_dir() or get_audio_file(path) is None:
-        print(f'{path.name} has no audio file extracted.')
+    if not audio_dir.is_dir() or get_audio_file(video) is None:
+        print(f'{video.name} has no audio file extracted.')
         return False
 
-    shot_file = get_shot_file(path)
+    shot_file = get_shot_file(video)
 
     if not shot_file.is_file():
-        print(f'{path.name} has no detected shots.')
+        print(f'{video.name} has no detected shots.')
         return False
-
-    if skip_existing:
-        transcript_file = get_transcript_file(path)
-
-        if transcript_file.is_file():
-            return False
 
     return True
 
 
+def was_processed(video: Path):
+    return False
+
+
+def main(args):
+    video_files = {file for file in args.files if check_requirements(file)}
+
+    if args.skip_existing:
+        video_files = {file for file in video_files if not was_processed(file)}
+
+    assert len(video_files) > 0, 'No suitable video files have been found.'
+
+    video_files = sorted(video_files, key=get_date_time)
+
+    print(f'Transcribing audio streams of {len(video_files)} videos ... \n')
+
+    for idx, vf in enumerate(video_files):
+        vd = VideoData(vf)
+
+        vd.transcripts_dir.mkdir(exist_ok=True)
+
+        process_video(vd)
+
+
 if __name__ == "__main__":
-    # parser = ArgumentParser()
-    # parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
-    # parser.add_argument('-s', '--skip', action='store_true', help="skip keyframe extraction if already exist")
-    # parser.add_argument('--parallel', action='store_true')
-    # args = parser.parse_args()
-    #
-    # video_files = []
-    #
-    # for file in args.files:
-    #     if file.is_file() and check_requirements(file, args.skip):
-    #         video_files.append(file)
-    #     elif file.is_dir():
-    #         video_files.extend([video for video in file.glob('*.mp4') if check_requirements(video, args.skip)])
-    #
-    # assert len(video_files) > 0
-    #
-    # video_files.sort(key=get_date_time)
-
-    # print(f'Transcribing audio stream of {len(video_files)} videos ... \n')
-
-    # for idx, vf in enumerate(video_files):
-    # vd = VideoData(vf)
-
-    # result = transcribe_audio(vd)
-
-    audio_file = 'test/story_2.wav'
-    transcriptions = model.transcribe([audio_file])
-
-    result = transcriptions[0]
-
-    print(result)
-
-    # with open(get_transcript_file(vd), 'w') as file:
-    #    json.dump(result, file, ensure_ascii=False)
+    args = parser.parse_args()
+    main(args)

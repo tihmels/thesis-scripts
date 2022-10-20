@@ -11,7 +11,7 @@ import spacy
 from spacy.language import Language
 from spacy_langdetect import LanguageDetector
 
-from common.VideoData import VideoData, get_shot_file, get_date_time, get_caption_file, get_scene_file
+from common.VideoData import VideoData, get_shot_file, get_date_time, get_banner_caption_file, get_scene_file
 from common.constants import TV_FILENAME_RE
 
 
@@ -135,7 +135,7 @@ def check_requirements(path: Path, skip_existing=False):
         print(f'{path.name} has no detected shots.')
         return False
 
-    topic_file = get_caption_file(path)
+    topic_file = get_banner_caption_file(path)
 
     if not topic_file.is_file():
         print(f'{path.name} has no topic file.')

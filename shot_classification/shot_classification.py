@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from alive_progress import alive_bar
 
-from common.VideoData import get_keyframe_dir, get_date_time, VideoData, get_shot_type_file, get_shot_file
+from common.VideoData import get_keyframe_dir, get_date_time, VideoData, get_shot_classification_file, get_shot_file
 from common.constants import TV_FILENAME_RE
 from shot_classifier_model.inference import classify_video_shots
 
@@ -61,7 +61,7 @@ def main(args):
                 bar()
 
         df = pd.DataFrame(data=np.array(classifications), columns=['class'])
-        df.to_csv(get_shot_type_file(vd), index=False)
+        df.to_csv(get_shot_classification_file(vd), index=False)
 
 
 if __name__ == "__main__":
