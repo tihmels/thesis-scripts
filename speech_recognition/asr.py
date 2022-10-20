@@ -64,9 +64,9 @@ def main(args):
     for idx, vf in enumerate(video_files):
         vd = VideoData(vf)
 
-        audio_file = get_main_audio_file(vd)
+        print(f'[{idx + 1}/{len(video_files)}] {vd} ', end='')
 
-        result = transcribe_audio_file(audio_file)
+        result = transcribe_audio_file(get_main_audio_file(vd))
 
         transcripts = [(sec_to_time(int(segment['start'])),
                         sec_to_time(int(segment['end'])),
@@ -76,6 +76,8 @@ def main(args):
             for (start, end, text) in transcripts:
                 file.write("[" + start.isoformat() + " - " + end.isoformat() + "]" + " " + text.strip())
                 file.write('\n')
+
+        print(''u'\u2713')
 
 
 if __name__ == "__main__":

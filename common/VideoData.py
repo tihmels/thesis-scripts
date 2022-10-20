@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Union
 
 import pandas as pd
-from pydub import AudioSegment
 
 from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT_AUDIO_FILENAME_RE, \
     STORY_TRANSCRIPT_FILENAME_RE
@@ -23,6 +22,7 @@ class VideoData:
         self.sm_dir: Path = get_sm_dir(path)
         self._shots: [(int, int)] = None
         self._scenes = None
+        self._transcript = None
         self._frames: [Path] = None
         self._keyframes: [Path] = None
         self._captions: [Path] = None
@@ -30,7 +30,7 @@ class VideoData:
     @property
     def shots(self):
         if self._shots is None:
-            self._shots = read_shots_from_file(get_shot_file(self.path))
+            self._shots = read_shots_from_file(get_shot_file(self))
         return self._shots
 
     @property
@@ -42,32 +42,26 @@ class VideoData:
     @property
     def scenes(self):
         if self._scenes is None:
-            self._scenes = read_scenes_from_file(get_story_file(self.path))
+            self._scenes = read_scenes_from_file(get_story_file(self))
         return self._scenes
 
     @property
     def keyframes(self):
         if self._keyframes is None:
-            self._keyframes = sorted(get_keyframe_paths(self.path))
+            self._keyframes = sorted(get_keyframe_paths(self))
         return self._keyframes
 
     @property
     def frames(self):
         if self._frames is None:
-            self._frames = sorted(get_frame_paths(self.path))
+            self._frames = sorted(get_frame_paths(self))
         return self._frames
 
     @property
-    def audio(self):
-        if self._audio is None:
-            self._audio = AudioSegment.from_wav(get_main_audio_file(self.path))
-        return self._audio
-
-    @property
-    def audio_shots(self):
-        if self._audio_shots is None:
-            self._audio_shots = [AudioSegment.from_wav(file) for file in sorted(get_shot_audio_files(self.path))]
-        return self._audio
+    def transcript(self):
+        if self._transcript is None:
+            self._transcript = read_transcript_from_file(get_main_transcript_file(self))
+        return self._transcript
 
     @property
     def n_frames(self):
