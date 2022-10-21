@@ -51,6 +51,7 @@ def check_requirements(video: Path):
 def was_processed(video: Path):
     story_transcripts = get_story_transcripts(video)
     stories = read_scenes_from_file(get_story_file(video))
+
     return len(story_transcripts) == len(stories)
 
 

@@ -14,6 +14,10 @@ from spacy_langdetect import LanguageDetector
 from common.VideoData import VideoData, get_shot_file, get_date_time, get_banner_caption_file, get_story_file
 from common.constants import TV_FILENAME_RE
 
+parser = ArgumentParser('Scene Segmentation')
+parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
+parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
+
 
 @Language.factory("language_detector")
 def get_lang_detector(nlp, name):
@@ -40,14 +44,19 @@ def is_valid_text(text: str):
     return doc._.language['language'] == 'de' and doc._.language['score'] >= 0.9
 
 
+def preprocess_captions(captions):
+    for i in range(1, len(captions)):
+        headline, subline, confidence = captions[i]
+
+        if not (headline.strip() and subline.strip()) or confidence < 0.7:
+            predecessor = captions[i - 1]
+            captions[i] = predecessor
+
+    return captions
+
+
 def segment_ts100(vd: VideoData, lev_threshold=5):
-    captions = {shot_idx: (caption, conf) for shot_idx, caption, conf in vd.captions}
-
-    for i in range(1, len(captions) - 1):
-        shot_idx, text, conf = captions[i]
-
-        if not text or conf < 0.5:
-            captions[i] = (shot_idx, captions[i - 1][1], '')
+    captions = preprocess_captions(vd.captions[:-1])
 
     levenshtein_distances = np.empty(vd.n_shots)
     current_caption = ''
@@ -122,49 +131,38 @@ def segment_ts100(vd: VideoData, lev_threshold=5):
     return stories
 
 
-def check_requirements(path: Path, skip_existing=False):
-    match = re.match(TV_FILENAME_RE, path.name)
-
-    if match is None or not path.is_file():
-        print(f'{path.name} does not exist or does not match TV-*.mp4 pattern.')
+def check_requirements(video: Path):
+    if not re.match(TV_FILENAME_RE, video.name):
         return False
 
-    shot_file = get_shot_file(path)
+    shot_file = get_shot_file(video)
 
     if not shot_file.is_file():
-        print(f'{path.name} has no detected shots.')
+        print(f'{video.name} has no detected shots.')
         return False
 
-    topic_file = get_banner_caption_file(path)
+    topic_file = get_banner_caption_file(video)
 
     if not topic_file.is_file():
-        print(f'{path.name} has no topic file.')
-        return False
-
-    if skip_existing:
+        print(f'{video.name} has no topic file.')
         return False
 
     return True
 
 
-if __name__ == "__main__":
-    parser = ArgumentParser()
-    parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
-    parser.add_argument('-s', '--skip', action='store_true', help="skip scene segmentation if already exist")
-    parser.add_argument('--parallel', action='store_true')
-    args = parser.parse_args()
+def was_processed(video: Path):
+    return get_story_file(video).is_file()
 
-    video_files = []
 
-    for file in args.files:
-        if file.is_file() and check_requirements(file, args.skip):
-            video_files.append(file)
-        elif file.is_dir():
-            video_files.extend([video for video in file.glob('*.mp4') if check_requirements(video, args.skip)])
+def main(args):
+    video_files = {file for file in args.files if check_requirements(file)}
 
-    assert len(video_files) > 0
+    if args.skip_existing:
+        video_files = {file for file in video_files if not was_processed(file)}
 
-    video_files.sort(key=get_date_time)
+    assert len(video_files) > 0, 'No suitable video files have been found.'
+
+    video_files = sorted(video_files, key=get_date_time)
 
     print(f'Scene Segmentation for {len(video_files)} videos ... \n')
 
@@ -178,3 +176,8 @@ if __name__ == "__main__":
 
         # with open(get_story_file(vd), 'w') as f:
         #     json.dump(story_df, f, indent=4, ensure_ascii=False)
+
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+    main(args)

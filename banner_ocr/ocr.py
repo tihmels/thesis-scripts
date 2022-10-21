@@ -7,20 +7,22 @@ import numpy as np
 import pandas as pd
 import skimage
 import spacy
-from PIL import Image
+from PIL import Image, ImageEnhance
 from alive_progress import alive_bar
 from pytesseract import pytesseract, Output
 from skimage.feature import match_template
 from skimage.filters.edges import sobel
 from skimage.filters.thresholding import try_all_threshold
 
-from common.VideoData import get_date_time, VideoData, get_banner_caption_file, get_shot_file, is_summary
+from common.VideoData import get_date_time, VideoData, get_banner_caption_file, get_shot_file, is_summary, \
+    get_frame_dir, get_frame_paths
 from common.constants import TV_FILENAME_RE, TS_LOGO
 
-parser = ArgumentParser(description='Extracts banner captions from ts100 videos')
+parser = ArgumentParser(description='Banner Caption Extraction')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+',
-                    help='ts100 video files or directories to search for ts100 files')
-parser.add_argument('--overwrite', action='store_false', dest='skip_existing', help='Re-extracts banner captions for all videos')
+                    help="Tagesschau video file(s)")
+parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
+                    help='Re-extracts banner captions for all videos')
 
 TS_LOGO = np.array(Image.open(TS_LOGO).convert('L'))
 
@@ -33,9 +35,11 @@ def preprocess_caption_area(caption_area, is_nightly):
         binary = skimage.morphology.binary_dilation(binary, footprint=skimage.morphology.diamond(1))
         return binary
     else:
+        Image.fromarray(caption_area).save("/Users/tihmels/Desktop/before_preprocess.jpg")
         thresh = skimage.filters.thresholding.threshold_li(caption_area)
         binary = caption_area > thresh
-        binary = skimage.morphology.binary_erosion(binary, footprint=skimage.morphology.diamond(1))
+        # binary = skimage.morphology.binary_erosion(binary, footprint=skimage.morphology.diamond(1))
+        Image.fromarray(binary).save("/Users/tihmels/Desktop/after_preprocess.jpg")
         return binary
 
 
@@ -43,7 +47,7 @@ def get_caption_area(frame, is_nightly, resize_factor=4):
     if is_nightly:
         return frame[-102 * resize_factor:-48 * resize_factor, 55 * resize_factor:]
     else:
-        return frame[-48 * resize_factor:-18 * resize_factor, -425 * resize_factor:]
+        return frame[-46 * resize_factor:-17 * resize_factor, -420 * resize_factor:]
 
 
 def is_nightly_version(vd: VideoData):
@@ -58,15 +62,24 @@ def is_nightly_version(vd: VideoData):
     return max_corr > 0.9
 
 
-def extract_caption_data(vd: VideoData, resize_factor=4):
+def extract_caption_data_per_shot(vd: VideoData, resize_factor=4):
     segments = vd.shots
+
     is_nightly = is_nightly_version(vd)
 
-    for first_frame_idx, last_frame_idx, _ in segments:
+    for first_frame_idx, last_frame_idx in segments:
         center_frame_index = int(((first_frame_idx + last_frame_idx) / 2))
         center_frame_path = vd.frames[center_frame_index]
 
         center_frame = Image.open(center_frame_path).convert('L')
+
+        center_frame.save("/Users/tihmels/Desktop/before.jpg")
+
+        sharpness_enhancer = ImageEnhance.Sharpness(center_frame)
+        center_frame = sharpness_enhancer.enhance(2.0)
+
+        center_frame.save("/Users/tihmels/Desktop/after.jpg")
+
         center_frame_resized = center_frame.resize(
             (center_frame.size[0] * resize_factor, center_frame.size[1] * resize_factor))
         center_frame_resized = np.array(center_frame_resized)
@@ -75,7 +88,7 @@ def extract_caption_data(vd: VideoData, resize_factor=4):
         caption_area = preprocess_caption_area(caption_area, is_nightly)
 
         custom_oem_psm_config = r'--psm 4 --oem 1'
-        caption_data = pytesseract.image_to_data(caption_area, output_type=Output.DICT, lang='deu+eng',
+        caption_data = pytesseract.image_to_data(caption_area, output_type=Output.DICT, lang='deu',
                                                  config=custom_oem_psm_config)
 
         yield caption_data
@@ -86,6 +99,12 @@ def check_requirements(video: Path):
 
     if not re.match(TV_FILENAME_RE, video.name):
         print(f'{video.name} does not match TV-*.mp4 pattern.')
+        return False
+
+    frame_dir = get_frame_dir(video)
+
+    if not frame_dir.is_dir() or not len(get_frame_paths(video)) > 0:
+        print(f'{video.name} has no extracted frames.')
         return False
 
     shot_file = get_shot_file(video)
@@ -123,11 +142,11 @@ def main(args):
 
             captions = []
 
-            for shot_idx, caption_data in enumerate(extract_caption_data(vd)):
+            for shot_idx, caption_data in enumerate(extract_caption_data_per_shot(vd)):
 
                 positive_confidence_indices = (np.array(caption_data['conf']) > 0.0).nonzero()
 
-                if len(positive_confidence_indices[0]) < 1:
+                if len(positive_confidence_indices[0]) == 0:
                     captions.append(("", "", -1))
                     bar()
 
@@ -135,13 +154,18 @@ def main(args):
 
                 strings = np.array(caption_data['text'])[positive_confidence_indices]
                 confidences = np.array(caption_data['conf'])[positive_confidence_indices]
-                blocks = np.array(caption_data['block_num'])[positive_confidence_indices]
 
-                unique_blocks_indices = np.unique(blocks, return_index=True)[1]
+                blocks = np.array(caption_data['block_num'])[positive_confidence_indices]
+                lines = np.array(caption_data['line_num'])[positive_confidence_indices]
+
+                blocks_vs_lines = [max(block, line) for block, line in zip(blocks, lines)]
+
+                unique_blocks_indices = np.unique(blocks_vs_lines, return_index=True)[1]
 
                 rows = [strings[unique_blocks_indices[i]:unique_blocks_indices[i + 1]] for i in
                         range(0, len(unique_blocks_indices) - 1)]
                 rows.append(strings[unique_blocks_indices[-1]:])
+
                 rows = [row.tolist() for row in rows]
 
                 headline, *sublines = rows

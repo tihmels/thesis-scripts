@@ -34,11 +34,7 @@ def extract_frames(vd: VideoData, fps=0.0, resize=None):
 def was_processed(video: Path):
     frame_dir = get_frame_dir(video)
 
-    if frame_dir.is_dir() and len(get_frame_paths(video)) > 0:
-        print(f'{video.name} has already frames extracted.')
-        return True
-
-    return False
+    return frame_dir.is_dir() and len(get_frame_paths(video)) > 0
 
 
 def main(args):

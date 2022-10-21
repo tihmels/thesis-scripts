@@ -103,6 +103,7 @@ TRANSCRIPT_FILENAME = 'transcript.txt'
 CAPTIONS_FILENAME = 'captions.csv'
 SHOT_FILENAME = 'shots.csv'
 SHOT_CLASS_FILENAME = 'classifications.csv'
+STORY_FILENAME = 'stories.csv'
 
 
 def get_date_time(video: VideoPathType):
@@ -259,7 +260,7 @@ def read_transcript_from_file(file: Path):
 
 def get_story_file(video: VideoPathType) -> Path:
     if isinstance(video, Path):
-        return Path(get_data_dir(video), "stories.csv")
+        return Path(get_data_dir(video), STORY_FILENAME)
     else:
         return get_story_file(video.path)
 
