@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import whisper
+from pandas import DataFrame
 
 from common.VideoData import VideoData, get_audio_dir, get_shot_file, get_date_time, \
     get_main_audio_file, get_main_transcript_file
@@ -15,7 +16,7 @@ parser = ArgumentParser('Automatic Speech Recognition')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help='Tagesschau video file(s)')
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
-model = whisper.load_model("large", in_memory=True)
+model = whisper.load_model("medium", in_memory=True)
 
 
 def transcribe_audio_file(audio_file: Path):
@@ -68,14 +69,15 @@ def main(args):
 
         result = transcribe_audio_file(get_main_audio_file(vd))
 
-        transcripts = [(sec_to_time(int(segment['start'])),
-                        sec_to_time(int(segment['end'])),
-                        segment['text']) for segment in result['segments']]
+        segments = result['segments']
 
-        with open(get_main_transcript_file(vd), 'w') as file:
-            for (start, end, text) in transcripts:
-                file.write("[" + start.isoformat() + " - " + end.isoformat() + "]" + " " + text.strip())
-                file.write('\n')
+        transcriptions = [(sec_to_time(int(segment['start'])),
+                           sec_to_time(int(segment['end'])),
+                           segment['text'].strip()) for segment in segments]
+
+        df = DataFrame(transcriptions, columns=['start', 'end', 'caption'])
+
+        df.to_csv(get_main_transcript_file(vd), index=False, header=True)
 
         print(''u'\u2713')
 
