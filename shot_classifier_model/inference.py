@@ -1,23 +1,25 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
 
 import json
-import logging
 import re
 from argparse import ArgumentParser
 from pathlib import Path
 
 import numpy as np
+import tensorflow as tf
 from alive_progress import alive_bar
 
 from common.VideoData import get_keyframe_dir, get_date_time, VideoData
 from common.constants import TV_FILENAME_RE
-from common.fs_utils import set_tf_loglevel
-import tensorflow as tf
 
 model = tf.keras.models.load_model(Path(Path(__file__).resolve().parent, 'model', 'ts_anchor_model'))
 model.load_weights(Path(Path(__file__).resolve().parent, 'model', 'ts_anchor_v1.weights.best.hdf5'))
 
 input_shape = model.input_shape[1:-1]
+
+parser = ArgumentParser('Anchorshot Detection')
+parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
+parser.add_argument('--topn', type=int, default=5)
 
 with open(Path(Path(__file__).resolve().parent, 'model', 'classes.txt'), 'r') as file:
     classes = json.load(file)
@@ -56,17 +58,11 @@ def check_requirements(path: Path):
 
 
 def main(args):
-    video_files = []
+    video_files = {file for file in args.files if check_requirements(file)}
 
-    for file in args.files:
-        if file.is_file() and check_requirements(file):
-            video_files.append(file)
-        elif file.is_dir():
-            video_files.extend([video for video in file.glob('*.mp4') if check_requirements(video)])
+    assert len(video_files) > 0, 'No suitable video files have been found.'
 
-    assert len(video_files) > 0
-
-    video_files.sort(key=get_date_time)
+    video_files = sorted(video_files, key=get_date_time)
 
     for idx, vf in enumerate(video_files):
         vd = VideoData(vf)
@@ -78,9 +74,5 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser('Anchorshot Detection')
-    parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
-    parser.add_argument('--topn', type=int, default=5)
     args = parser.parse_args()
-
     main(args)

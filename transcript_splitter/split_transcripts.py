@@ -1,3 +1,5 @@
+#!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
+
 import re
 from argparse import ArgumentParser
 from datetime import datetime, timedelta
