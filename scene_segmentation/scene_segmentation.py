@@ -8,8 +8,7 @@ import Levenshtein
 import numpy as np
 import pandas as pd
 import spacy
-from spacy.language import Language
-from spacy_langdetect import LanguageDetector
+from spellchecker import SpellChecker
 
 from common.VideoData import VideoData, get_shot_file, get_date_time, get_banner_caption_file, get_story_file
 from common.constants import TV_FILENAME_RE
@@ -18,14 +17,15 @@ parser = ArgumentParser('Scene Segmentation')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
-
-@Language.factory("language_detector")
-def get_lang_detector(nlp, name):
-    return LanguageDetector()
-
+spell = SpellChecker(language=None, distance=1)  # loads default word frequency list
+spell.word_frequency.load_text_file('/Users/tihmels/TS/topics_dict.txt')
 
 spacy_de = spacy.load('de_core_news_sm')
-spacy_de.add_pipe('language_detector', last=True)
+
+
+def spellcheck(text):
+    print(text)
+    return text
 
 
 def pairwise(iterable):
@@ -39,14 +39,17 @@ def segment_ts15(vd: VideoData):
     yield
 
 
-def is_valid_text(text: str):
+def is_named_entity_only(text):
     doc = spacy_de(text)
-    return doc._.language['language'] == 'de' and doc._.language['score'] >= 0.9
+    entities = doc.ents
+
+    if len(entities) == 1 and len(entities[0].text) == len(text):
+        return True
 
 
 def preprocess_captions(captions):
-    for i in range(1, len(captions)):
-        headline, subline, confidence = captions[i]
+    for i in range(0, len(captions)):
+        _, headline, subline, confidence = captions[i]
 
         if not (headline.strip() and subline.strip()) or confidence < 0.7:
             predecessor = captions[i - 1]
@@ -56,9 +59,14 @@ def preprocess_captions(captions):
 
 
 def segment_ts100(vd: VideoData, lev_threshold=5):
-    captions = preprocess_captions(vd.captions[:-1])
+    captions = vd.captions[:-1]  # last shot is always weather
 
-    levenshtein_distances = np.empty(vd.n_shots)
+    if is_named_entity_only(captions.iloc[0]['headline']):  # check if first banner caption is anchor name
+        captions.drop(0, inplace=True)
+
+    captions = preprocess_captions(captions)
+
+    levenshtein_distances = np.empty(len(captions))
     current_caption = ''
 
     for shot_idx in range(vd.n_shots):
@@ -89,6 +97,8 @@ def segment_ts100(vd: VideoData, lev_threshold=5):
         story_captions = [captions.get(idx) for idx in range(first_shot_idx, last_shot_idx + 1)]
 
         story_title = max(story_captions, key=lambda cap: cap[1])[0]
+
+        story_title = spellcheck(story_title)
 
         story_topic = list(captions.values())[last_shot_idx]
         story_first_shot_idx = int(list(captions.keys())[first_shot_idx])

@@ -1,4 +1,3 @@
-import csv
 import re
 from datetime import datetime
 from pathlib import Path
@@ -36,7 +35,7 @@ class VideoData:
     @property
     def captions(self):
         if self._captions is None:
-            self._captions = read_captions_from_file(get_banner_caption_file(self.path), is_summary(self))
+            self._captions = read_banner_captions_from_file(get_banner_caption_file(self.path))
         return self._captions
 
     @property
@@ -280,14 +279,8 @@ def read_scenes_from_file(file: Path):
     return df
 
 
-def read_captions_from_file(file: Path, is_summary: bool):
-    if is_summary:
-        df = pd.read_csv(file, usecols=['headline', 'subline', 'confidence'], keep_default_na=False)
-        return list(df.to_records(index=False))
-    else:
-        with open(file, 'r') as file:
-            reader = csv.reader(file)
-            return [row for row in reader]
+def read_banner_captions_from_file(file: Path):
+    return pd.read_csv(file, usecols=['headline', 'subline', 'confidence'], keep_default_na=False)
 
 
 def read_shots_from_file(file: Path):
