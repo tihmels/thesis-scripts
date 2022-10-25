@@ -99,7 +99,7 @@ KF_DIR = 'keyframes'
 TRANSCRIPT_DIR = 'transcripts'
 SM_DIR = 'sm'
 
-TRANSCRIPT_FILENAME = 'transcript.txt'
+TRANSCRIPT_FILENAME = 'transcript.csv'
 CAPTIONS_FILENAME = 'captions.csv'
 SHOT_FILENAME = 'shots.csv'
 SHOT_CLASS_FILENAME = 'classifications.csv'
@@ -265,14 +265,14 @@ def get_story_file(video: VideoPathType) -> Path:
         return get_story_file(video.path)
 
 
-def get_xml_transcript(video: VideoPathType) -> Path:
+def get_xml_transcript_file(video: VideoPathType) -> Path:
     if isinstance(video, Path):
         date = video.name.split("-")[1]
         xml_files = [file for file in get_data_dir(video).iterdir() if
                      re.match(r'TV-' + date + r'-(\d{5}).xml', file.name)]
         return xml_files[0] if xml_files else None
     else:
-        return get_xml_transcript(video.path)
+        return get_xml_transcript_file(video.path)
 
 
 def read_scenes_from_file(file: Path):

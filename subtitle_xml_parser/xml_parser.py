@@ -6,7 +6,9 @@ from datetime import datetime
 from pathlib import Path
 from xml.dom.minidom import parse
 
-from common.VideoData import get_date_time, VideoData, get_xml_transcript, get_data_dir, is_summary, \
+from pandas import DataFrame
+
+from common.VideoData import get_date_time, VideoData, get_xml_transcript_file, is_summary, \
     get_main_transcript_file
 from common.constants import TV_FILENAME_RE
 
@@ -18,14 +20,17 @@ parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
 trigger_sentence = "Guten Abend, ich begrüße sie zur tagesschau."
 
 
-def extract_captions(dom):
+def extract_caption_and_color(dom):
     spans = dom.getElementsByTagName("tt:span")
 
-    text = ' '.join([span.firstChild.nodeValue for span in spans if span.getAttribute('style') == 'textWhite'])
+    if len(spans) == 0:
+        return '', ''
 
-    # text = ' '.join([span.firstChild.nodeValue for span in spans])
+    text = ' '.join([span.firstChild.nodeValue for span in spans])
 
-    return text.strip()
+    color = spans[0].getAttribute('style')[4:].lower()
+
+    return text.strip(), color
 
 
 def get_time(timestamp):
@@ -39,23 +44,24 @@ def parse_xml(dom):
 
     intervals = [(get_time(section.getAttribute('begin')),
                   get_time(section.getAttribute('end'))) for section in sections]
-    captions = [extract_captions(section) for section in sections]
+    captions = [extract_caption_and_color(section) for section in sections]
 
     return intervals, captions
 
 
 def process_video(vd: VideoData):
-    xml_transcript = get_xml_transcript(vd)
+    xml_transcript = get_xml_transcript_file(vd)
 
     dom = parse(str(xml_transcript))
 
     intervals, captions = parse_xml(dom)
 
-    with open(Path(get_data_dir(vd), 'transcript.txt'), 'w') as f:
-        for interval, caption in zip(intervals, captions):
-            start, end = interval[0].isoformat(), interval[1].isoformat()
-            f.write("[" + start + " - " + end + "]" + " " + caption)
-            f.write('\n')
+    start, end = zip(*intervals)
+    caption, color = zip(*captions)
+
+    df = DataFrame(zip(start, end, caption, color), columns=['start', 'end', 'caption', 'color'])
+
+    df.to_csv(get_main_transcript_file(vd), index=False, header=True)
 
 
 def was_processed(video):
@@ -68,7 +74,7 @@ def check_requirements(video: Path):
     if not re.match(TV_FILENAME_RE, video.name):
         return False
 
-    if not get_xml_transcript(video):
+    if not get_xml_transcript_file(video):
         print(f'{video.name} has no XML transcript file')
         return False
 

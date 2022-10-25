@@ -18,6 +18,8 @@ from common.VideoData import get_date_time, VideoData, get_banner_caption_file, 
     get_frame_dir, get_frame_paths
 from common.constants import TV_FILENAME_RE, TS_LOGO
 
+from spellchecker import SpellChecker
+
 parser = ArgumentParser(description='Banner Caption Extraction')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+',
                     help="Tagesschau video file(s)")
@@ -27,6 +29,9 @@ parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
 TS_LOGO = np.array(Image.open(TS_LOGO).convert('L'))
 
 spacy_de = spacy.load('de_core_news_sm')
+
+spell = SpellChecker(language='de', distance=1)  # loads default word frequency list
+spell.word_frequency.load_text_file('/Users/tihmels/TS/topics_dict.txt')
 
 
 def preprocess_caption_area(caption_area, is_nightly):
@@ -38,7 +43,7 @@ def preprocess_caption_area(caption_area, is_nightly):
         Image.fromarray(caption_area).save("/Users/tihmels/Desktop/before_preprocess.jpg")
         thresh = skimage.filters.thresholding.threshold_li(caption_area)
         binary = caption_area > thresh
-        # binary = skimage.morphology.binary_erosion(binary, footprint=skimage.morphology.diamond(1))
+        binary = skimage.morphology.binary_erosion(binary, footprint=skimage.morphology.diamond(1))
         Image.fromarray(binary).save("/Users/tihmels/Desktop/after_preprocess.jpg")
         return binary
 
@@ -76,7 +81,7 @@ def extract_caption_data_per_shot(vd: VideoData, resize_factor=4):
         center_frame.save("/Users/tihmels/Desktop/before.jpg")
 
         sharpness_enhancer = ImageEnhance.Sharpness(center_frame)
-        center_frame = sharpness_enhancer.enhance(2.0)
+        center_frame = sharpness_enhancer.enhance(1.5)
 
         center_frame.save("/Users/tihmels/Desktop/after.jpg")
 
@@ -144,7 +149,11 @@ def main(args):
 
             for shot_idx, caption_data in enumerate(extract_caption_data_per_shot(vd)):
 
-                positive_confidence_indices = (np.array(caption_data['conf']) > 0.0).nonzero()
+                positive_confidences = np.array(caption_data['conf']) > 0.0
+                non_empty_texts = list(map(lambda idx: True if caption_data['text'][idx].strip() else False,
+                                           range(0, len(positive_confidences))))
+
+                positive_confidence_indices = (positive_confidences & non_empty_texts).nonzero()
 
                 if len(positive_confidence_indices[0]) == 0:
                     captions.append(("", "", -1))
@@ -173,9 +182,9 @@ def main(args):
                 headline = ' '.join(headline).strip()
                 subline = ' '.join([sub for subline in sublines for sub in subline]).strip()
 
-                mean_conf = np.mean(confidences) / 100
+                median_confidence = np.median(confidences) / 100
 
-                captions.append((headline, subline, np.around(mean_conf, 2)))
+                captions.append((headline, subline, np.around(median_confidence, 2)))
 
                 bar()
 
