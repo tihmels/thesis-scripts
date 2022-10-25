@@ -60,7 +60,7 @@ class VideoData:
     @property
     def transcript(self):
         if self._transcript is None:
-            self._transcript = read_transcript_from_file(get_main_transcript_file(self), self.is_summary)
+            self._transcript = read_transcript_from_file(get_main_transcript_file(self))
         return self._transcript
 
     @property
@@ -242,16 +242,13 @@ def get_main_transcript_file(video: VideoPathType):
         return get_main_transcript_file(video.path)
 
 
-def read_transcript_from_file(file: Path, is_summary: bool):
-    if is_summary:
-        columns = ['start', 'end', 'caption']
-    else:
-        columns = ['start', 'end', 'caption', 'color']
+def read_transcript_from_file(file: Path):
+    columns = ['start', 'end', 'caption', 'color']
 
     time_parser = lambda times: [datetime.strptime(time, '%H:%M:%S').time() for time in times]
 
     df = pd.read_csv(file,
-                     usecols=columns,
+                     usecols=lambda x: x in columns,
                      parse_dates=['start', 'end'],
                      date_parser=time_parser)
 
