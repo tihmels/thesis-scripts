@@ -49,7 +49,7 @@ def is_named_entity_only(text):
 def preprocess_captions(captions):
     for idx, cd in captions.items():
 
-        if not (cd.headline.strip() and cd.subline.strip()) or cd.confidence < 0.7:
+        if not cd.text.strip() or cd.confidence < 0.7 and idx - 1 in captions:
             predecessor = captions[idx - 1]
             captions[idx] = predecessor
 
