@@ -292,3 +292,5 @@ unigram.txt
 
 shot_classifier_model/model/**
 shot_classifier_model/**/*.hdf5
+
+subtitle_xml_downloader/subtitles/**
