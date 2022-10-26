@@ -5,6 +5,7 @@ from typing import Union
 
 import pandas as pd
 
+from common.DataModel import CaptionData
 from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT_AUDIO_FILENAME_RE, \
     STORY_TRANSCRIPT_FILENAME_RE
 
@@ -24,7 +25,7 @@ class VideoData:
         self._transcript = None
         self._frames: [Path] = None
         self._keyframes: [Path] = None
-        self._captions: [Path] = None
+        self._captions: [CaptionData] = None
 
     @property
     def shots(self):
@@ -280,7 +281,8 @@ def read_scenes_from_file(file: Path):
 
 
 def read_banner_captions_from_file(file: Path):
-    return pd.read_csv(file, usecols=['headline', 'subline', 'confidence'], keep_default_na=False)
+    df = pd.read_csv(file, usecols=['headline', 'subline', 'confidence'], keep_default_na=False)
+    return list(map(lambda val: CaptionData(val[0], val[1], val[2]), df.values.tolist()))
 
 
 def read_shots_from_file(file: Path):
