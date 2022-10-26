@@ -37,12 +37,6 @@ def check_requirements(video: Path):
         print(f'{video.name} has no audio file extracted.')
         return False
 
-    shot_file = get_shot_file(video)
-
-    if not shot_file.is_file():
-        print(f'{video.name} has no detected shots.')
-        return False
-
     return True
 
 

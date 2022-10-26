@@ -92,7 +92,7 @@ class VideoData:
 
 VideoPathType = Union[VideoData, Path]
 
-AUDIO_DIR = 'audio'
+AUDIO_DIR = 'audios'
 FRAME_DIR = 'frames'
 KF_DIR = 'keyframes'
 TRANSCRIPT_DIR = 'transcripts'
