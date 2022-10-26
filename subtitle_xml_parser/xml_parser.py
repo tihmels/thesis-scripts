@@ -12,8 +12,8 @@ from common.VideoData import get_date_time, VideoData, get_xml_transcript_file, 
     get_main_transcript_file
 from common.constants import TV_FILENAME_RE
 
-parser = argparse.ArgumentParser('Video frame extraction using ffmpeg')
-parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="TS video files")
+parser = argparse.ArgumentParser('Parse Tagesschau Subtitle-XML file')
+parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
                     help='Re-extracts frames for all videos')
 
