@@ -5,7 +5,7 @@ from typing import Union
 
 import pandas as pd
 
-from common.DataModel import CaptionData, TranscriptData, StoryData, ShotData
+from common.DataModel import CaptionData, TranscriptData, StoryData, ShotData, ShotClassificationData
 from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT_AUDIO_FILENAME_RE, \
     STORY_TRANSCRIPT_FILENAME_RE
 
@@ -20,16 +20,30 @@ class VideoData:
         self.audio_dir: Path = get_audio_dir(path)
         self.transcripts_dir: Path = get_transcription_dir(path)
         self.sm_dir: Path = get_sm_dir(path)
+        self._topics: [str] = None
         self._frames: [Path] = None
         self._keyframes: [Path] = None
+        self._classifications: [ShotClassificationData] = None
         self._shots: [ShotData] = None
         self._scenes: [StoryData] = None
         self._transcript: [TranscriptData] = None
         self._captions: [CaptionData] = None
 
     @property
+    def classifications(self):
+        if self._classifications is None:
+            self._classifications = read_classifications_from_file(get_shot_classification_file(self))
+        return self._classifications
+
+    @property
+    def topics(self):
+        if self._topics is None:
+            self._topics = read_topics_from_file(get_topic_file(self))
+        return self._topics
+
+    @property
     def audio(self) -> Path:
-        return
+        return get_main_audio_file(self)
 
     @property
     def shots(self) -> [ShotData]:
@@ -108,6 +122,7 @@ CAPTIONS_FILENAME = 'captions.csv'
 SHOT_FILENAME = 'shots.csv'
 SHOT_CLASS_FILENAME = 'classifications.csv'
 STORY_FILENAME = 'stories.csv'
+TOPICS_FILENAME = 'topics.csv'
 
 
 def get_date_time(video: VideoPathType):
@@ -165,6 +180,13 @@ def is_summary(video: VideoPathType):
         return video.parent.name == 'ts100'
     else:
         return is_summary(video.path)
+
+
+def get_topic_file(video: VideoPathType) -> Path:
+    if isinstance(video, Path):
+        return Path(get_data_dir(video), TOPICS_FILENAME)
+    else:
+        return get_topic_file(video.path)
 
 
 def get_main_audio_file(video: VideoPathType) -> Path:
@@ -292,6 +314,16 @@ def read_banner_captions_from_file(file: Path) -> [CaptionData]:
     return list(map(lambda val: CaptionData(val[0], val[1], val[2]), df.values.tolist()))
 
 
-def read_shots_from_file(file: Path):
+def read_shots_from_file(file: Path) -> [ShotData]:
     df = pd.read_csv(file, usecols=['first_frame_idx', 'last_frame_idx'])
     return list(map(lambda val: ShotData(val[0], val[1]), df.values.tolist()))
+
+
+def read_classifications_from_file(file: Path) -> [ShotClassificationData]:
+    df = pd.read_csv(file, usecols=['class', 'prop'])
+    return list(map(lambda val: ShotClassificationData(val[0], val[1]), df.values.tolist()))
+
+
+def read_topics_from_file(file: Path) -> [str]:
+    df = pd.read_csv(file)
+    return list(map(lambda t: t.strip(), df.keys().tolist()))

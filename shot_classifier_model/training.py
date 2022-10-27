@@ -47,7 +47,7 @@ def generators(path, classes, target_size, batch_size, preprocessing):
 
 
 def create_model(input_shape, n_classes, optimizer, fine_tune=0):
-    conv_base = tf.keras.applications.VGG19(
+    conv_base = tf.keras.applications.ResNet50(
         weights='imagenet',
         input_shape=input_shape,
         include_top=False)
@@ -87,7 +87,7 @@ def main(args):
         clazz in subdirs for clazz in classes), f'each class need to be present as subdirectory in {base_dir}'
 
     train_ds, val_ds = generators(base_dir, classes, args.shape, args.bs,
-                                  tf.keras.applications.vgg19.preprocess_input)
+                                  tf.keras.applications.resnet50.preprocess_input)
 
     width, height = args.shape
 
@@ -96,7 +96,7 @@ def main(args):
     optim_1 = tf.keras.optimizers.Adam(learning_rate=0.001)
     optim_2 = tf.keras.optimizers.Adam(lr=0.0001)
 
-    vgg_model = create_model(input_shape, len(classes), optim_1 if args.ft == 0 else optim_2, args.ft)
+    resnet_model = create_model(input_shape, len(classes), optim_1 if args.ft == 0 else optim_2, args.ft)
 
     checkpoint = ModelCheckpoint(
         filepath=Path(Path(__file__).resolve().parent, 'model', 'ts_anchor_v1.weights.best.hdf5'),
@@ -110,13 +110,13 @@ def main(args):
                                patience=5,
                                restore_best_weights=True)
 
-    vgg_model.fit(train_ds,
-                  epochs=args.epochs,
-                  validation_data=val_ds,
-                  callbacks=[checkpoint, early_stop]
-                  )
+    resnet_model.fit(train_ds,
+                     epochs=args.epochs,
+                     validation_data=val_ds,
+                     callbacks=[checkpoint, early_stop]
+                     )
 
-    vgg_model.save(
+    resnet_model.save(
         Path(Path(__file__).resolve().parent, 'model', 'ts_anchor_model'),
     )
 

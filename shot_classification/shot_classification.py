@@ -8,13 +8,14 @@ import numpy as np
 import pandas as pd
 from alive_progress import alive_bar
 
-from common.VideoData import get_keyframe_dir, get_date_time, VideoData, get_shot_classification_file, get_shot_file
+from common.VideoData import get_date_time, VideoData, get_shot_classification_file, get_shot_file, get_keyframe_dir, \
+    get_keyframe_paths, read_shots_from_file
 from common.constants import TV_FILENAME_RE
 from shot_classifier_model.inference import classify_video_shots
 
 parser = argparse.ArgumentParser('Video Shot Classifier')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
-parser.add_argument('--overwrite', action='store_false', dest='skip_existing', )
+parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
 
 def check_requirements(video: Path):
@@ -25,6 +26,12 @@ def check_requirements(video: Path):
 
     if not shot_file.is_file():
         print(f'{video.name} has no detected shots.')
+        return False
+
+    kf_dir = get_keyframe_dir(video)
+
+    if not kf_dir.is_dir() or not len(get_keyframe_paths(video)) == len(read_shots_from_file(shot_file)):
+        print(f'{video.name} has no detected keyframes.')
         return False
 
     return True
@@ -49,14 +56,14 @@ def main(args):
 
         print(f'[{idx + 1}/{len(video_files)}] {vd}')
 
-        classifications = []
+        results = []
 
         with alive_bar(vd.n_shots, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
-            for classification in classify_video_shots(vd, top_n=1):
-                classifications.append(classification[0][0])
+            for result in classify_video_shots(vd, top_n=1):
+                results.append(result[0])
                 bar()
 
-        df = pd.DataFrame(data=np.array(classifications), columns=['class'])
+        df = pd.DataFrame(data=np.array(results), columns=['class', 'prop'])
         df.to_csv(get_shot_classification_file(vd), index=False)
 
 

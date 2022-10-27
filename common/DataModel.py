@@ -34,3 +34,9 @@ class StoryData:
     last_frame_idx: int
     first_shot_idx: int
     last_shot_idx: int
+
+
+@dataclass
+class ShotClassificationData:
+    clazz: str
+    prop: float

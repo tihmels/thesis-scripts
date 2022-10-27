@@ -1,6 +1,5 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
 import re
-import textwrap
 from argparse import ArgumentParser
 from itertools import tee
 from pathlib import Path
@@ -12,7 +11,8 @@ import yake
 from fuzzywuzzy import fuzz
 from spellchecker import SpellChecker
 
-from common.VideoData import VideoData, get_shot_file, get_date_time, get_banner_caption_file, get_story_file
+from common.VideoData import VideoData, get_shot_file, get_date_time, get_banner_caption_file, get_story_file, \
+    get_topic_file, is_summary
 from common.constants import TV_FILENAME_RE
 
 parser = ArgumentParser('Scene Segmentation')
@@ -37,8 +37,10 @@ def pairwise(iterable):
 
 
 def segment_ts15(vd: VideoData):
-    print("WTF")
-    yield
+    classifications = vd.classifications
+    topics = vd.topics
+
+    return None
 
 
 def is_named_entity_only(text):
@@ -127,7 +129,7 @@ def check_requirements(video: Path):
         print(f'{video.name} has no detected shots.')
         return False
 
-    topic_file = get_banner_caption_file(video)
+    topic_file = get_banner_caption_file(video) if is_summary(video) else get_topic_file(video)
 
     if not topic_file.is_file():
         print(f'{video.name} has no topic file.')

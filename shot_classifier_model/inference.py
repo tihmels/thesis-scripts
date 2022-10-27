@@ -7,7 +7,6 @@ from pathlib import Path
 
 import numpy as np
 import tensorflow as tf
-from alive_progress import alive_bar
 
 from common.VideoData import get_keyframe_dir, get_date_time, VideoData
 from common.constants import TV_FILENAME_RE
@@ -31,7 +30,7 @@ def classify_video_shots(vd: VideoData, top_n=5):
     keyframes = [np.expand_dims(frame, axis=0) for frame in keyframes]
 
     for kf in keyframes:
-        kf = tf.keras.applications.vgg19.preprocess_input(kf)
+        kf = tf.keras.applications.resnet50.preprocess_input(kf)
         prediction = model.predict(kf)[0]
 
         result = [(classes[i], np.round(float(prediction[i]) * 100.0, 2)) for i in range(len(prediction))]
@@ -64,13 +63,12 @@ def main(args):
 
     video_files = sorted(video_files, key=get_date_time)
 
-    for idx, vf in enumerate(video_files):
+    for vf in video_files:
         vd = VideoData(vf)
 
-        with alive_bar(vd.n_shots, ctrl_c=False, title=f'[{idx + 1}/{vd.n_shots}] {vd}', length=20) as bar:
-            for result in classify_video_shots(vd, args.topn):
-                print(result)
-                bar()
+        for idx, result in enumerate(classify_video_shots(vd, args.topn)):
+            frame = vd.keyframes[idx]
+            print("[" + str(idx) + "] " + str(result) + " (" + frame.stem + ")")
 
 
 if __name__ == "__main__":
