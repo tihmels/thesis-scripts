@@ -4,10 +4,10 @@ from argparse import ArgumentParser
 from itertools import tee
 from pathlib import Path
 
-import Levenshtein
 import numpy as np
 import pandas as pd
 import spacy
+from fuzzywuzzy import fuzz
 from spellchecker import SpellChecker
 
 from common.VideoData import VideoData, get_shot_file, get_date_time, get_banner_caption_file, get_story_file
@@ -24,7 +24,6 @@ spacy_de = spacy.load('de_core_news_sm')
 
 
 def spellcheck(text):
-    print(text)
     return text
 
 
@@ -46,100 +45,73 @@ def is_named_entity_only(text):
     return len(entities) == 1 and len(entities[0].text) == len(text)
 
 
-def segment_ts100(vd: VideoData, lev_threshold=5):
-    captions = {idx: cd for idx, cd in enumerate(vd.captions[:-1])}  # last shot is always weather
-
-    if is_named_entity_only(captions[0].text):  # check if first banner caption contains anchor name
+def preprocess_captions(captions):
+    if is_named_entity_only(captions[0].text):  # check if first banner text contains anchor name
         captions.pop(0)
-
+    # the last shot in a story is often very short, which is why the banner text is not captured by OCR.
+    # we fix this assuming that this shot belongs to the previous caption
     for idx, cd in captions.items():
         if (not cd.text.strip() or cd.confidence < 0.7) and idx - 1 in captions:
             predecessor = captions[idx - 1]
             captions[idx] = predecessor
 
-    first_idx, last_idx = min(captions.keys()), max(captions.keys())
-    first_caption = captions[first_idx].text
 
-    stories = []
+def segment_ts100(vd: VideoData):
+    captions = {idx: cd for idx, cd in enumerate(vd.captions[:-1])}  # last shot is always weather
+
+    preprocess_captions(captions)
+
+    first_idx, last_idx = min(captions.keys()), max(captions.keys())
+    current_caption = captions[first_idx].text
+
+    story_indices = [[first_idx]]
 
     for idx in range(first_idx + 1, last_idx):
-        caption = captions[idx]
+        next_caption = captions[idx].text
 
+        ratio = fuzz.partial_ratio(current_caption, next_caption)
 
+        if ratio > 80:
+            story_indices[-1].append(idx)
+        else:
+            story_indices.append([idx])
 
-    levenshtein_distances = np.empty(len(captions))
-    current_caption = ''
-
-    for shot_idx in range(vd.n_shots):
-        caption, conf = captions[shot_idx]
-
-        if not caption and conf == 1.0:
-            caption = current_caption
-
-        levenshtein_distances[shot_idx] = Levenshtein.distance(current_caption, caption)
-        current_caption = caption
-
-    levenshtein_distances = np.where(levenshtein_distances > lev_threshold, 1, 0)
-
-    semantic_boundary_indices = [i for i, x in enumerate(levenshtein_distances) if x == 1]
-    semantic_boundary_indices.append(len(captions))
-
-    semantic_boundary_ranges = [(i1, i2 - 1) for i1, i2 in pairwise(semantic_boundary_indices)]
-
-    print(semantic_boundary_ranges)
+        current_caption = next_caption
 
     stories = []
 
-    for first_shot_idx, last_shot_idx in semantic_boundary_ranges:
+    for story in story_indices:
 
-        if first_shot_idx == last_shot_idx and captions[first_shot_idx][0] == "":
+        story_captions = [captions[idx] for idx in story]
+
+        if story[0] == story[-1] and story_captions[0].text == "":
             continue
 
-        story_captions = [captions.get(idx) for idx in range(first_shot_idx, last_shot_idx + 1)]
+        story_title = max(story_captions, key=lambda k: k.confidence).text
 
-        story_title = max(story_captions, key=lambda cap: cap[1])[0]
+        first_shot_idx, last_shot_idx = min(story), max(story)
+        first_frame_idx, last_frame_idx = vd.shots[first_shot_idx][0], vd.shots[last_shot_idx][1]
 
-        story_title = spellcheck(story_title)
-
-        story_topic = list(captions.values())[last_shot_idx]
-        story_first_shot_idx = int(list(captions.keys())[first_shot_idx])
-        story_last_shot_idx = int(list(captions.keys())[last_shot_idx])
-
-        first_frame_idx = vd.shots[story_first_shot_idx][0]
-        last_frame_idx = vd.shots[story_last_shot_idx][1]
         from_timestamp = np.divide(first_frame_idx, 25)
         to_timestamp = np.divide(last_frame_idx, 25)
 
-        n_shots = story_last_shot_idx - story_first_shot_idx + 1
+        n_shots = last_shot_idx - first_shot_idx + 1
         n_frames = last_frame_idx - first_frame_idx + 1
         total_ss = np.round(to_timestamp - from_timestamp, 2)
 
-        data = np.array(
-            [story_topic, first_frame_idx, last_frame_idx, n_frames, story_first_shot_idx, story_last_shot_idx, n_shots,
-             from_timestamp, to_timestamp, total_ss])
+        data = (story_title,
+                first_frame_idx, last_frame_idx, n_frames,
+                first_shot_idx, last_shot_idx, n_shots,
+                from_timestamp, to_timestamp, total_ss)
 
         stories.append(data)
-        # stories.append(
-        #     {'story_topic': story_topic,
-        #      'first_shot_idx': story_first_shot_idx,
-        #      'last_shot_idx': story_last_shot_idx,
-        #      'n_shots': story_last_shot_idx - story_first_shot_idx + 1,
-        #      'first_frame_idx': first_frame_idx,
-        #      'last_frame_idx': last_frame_idx,
-        #      'n_frames': last_frame_idx - first_frame_idx + 1,
-        #      'from_ss': from_timestamp,
-        #      'to_ss': to_timestamp,
-        #      'total_ss': np.round(to_timestamp - from_timestamp, 2)})
 
     df = pd.DataFrame(data=stories,
                       columns=['news_title', 'first_frame_idx',
                                'last_frame_idx', 'n_frames', 'first_shot_idx', 'last_shot_idx', 'n_shots', 'from_ss',
                                'to_ss', 'total_ss'])
 
-    df.index = df.index + 1
-    df.to_csv(get_story_file(vd))
-
-    return stories
+    return df
 
 
 def check_requirements(video: Path):
@@ -181,12 +153,9 @@ def main(args):
         vd = VideoData(vf)
 
         segmentor = segment_ts100 if vd.is_summary else segment_ts15
-        story_df = segmentor(vd)
+        df = segmentor(vd)
 
-        # story_df.to_csv(get_story_file(vd))
-
-        # with open(get_story_file(vd), 'w') as f:
-        #     json.dump(story_df, f, indent=4, ensure_ascii=False)
+        df.to_csv(get_story_file(vd), index=False)
 
 
 if __name__ == "__main__":

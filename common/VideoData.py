@@ -34,7 +34,7 @@ class VideoData:
         return self._shots
 
     @property
-    def captions(self):
+    def captions(self) -> [CaptionData]:
         if self._captions is None:
             self._captions = read_banner_captions_from_file(get_banner_caption_file(self.path))
         return self._captions
