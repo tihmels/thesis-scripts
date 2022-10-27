@@ -46,23 +46,26 @@ def is_named_entity_only(text):
     return len(entities) == 1 and len(entities[0].text) == len(text)
 
 
-def preprocess_captions(captions):
-    for idx, cd in captions.items():
-
-        if not cd.text.strip() or cd.confidence < 0.7 and idx - 1 in captions:
-            predecessor = captions[idx - 1]
-            captions[idx] = predecessor
-
-    return captions
-
-
 def segment_ts100(vd: VideoData, lev_threshold=5):
     captions = {idx: cd for idx, cd in enumerate(vd.captions[:-1])}  # last shot is always weather
 
     if is_named_entity_only(captions[0].text):  # check if first banner caption contains anchor name
         captions.pop(0)
 
-    preprocess_captions(captions)
+    for idx, cd in captions.items():
+        if (not cd.text.strip() or cd.confidence < 0.7) and idx - 1 in captions:
+            predecessor = captions[idx - 1]
+            captions[idx] = predecessor
+
+    first_idx, last_idx = min(captions.keys()), max(captions.keys())
+    first_caption = captions[first_idx].text
+
+    stories = []
+
+    for idx in range(first_idx + 1, last_idx):
+        caption = captions[idx]
+
+
 
     levenshtein_distances = np.empty(len(captions))
     current_caption = ''

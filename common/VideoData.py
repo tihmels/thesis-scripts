@@ -5,7 +5,7 @@ from typing import Union
 
 import pandas as pd
 
-from common.DataModel import CaptionData
+from common.DataModel import CaptionData, TranscriptData
 from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT_AUDIO_FILENAME_RE, \
     STORY_TRANSCRIPT_FILENAME_RE
 
@@ -22,9 +22,9 @@ class VideoData:
         self.sm_dir: Path = get_sm_dir(path)
         self._shots: [(int, int)] = None
         self._scenes = None
-        self._transcript = None
         self._frames: [Path] = None
         self._keyframes: [Path] = None
+        self._transcript: [TranscriptData] = None
         self._captions: [CaptionData] = None
 
     @property
@@ -252,7 +252,8 @@ def read_transcript_from_file(file: Path):
                      parse_dates=['start', 'end'],
                      date_parser=time_parser)
 
-    return list(df.to_records(index=False))
+    return list(
+        map(lambda val: TranscriptData(val[0], val[1], val[2], val[3] if 'color' in df else None), df.values.tolist()))
 
 
 def get_story_file(video: VideoPathType) -> Path:

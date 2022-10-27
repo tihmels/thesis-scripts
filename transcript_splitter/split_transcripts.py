@@ -30,7 +30,7 @@ def split_story_transcripts(vd: VideoData):
         start = start.replace(microsecond=0)
         end = end.replace(second=end.second + 1, microsecond=0)
 
-        yield list(filter(lambda t: start <= t[0] and t[1] <= end, transcript))
+        yield list(filter(lambda t: start <= t.start and t.end <= end, transcript))
 
 
 def check_requirements(video: Path):
@@ -77,7 +77,7 @@ def main(args):
         vd.transcripts_dir.mkdir(exist_ok=True)
 
         for story_idx, transcript in enumerate(split_story_transcripts(vd)):
-            text = ' '.join([transcript[2] for transcript in transcript])
+            text = ' '.join([transcript.text for transcript in transcript])
 
             target_file = Path(vd.transcripts_dir, 'story_' + str(story_idx) + '.txt')
 
