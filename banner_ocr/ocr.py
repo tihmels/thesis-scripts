@@ -58,12 +58,12 @@ def is_nightly_version(vd: VideoData):
 
 
 def extract_caption_data_from_shots(vd: VideoData, resize_factor=4):
-    segments = vd.shots
+    shots = vd.shots
 
     is_nightly = is_nightly_version(vd)
 
-    for first_frame_idx, last_frame_idx in segments:
-        center_frame_index = int(((first_frame_idx + last_frame_idx) / 2))
+    for sd in shots:
+        center_frame_index = int(((sd.first_frame_idx + sd.last_frame_idx) / 2))
         center_frame_path = vd.frames[center_frame_index]
 
         center_frame = Image.open(center_frame_path).convert('L')

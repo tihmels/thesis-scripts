@@ -5,7 +5,7 @@ from typing import Union
 
 import pandas as pd
 
-from common.DataModel import CaptionData, TranscriptData
+from common.DataModel import CaptionData, TranscriptData, StoryData, ShotData
 from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT_AUDIO_FILENAME_RE, \
     STORY_TRANSCRIPT_FILENAME_RE
 
@@ -20,15 +20,19 @@ class VideoData:
         self.audio_dir: Path = get_audio_dir(path)
         self.transcripts_dir: Path = get_transcription_dir(path)
         self.sm_dir: Path = get_sm_dir(path)
-        self._shots: [(int, int)] = None
-        self._scenes = None
         self._frames: [Path] = None
         self._keyframes: [Path] = None
+        self._shots: [ShotData] = None
+        self._scenes: [StoryData] = None
         self._transcript: [TranscriptData] = None
         self._captions: [CaptionData] = None
 
     @property
-    def shots(self):
+    def audio(self) -> Path:
+        return
+
+    @property
+    def shots(self) -> [ShotData]:
         if self._shots is None:
             self._shots = read_shots_from_file(get_shot_file(self))
         return self._shots
@@ -40,51 +44,51 @@ class VideoData:
         return self._captions
 
     @property
-    def scenes(self):
+    def scenes(self) -> [StoryData]:
         if self._scenes is None:
             self._scenes = read_scenes_from_file(get_story_file(self))
         return self._scenes
 
     @property
-    def keyframes(self):
+    def keyframes(self) -> [Path]:
         if self._keyframes is None:
             self._keyframes = sorted(get_keyframe_paths(self))
         return self._keyframes
 
     @property
-    def frames(self):
+    def frames(self) -> [Path]:
         if self._frames is None:
             self._frames = sorted(get_frame_paths(self))
         return self._frames
 
     @property
-    def transcript(self):
+    def transcript(self) -> [TranscriptData]:
         if self._transcript is None:
             self._transcript = read_transcript_from_file(get_main_transcript_file(self))
         return self._transcript
 
     @property
-    def n_frames(self):
+    def n_frames(self) -> int:
         return len(self.frames)
 
     @property
-    def n_shots(self):
+    def n_shots(self) -> int:
         return len(self.shots)
 
     @property
-    def n_stories(self):
+    def n_stories(self) -> int:
         return len(self.scenes)
 
     @property
-    def timecode(self):
+    def timecode(self) -> str:
         return self.id.split("-")[2]
 
     @property
-    def date_str(self):
+    def date_str(self) -> str:
         return self.date.strftime("%Y%m%d")
 
     @property
-    def is_summary(self):
+    def is_summary(self) -> bool:
         return is_summary(self)
 
     def __str__(self):
@@ -242,7 +246,7 @@ def get_main_transcript_file(video: VideoPathType):
         return get_main_transcript_file(video.path)
 
 
-def read_transcript_from_file(file: Path):
+def read_transcript_from_file(file: Path) -> [TranscriptData]:
     columns = ['start', 'end', 'caption', 'color']
 
     time_parser = lambda times: [datetime.strptime(time, '%H:%M:%S').time() for time in times]
@@ -273,19 +277,20 @@ def get_xml_transcript_file(video: VideoPathType) -> Path:
         return get_xml_transcript_file(video.path)
 
 
-def read_scenes_from_file(file: Path):
+def read_scenes_from_file(file: Path) -> [StoryData]:
     df = pd.read_csv(file, usecols=['news_title',
                                     'first_frame_idx', 'last_frame_idx', 'n_frames',
                                     'first_shot_idx', 'last_shot_idx', 'n_shots',
                                     'from_ss', 'to_ss', 'total_ss'], keep_default_na=False)
-    return df
+
+    return list(map(lambda val: StoryData(val[0], val[1], val[2], val[4], val[5]), df.values.tolist()))
 
 
-def read_banner_captions_from_file(file: Path):
+def read_banner_captions_from_file(file: Path) -> [CaptionData]:
     df = pd.read_csv(file, usecols=['headline', 'subline', 'confidence'], keep_default_na=False)
     return list(map(lambda val: CaptionData(val[0], val[1], val[2]), df.values.tolist()))
 
 
 def read_shots_from_file(file: Path):
     df = pd.read_csv(file, usecols=['first_frame_idx', 'last_frame_idx'])
-    return list(df.to_records(index=False))
+    return list(map(lambda val: ShotData(val[0], val[1]), df.values.tolist()))

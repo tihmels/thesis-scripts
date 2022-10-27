@@ -1,5 +1,6 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
 import re
+import textwrap
 from argparse import ArgumentParser
 from itertools import tee
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import spacy
+import yake
 from fuzzywuzzy import fuzz
 from spellchecker import SpellChecker
 
@@ -21,6 +23,7 @@ spell = SpellChecker(language=None, distance=1)  # loads default word frequency 
 spell.word_frequency.load_text_file('/Users/tihmels/TS/topics_dict.txt')
 
 spacy_de = spacy.load('de_core_news_sm')
+simple_kw_extractor = yake.KeywordExtractor(lan='de', top=1, n=2)
 
 
 def spellcheck(text):
@@ -69,7 +72,7 @@ def segment_ts100(vd: VideoData):
     for idx in range(first_idx + 1, last_idx):
         next_caption = captions[idx].text
 
-        ratio = fuzz.partial_ratio(current_caption, next_caption)
+        ratio = fuzz.token_sort_ratio(current_caption, next_caption)
 
         if ratio > 80:
             story_indices[-1].append(idx)
@@ -137,6 +140,17 @@ def was_processed(video: Path):
     return get_story_file(video).is_file()
 
 
+def extract_keyword(text):
+    language = "de"
+    max_ngram_size = 3
+    deduplication_threshold = 0.9
+    n_keywords = 1
+    custom_kw_extractor = yake.KeywordExtractor(lan=language, n=max_ngram_size, dedupLim=deduplication_threshold,
+                                                top=n_keywords, features=None)
+
+    return simple_kw_extractor.extract_keywords(text)[0]
+
+
 def main(args):
     video_files = {file for file in args.files if check_requirements(file)}
 
@@ -152,10 +166,17 @@ def main(args):
     for idx, vf in enumerate(video_files):
         vd = VideoData(vf)
 
+        print(f'[{idx + 1}/{len(video_files)}] {vd} | ', end='')
+
         segmentor = segment_ts100 if vd.is_summary else segment_ts15
         df = segmentor(vd)
 
         df.to_csv(get_story_file(vd), index=False)
+
+        news_stories = df['news_title'].values.tolist()
+        keywords = [extract_keyword(text) for text in news_stories]
+
+        print(' '.join([str(sidx + 1) + f'. {kw[0]}' for sidx, kw in enumerate(keywords)]))
 
 
 if __name__ == "__main__":

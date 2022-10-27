@@ -23,9 +23,9 @@ def split_story_transcripts(vd: VideoData):
 
     transcript = vd.transcript
 
-    for first_frame_idx, last_frame_idx in stories[['first_frame_idx', 'last_frame_idx']].itertuples(index=False):
-        start = sec_to_time(first_frame_idx / 25)
-        end = sec_to_time(last_frame_idx / 25)
+    for sd in stories:
+        start = sec_to_time(sd.first_frame_idx / 25)
+        end = sec_to_time(sd.last_frame_idx / 25)
 
         start = start.replace(microsecond=0)
         end = end.replace(second=end.second + 1, microsecond=0)

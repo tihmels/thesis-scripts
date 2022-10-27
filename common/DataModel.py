@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 
 
@@ -19,3 +19,18 @@ class TranscriptData:
     end: datetime.time
     text: str
     color: str = None
+
+
+@dataclass
+class ShotData:
+    first_frame_idx: int
+    last_frame_idx: int
+
+
+@dataclass
+class StoryData:
+    title: str
+    first_frame_idx: int
+    last_frame_idx: int
+    first_shot_idx: int
+    last_shot_idx: int

@@ -21,7 +21,7 @@ parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
 
 
 def split_audio_by_scenes(vd: VideoData):
-    audio = vd.audio
+    audio = get_main_audio_file(vd)
     scenes = vd.scenes[['first_frame_idx', 'last_frame_idx']].to_records(index=False)
 
     for scene_idx, (first_frame_idx, last_frame_idx) in enumerate(scenes):
@@ -38,16 +38,16 @@ def split_audio_by_scenes(vd: VideoData):
 
 def split_audio_by_shots(vd: VideoData):
     audio = vd.audio
-    segments = vd.shots
+    shots = vd.shots
 
-    for seg_idx, (seg_start_idx, seg_end_idx, _) in enumerate(segments):
-        start_ms = np.divide(seg_start_idx, 25) * 1000
-        end_ms = np.divide(seg_end_idx, 25) * 1000
+    for shot_idx, sd  in enumerate(shots):
+        start_ms = np.divide(sd.first_frame_idx, 25) * 1000
+        end_ms = np.divide(sd.last_frame_idx, 25) * 1000
 
         audio_segment = audio[start_ms:end_ms]
 
         audio_segment.export(
-            Path(vd.audio_dir, 'shot_' + str(seg_idx + 1) + '.wav'), format='wav')
+            Path(vd.audio_dir, 'shot_' + str(shot_idx + 1) + '.wav'), format='wav')
 
         yield
 
@@ -93,7 +93,7 @@ def main(args):
         vd = VideoData(vf)
 
         with alive_bar(vd.n_stories, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
-            for _ in split_audio_by_scenes(vd):
+            for _ in split_audio_by_shots(vd):
                 bar()
 
 
