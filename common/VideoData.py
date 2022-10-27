@@ -254,7 +254,8 @@ def read_transcript_from_file(file: Path) -> [TranscriptData]:
     df = pd.read_csv(file,
                      usecols=lambda x: x in columns,
                      parse_dates=['start', 'end'],
-                     date_parser=time_parser)
+                     date_parser=time_parser,
+                     keep_default_na=False)
 
     return list(
         map(lambda val: TranscriptData(val[0], val[1], val[2], val[3] if 'color' in df else None), df.values.tolist()))

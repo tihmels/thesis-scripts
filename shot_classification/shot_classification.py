@@ -14,44 +14,40 @@ from shot_classifier_model.inference import classify_video_shots
 
 parser = argparse.ArgumentParser('Video Shot Classifier')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
-parser.add_argument('--overwrite', action='store_true')
+parser.add_argument('--overwrite', action='store_false', dest='skip_existing', )
 
 
-def check_requirements(path: Path, skip_existing: bool):
-    match = re.match(TV_FILENAME_RE, path.name)
-
-    if match is None or not path.is_file():
+def check_requirements(video: Path):
+    if not re.match(TV_FILENAME_RE, video.name):
         return False
 
-    shot_file = get_shot_file(path)
+    shot_file = get_shot_file(video)
 
     if not shot_file.is_file():
-        print(f'{path.name} has no detected shots.')
+        print(f'{video.name} has no detected shots.')
         return False
-
-    kf_dir = get_keyframe_dir(path)
-
-    # if not kf_dir.is_dir() or len(list(kf_dir.glob("*.jpg"))) != len(read_shots_from_file(shot_file)):
-    #    return False
 
     return True
 
 
+def was_processed(video: Path):
+    return get_shot_classification_file(video).is_file()
+
+
 def main(args):
-    video_files = set()
+    video_files = {file for file in args.files if check_requirements(file)}
 
-    for file in args.files:
-        if file.is_file() and check_requirements(file, not args.overwrite):
-            video_files.add(file)
-        elif file.is_dir():
-            video_files.add([video for video in file.glob('*.mp4') if check_requirements(video, not args.overwrite)])
+    if args.skip_existing:
+        video_files = {file for file in video_files if not was_processed(file)}
 
-    assert len(video_files) > 0
+    assert len(video_files) > 0, 'No suitable video files have been found.'
 
     video_files = sorted(video_files, key=get_date_time)
 
     for idx, video in enumerate(video_files):
         vd = VideoData(video)
+
+        print(f'[{idx + 1}/{len(video_files)}] {vd}')
 
         classifications = []
 

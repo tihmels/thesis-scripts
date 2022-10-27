@@ -4,14 +4,47 @@ import argparse
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 from fuzzywuzzy import fuzz
 
-from common.VideoData import VideoData, get_date_time, read_transcript_from_file, get_main_transcript_file
+from common.VideoData import VideoData, get_date_time, get_shot_file
 
 parser = argparse.ArgumentParser()
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
                     help="Re-calculate shot boundaries for all videos")
+
+
+def get_start_frame(vd: VideoData):
+    transcripts = vd.transcript
+
+    for idx, td in enumerate(transcripts):
+
+        if fuzz.partial_ratio(td.text, 'Heute im Studio:') > 90:
+            intro_text_seconds = transcripts[idx + 2].start.second
+            first_frame_idx = intro_text_seconds * 25
+
+            shots = np.array([(shot.first_frame_idx, shot.last_frame_idx) for shot in vd.shots])
+
+            if np.logical_and(first_frame_idx - 10 < shots[:, 0], shots[:, 0] < first_frame_idx + 10).any():
+                break
+
+            after_index = np.argmax(shots[:, 0] > first_frame_idx)
+
+            before_shot = shots[after_index - 1]
+            after_shot = shots[after_index]
+
+            before_shot_new = (before_shot[0], first_frame_idx - 1)
+            new_shot = (first_frame_idx, after_shot[0] - 1)
+
+            shots[after_index - 1] = before_shot_new
+            new_shots = np.insert(shots, after_index, new_shot, axis=0)
+
+            df = pd.DataFrame(data=new_shots, columns=['first_frame_idx', 'last_frame_idx'])
+
+            df.to_csv(get_shot_file(vd), index=False)
+
+
 
 
 def check_requirements(video: Path):
@@ -34,20 +67,10 @@ def main(args):
 
     print(f'Detecting shot boundaries for {len(video_files)} videos ...', end='\n\n')
 
-    for idx, vf in enumerate(video_files):
+    for vf_idx, vf in enumerate(video_files):
         vd = VideoData(vf)
 
-        transcripts = read_transcript_from_file(get_main_transcript_file(vd))
-
-        for t_idx, (start, end, caption) in enumerate(transcripts):
-
-            if fuzz.partial_ratio(caption, 'Guten Abend, ich begrüße Sie zur tagesschau') > 90:
-                first_text = t_idx + 1
-                first_text_seconds = transcripts[first_text][0].second
-
-                first_frame_idx = first_text_seconds * 25
-
-                shots = vd.shots
+        get_start_frame(vd)
 
 
 if __name__ == "__main__":
