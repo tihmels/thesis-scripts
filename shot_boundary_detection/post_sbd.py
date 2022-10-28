@@ -23,7 +23,6 @@ def fix_first_anchorshot_segment(transcript, segments):
             first_story_sentence = transcript[idx + 2]
             first_story_sentence_frame_idx = first_story_sentence.start.second * 25
 
-
             if np.logical_and(first_story_sentence_frame_idx - 10 < segments[:, 0],
                               segments[:, 0] < first_story_sentence_frame_idx + 10).any():
                 break
