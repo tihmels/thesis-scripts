@@ -57,6 +57,25 @@ def is_nightly_version(vd: VideoData):
     return max_corr > 0.9
 
 
+def extract_caption_data_from_frame(frame: Path, resize_factor, is_nightly, custom_oem_psm_config='--psm 4 --oem 1'):
+    frame = Image.open(frame).convert('L')
+
+    sharpness_enhancer = ImageEnhance.Sharpness(frame)
+    frame = sharpness_enhancer.enhance(1.5)
+
+    frame = frame.resize(
+        (frame.size[0] * resize_factor, frame.size[1] * resize_factor))
+    center_frame_resized = np.array(frame)
+
+    caption_area = get_caption_area(center_frame_resized, is_nightly)
+    caption_area = preprocess_caption_area(caption_area, is_nightly)
+
+    caption_data = pytesseract.image_to_data(caption_area, output_type=Output.DICT, lang='deu',
+                                             config=custom_oem_psm_config)
+
+    return caption_data
+
+
 def extract_caption_data_from_shots(vd: VideoData, resize_factor=4):
     shots = vd.shots
 
@@ -66,23 +85,9 @@ def extract_caption_data_from_shots(vd: VideoData, resize_factor=4):
         center_frame_index = int(((sd.first_frame_idx + sd.last_frame_idx) / 2))
         center_frame_path = vd.frames[center_frame_index]
 
-        center_frame = Image.open(center_frame_path).convert('L')
+        image_data = extract_caption_data_from_frame(center_frame_path, resize_factor, is_nightly)
 
-        sharpness_enhancer = ImageEnhance.Sharpness(center_frame)
-        center_frame = sharpness_enhancer.enhance(1.5)
-
-        center_frame_resized = center_frame.resize(
-            (center_frame.size[0] * resize_factor, center_frame.size[1] * resize_factor))
-        center_frame_resized = np.array(center_frame_resized)
-
-        caption_area = get_caption_area(center_frame_resized, is_nightly)
-        caption_area = preprocess_caption_area(caption_area, is_nightly)
-
-        custom_oem_psm_config = r'--psm 4 --oem 1'
-        caption_data = pytesseract.image_to_data(caption_area, output_type=Output.DICT, lang='deu',
-                                                 config=custom_oem_psm_config)
-
-        yield caption_data
+        yield image_data
 
 
 def check_requirements(video: Path):

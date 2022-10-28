@@ -1,10 +1,26 @@
 import logging
 import os
 import re
+from datetime import datetime, timedelta
 from pathlib import Path
 from shutil import rmtree
 
 from common.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE
+
+
+def sec_to_time(seconds):
+    return (datetime.min + timedelta(seconds=seconds)).time()
+
+
+def add_sec_to_time(time, secs):
+    fulldate = datetime(100, 1, 1, time.hour, time.minute, time.second)
+    fulldate = fulldate + timedelta(seconds=secs)
+    return fulldate.time()
+
+
+def frame_idx_to_time(frame_idx):
+    seconds = frame_idx / 25
+    return sec_to_time(seconds)
 
 
 def re_create_dir(path: Path):

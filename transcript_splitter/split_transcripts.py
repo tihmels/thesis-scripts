@@ -2,20 +2,16 @@
 
 import re
 from argparse import ArgumentParser
-from datetime import datetime, timedelta
 from pathlib import Path
 
 from common.VideoData import get_date_time, VideoData, get_main_transcript_file, get_story_file, get_story_transcripts, \
     read_scenes_from_file
 from common.constants import TV_FILENAME_RE
+from common.fs_utils import frame_idx_to_time
 
 parser = ArgumentParser('Automatic Speech Recognition')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help='Tagesschau video file(s)')
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
-
-
-def sec_to_time(seconds):
-    return (datetime.min + timedelta(seconds=seconds)).time()
 
 
 def split_story_transcripts(vd: VideoData):
@@ -24,8 +20,8 @@ def split_story_transcripts(vd: VideoData):
     transcript = vd.transcript
 
     for sd in stories:
-        start = sec_to_time(sd.first_frame_idx / 25)
-        end = sec_to_time(sd.last_frame_idx / 25)
+        start = frame_idx_to_time(sd.first_frame_idx)
+        end = frame_idx_to_time(sd.last_frame_idx)
 
         start = start.replace(microsecond=0)
         end = end.replace(second=end.second + 1, microsecond=0)

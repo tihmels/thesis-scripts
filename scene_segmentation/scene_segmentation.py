@@ -1,7 +1,6 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
 import re
 from argparse import ArgumentParser
-from itertools import tee
 from pathlib import Path
 
 import numpy as np
@@ -11,6 +10,7 @@ import yake
 from fuzzywuzzy import fuzz
 from spellchecker import SpellChecker
 
+from banner_ocr.ocr import extract_caption_data_from_frame
 from common.VideoData import VideoData, get_shot_file, get_date_time, get_banner_caption_file, get_story_file, \
     get_topic_file, is_summary
 from common.constants import TV_FILENAME_RE
@@ -26,19 +26,19 @@ spacy_de = spacy.load('de_core_news_sm')
 simple_kw_extractor = yake.KeywordExtractor(lan='de', top=1, n=2)
 
 
-def spellcheck(text):
-    return text
-
-
-def pairwise(iterable):
-    a, b = tee(iterable)
-    next(b, None)
-    return zip(a, b)
-
-
 def segment_ts15(vd: VideoData):
-    classifications = vd.classifications
+    classifications = {idx: classification for idx, classification in enumerate(vd.classifications)}
     topics = vd.topics
+
+    is_anchorshot = lambda c: c.clazz == 'anchor'
+
+    anchorshot_indices = [idx for idx, clazz in classifications.items() if is_anchorshot(clazz)]
+
+    anchor_transcripts = [vd.get_shot_transcripts(idx) for idx in anchorshot_indices]
+
+    test_frame_idx = vd.shots[anchorshot_indices[0]].center_frame_idx()
+
+    frame_text = extract_caption_data_from_frame(vd.frames[test_frame_idx], 4, True)
 
     return None
 

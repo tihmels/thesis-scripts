@@ -7,7 +7,9 @@ import pandas as pd
 
 from common.DataModel import CaptionData, TranscriptData, StoryData, ShotData, ShotClassificationData
 from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT_AUDIO_FILENAME_RE, \
-    STORY_TRANSCRIPT_FILENAME_RE
+    STORY_TRANSCRIPT_FILENAME_RE, AUDIO_DIR, FRAME_DIR, KF_DIR, TRANSCRIPT_DIR, SM_DIR, TOPICS_FILENAME, \
+    CAPTIONS_FILENAME, SHOT_CLASS_FILENAME, SHOT_FILENAME, TRANSCRIPT_FILENAME, STORY_FILENAME
+from common.fs_utils import frame_idx_to_time, add_sec_to_time
 
 
 class VideoData:
@@ -30,13 +32,13 @@ class VideoData:
         self._captions: [CaptionData] = None
 
     @property
-    def classifications(self):
+    def classifications(self) -> [ShotClassificationData]:
         if self._classifications is None:
             self._classifications = read_classifications_from_file(get_shot_classification_file(self))
         return self._classifications
 
     @property
-    def topics(self):
+    def topics(self) -> [str]:
         if self._topics is None:
             self._topics = read_topics_from_file(get_topic_file(self))
         return self._topics
@@ -105,24 +107,20 @@ class VideoData:
     def is_summary(self) -> bool:
         return is_summary(self)
 
+    def get_shot_transcripts(self, from_idx, to_idx=None):
+        from_shot, to_shot = self.shots[from_idx], self.shots[to_idx] if to_idx else self.shots[from_idx]
+        from_time, to_time = frame_idx_to_time(from_shot.first_frame_idx), frame_idx_to_time(to_shot.last_frame_idx)
+
+        from_time = from_time.replace(microsecond=0)
+        to_time = add_sec_to_time(to_time, 1).replace(microsecond=0)
+
+        return [trans for trans in self.transcript if from_time <= trans.start and trans.end <= to_time]
+
     def __str__(self):
         return str(self.path.relative_to(self.path.parent.parent)).split('.')[0]
 
 
 VideoPathType = Union[VideoData, Path]
-
-AUDIO_DIR = 'audios'
-FRAME_DIR = 'frames'
-KF_DIR = 'keyframes'
-TRANSCRIPT_DIR = 'transcripts'
-SM_DIR = 'sm'
-
-TRANSCRIPT_FILENAME = 'transcript.csv'
-CAPTIONS_FILENAME = 'captions.csv'
-SHOT_FILENAME = 'shots.csv'
-SHOT_CLASS_FILENAME = 'classifications.csv'
-STORY_FILENAME = 'stories.csv'
-TOPICS_FILENAME = 'topics.csv'
 
 
 def get_date_time(video: VideoPathType):
@@ -321,9 +319,9 @@ def read_shots_from_file(file: Path) -> [ShotData]:
 
 def read_classifications_from_file(file: Path) -> [ShotClassificationData]:
     df = pd.read_csv(file, usecols=['class', 'prop'])
-    return list(map(lambda val: ShotClassificationData(val[0], val[1]), df.values.tolist()))
+    return [ShotClassificationData(val[0], val[1]) for val in df.values.tolist()]
 
 
 def read_topics_from_file(file: Path) -> [str]:
-    df = pd.read_csv(file)
-    return list(map(lambda t: t.strip(), df.keys().tolist()))
+    df = pd.read_csv(file, skiprows=0, header=None, keep_default_na=False)
+    return [topic.strip() for sublist in df.values.tolist() for topic in sublist]

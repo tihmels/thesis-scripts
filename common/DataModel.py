@@ -26,6 +26,9 @@ class ShotData:
     first_frame_idx: int
     last_frame_idx: int
 
+    def center_frame_idx(self):
+        return int((self.first_frame_idx + self.last_frame_idx) / 2)
+
 
 @dataclass
 class StoryData:
