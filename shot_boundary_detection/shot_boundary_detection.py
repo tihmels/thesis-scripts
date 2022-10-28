@@ -1,7 +1,6 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
 
 import argparse
-import logging
 import re
 from pathlib import Path
 
@@ -9,11 +8,10 @@ import cv2
 import numpy as np
 import pandas as pd
 
-from common.VideoData import VideoData, get_shot_file, get_data_dir, get_frame_dir, get_frame_paths, get_date_time
+from common.VideoData import VideoData, get_shot_file, get_data_dir, get_frame_dir, get_frame_paths, get_date_time, \
+    get_main_transcript_file
 from common.constants import TV_FILENAME_RE
-from common.fs_utils import set_tf_loglevel
-
-set_tf_loglevel(logging.FATAL)
+from post_sbd import fix_first_anchorshot_segment
 from transnetv2 import TransNetV2
 
 parser = argparse.ArgumentParser('Shot Boundary Detection (SBD) using TransNet V2')
@@ -42,7 +40,10 @@ def detect_shot_boundaries(vd: VideoData, threshold):
 
     _, segments, img = shot_transition_detection(np.array(frames), threshold)
 
-    segments = segments[segments[:, 1] - segments[:, 0] > 10]
+    if not vd.is_summary and get_main_transcript_file(vd).is_file():
+        segments = fix_first_anchorshot_segment(vd.transcript, segments)
+
+    segments = segments[segments[:, 1] - segments[:, 0] > 13]
 
     return segments, img
 
