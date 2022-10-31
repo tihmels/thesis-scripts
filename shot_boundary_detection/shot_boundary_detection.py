@@ -16,7 +16,7 @@ from transnetv2 import TransNetV2
 
 parser = argparse.ArgumentParser('Shot Boundary Detection (SBD) using TransNet V2')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")
-parser.add_argument('--threshold', type=float, default=0.2, help='Threshold for scene prediction')
+parser.add_argument('--threshold', type=float, default=0.2, help='Shot transition threshold')
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
                     help="Re-calculate shot boundaries for all videos")
 
