@@ -9,9 +9,9 @@ from common.VideoData import get_date_time, VideoData, get_main_transcript_file,
 from common.constants import TV_FILENAME_RE
 from common.fs_utils import frame_idx_to_time
 
-parser = ArgumentParser('Automatic Speech Recognition')
+parser = ArgumentParser('Automatic Speech Recognition using OpenAI Whisper')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help='Tagesschau video file(s)')
-parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
+parser.add_argument('--overwrite', action='store_false', dest='skip_existing', help='')
 
 
 def split_story_transcripts(vd: VideoData):

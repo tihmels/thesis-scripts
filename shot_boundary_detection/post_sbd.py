@@ -10,35 +10,39 @@ from fuzzywuzzy import fuzz
 
 from common.VideoData import VideoData, get_date_time, is_summary, get_main_transcript_file, get_shot_file
 from common.constants import TV_FILENAME_RE
+from common.fs_utils import sec_to_frame_idx
 
 parser = argparse.ArgumentParser()
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")
-parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
-                    help="Re-calculate shot boundaries for all videos")
+parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
+
+welcoming = "ich begrüße Sie zur tagesschau"
 
 
-def fix_first_anchorshot_segment(transcript, segments):
+def fix_first_anchorshot_segment(vd: VideoData, shots):
+    transcript = vd.transcript
+
     for idx, td in enumerate(transcript):
-        if fuzz.partial_ratio(td.text, 'Heute im Studio:') > 90:
-            first_story_sentence = transcript[idx + 2]
-            first_story_sentence_frame_idx = first_story_sentence.start.second * 25
+        if fuzz.token_set_ratio(td.text, welcoming) > 90:
+            first_news_sentence = transcript[idx + 1]
+            first_news_frame_idx = sec_to_frame_idx(first_news_sentence.start.second)
 
-            if np.logical_and(first_story_sentence_frame_idx - 10 < segments[:, 0],
-                              segments[:, 0] < first_story_sentence_frame_idx + 10).any():
+            if np.logical_and(first_news_frame_idx - 10 < shots[:, 0],
+                              shots[:, 0] < first_news_frame_idx + 10).any():
                 break
 
-            after_index = np.argmax(segments[:, 0] > first_story_sentence_frame_idx)
+            after_shot_idx = np.argmax(shots[:, 0] > first_news_frame_idx)
 
-            before_shot = segments[after_index - 1]
-            after_shot = segments[after_index]
+            after_shot = shots[after_shot_idx]
+            before_shot = shots[after_shot_idx - 1]
 
-            before_shot_new = (before_shot[0], first_story_sentence_frame_idx - 1)
-            new_shot = (first_story_sentence_frame_idx, after_shot[0] - 1)
+            updated_before_shot = (before_shot[0], first_news_frame_idx - 1)
+            new_shot = (first_news_frame_idx, after_shot[0] - 1)
 
-            segments[after_index - 1] = before_shot_new
-            new_shots = np.insert(segments, after_index, new_shot, axis=0)
+            shots[after_shot_idx - 1] = updated_before_shot
+            updated_shots = np.insert(shots, after_shot_idx, new_shot, axis=0)
 
-            return new_shots
+            return updated_shots
 
 
 def check_requirements(video: Path):

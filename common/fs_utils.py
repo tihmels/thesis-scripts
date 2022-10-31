@@ -5,11 +5,31 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from shutil import rmtree
 
+import cv2
+
 from common.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE
+
+
+def sec_to_frame_idx(second):
+    return second * 25
+
+
+def frame_idx_to_sec(idx):
+    return idx / 25
 
 
 def sec_to_time(seconds):
     return (datetime.min + timedelta(seconds=seconds)).time()
+
+
+def read_images(img_paths: [Path], cvt_color=cv2.COLOR_BGR2RGB, resize=None):
+    images = [cv2.imread(str(img)) for img in img_paths]
+    images = [cv2.cvtColor(img, cvt_color) for img in images]
+
+    if resize:
+        images = [cv2.resize(img, resize) for img in images]
+
+    return images
 
 
 def add_sec_to_time(time, secs):
@@ -19,15 +39,15 @@ def add_sec_to_time(time, secs):
 
 
 def frame_idx_to_time(frame_idx):
-    seconds = frame_idx / 25
+    seconds = frame_idx_to_sec(frame_idx)
     return sec_to_time(seconds)
 
 
-def re_create_dir(path: Path):
-    if path.is_dir():
+def create_dir(path: Path, rm_if_exist=False):
+    if path.is_dir() and rm_if_exist:
         rmtree(path)
 
-    path.mkdir(parents=True)
+    path.mkdir(parents=True, exist_ok=False if rm_if_exist else True)
 
 
 def get_summary_videos():

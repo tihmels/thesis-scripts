@@ -4,13 +4,13 @@ import argparse
 import re
 from pathlib import Path
 
-import cv2
 import numpy as np
 import pandas as pd
 
 from common.VideoData import VideoData, get_shot_file, get_data_dir, get_frame_dir, get_frame_paths, get_date_time, \
     get_main_transcript_file
 from common.constants import TV_FILENAME_RE
+from common.fs_utils import create_dir, read_images
 from post_sbd import fix_first_anchorshot_segment
 from transnetv2 import TransNetV2
 
@@ -26,26 +26,23 @@ model = TransNetV2()
 def shot_transition_detection(frames, threshold=0.2):
     single_frame_predictions, all_frame_predictions = model.predict_frames(frames)
 
-    predictions = np.stack([single_frame_predictions, all_frame_predictions], 1)
-    scenes = model.predictions_to_scenes(single_frame_predictions, threshold=threshold)
+    shots = model.predictions_to_scenes(single_frame_predictions, threshold=threshold)
     img = model.visualize_predictions(frames, (single_frame_predictions, all_frame_predictions))
 
-    return predictions, scenes, img
+    return shots, img
 
 
-def detect_shot_boundaries(vd: VideoData, threshold):
-    frames = [cv2.imread(str(frame)) for frame in vd.frames]
-    frames = [cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) for frame in frames]
-    frames = [cv2.resize(frame, (48, 27)) for frame in frames]
+def process_video(vd: VideoData, threshold):
+    frames = read_images(vd.frames, resize=(48, 27))
 
-    _, segments, img = shot_transition_detection(np.array(frames), threshold)
+    shots, img = shot_transition_detection(np.array(frames), threshold)
 
     if not vd.is_summary and get_main_transcript_file(vd).is_file():
-        segments = fix_first_anchorshot_segment(vd.transcript, segments)
+        shots = fix_first_anchorshot_segment(vd, shots)
 
-    segments = segments[segments[:, 1] - segments[:, 0] > 13]
+    shots = shots[shots[:, 1] - shots[:, 0] > 13]
 
-    return segments, img
+    return shots, img
 
 
 def check_requirements(video: Path):
@@ -82,9 +79,11 @@ def main(args):
 
         print(f'[{idx + 1}/{len(video_files)}] {vd}')
 
-        segments, img = detect_shot_boundaries(vd, args.threshold)
+        create_dir(vd.frames, rm_if_exist=True)
 
-        df = pd.DataFrame(data=segments, columns=['first_frame_idx', 'last_frame_idx'])
+        shots, img = process_video(vd, args.threshold)
+
+        df = pd.DataFrame(data=shots, columns=['first_frame_idx', 'last_frame_idx'])
 
         df.to_csv(get_shot_file(vd), index=False)
         img.save(Path(get_data_dir(vd), 'shots.png').absolute())
