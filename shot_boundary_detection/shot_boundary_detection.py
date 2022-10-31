@@ -10,7 +10,7 @@ import pandas as pd
 from common.VideoData import VideoData, get_shot_file, get_data_dir, get_frame_dir, get_frame_paths, get_date_time, \
     get_main_transcript_file
 from common.constants import TV_FILENAME_RE
-from common.fs_utils import create_dir, read_images
+from common.fs_utils import read_images
 from post_sbd import fix_first_anchorshot_segment
 from transnetv2 import TransNetV2
 
@@ -78,8 +78,6 @@ def main(args):
         vd = VideoData(vf)
 
         print(f'[{idx + 1}/{len(video_files)}] {vd}')
-
-        create_dir(vd.frames, rm_if_exist=True)
 
         shots, img = process_video(vd, args.threshold)
 

@@ -14,7 +14,7 @@ from common.VideoData import VideoData, get_frame_dir, get_frame_paths, get_shot
     get_keyframe_paths, \
     read_shots_from_file, get_date_time
 from common.constants import TV_FILENAME_RE
-from common.fs_utils import re_create_dir
+from common.fs_utils import create_dir
 
 parser = argparse.ArgumentParser('Keyframe Extraction')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help='Tagesschau video file(s)')
@@ -121,7 +121,7 @@ def main(args):
     for idx, vf in enumerate(video_files):
         vd = VideoData(vf)
 
-        re_create_dir(vd.keyframe_dir)
+        create_dir(vd.keyframe_dir, rm_if_exist=True)
 
         with alive_bar(vd.n_shots, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
             for kf_idx in detect_keyframes(vd, get_center_kf_idx if args.center else get_magnitude_gradient_kf_idx):

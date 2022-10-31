@@ -8,7 +8,7 @@ import ffmpeg
 
 from common.VideoData import get_frame_dir, get_date_time, get_frame_paths, VideoData
 from common.constants import TV_FILENAME_RE
-from common.fs_utils import re_create_dir
+from common.fs_utils import create_dir
 
 parser = argparse.ArgumentParser('Video frame extraction using ffmpeg')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help='Tagesschau video file(s)')
@@ -54,7 +54,7 @@ def main(args):
 
         print(f'[{idx + 1}/{len(video_files)}] {vd}', end=' | ')
 
-        re_create_dir(vd.frame_dir)
+        create_dir(vd.frame_dir, rm_if_exist=True)
 
         extract_frames(vd, args.fps, args.size)
 
