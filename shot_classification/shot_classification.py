@@ -38,7 +38,9 @@ def check_requirements(video: Path):
 
 
 def was_processed(video: Path):
-    return get_shot_classification_file(video).is_file()
+    shot_file = get_shot_file(video)
+
+    return all(shot.type for shot in read_shots_from_file(shot_file))
 
 
 def main(args):
@@ -60,11 +62,14 @@ def main(args):
 
         with alive_bar(vd.n_shots, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
             for result in classify_video_shots(vd, top_n=1):
-                results.append(result[0])
+                results.append(result[0][0])
                 bar()
 
-        df = pd.DataFrame(data=np.array(results), columns=['class', 'prop'])
-        df.to_csv(get_shot_classification_file(vd), index=False)
+        shots = [(sd.first_frame_idx, sd.last_frame_idx) for sd in vd.shots]
+        shots_and_type = [(first_idx, last_idx, shot_type) for (first_idx, last_idx), shot_type in zip(shots, results)]
+
+        df = pd.DataFrame(data=np.array(shots_and_type), columns=['first_frame_idx', 'last_frame_idx', 'type'])
+        df.to_csv(get_shot_file(vd), index=False)
 
 
 if __name__ == "__main__":

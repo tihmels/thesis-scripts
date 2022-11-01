@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 
 
 @dataclass
@@ -21,13 +22,22 @@ class TranscriptData:
     color: str = None
 
 
+class ShotType(Enum):
+    ANCHOR = 1
+    NEWS = 2
+
+
 @dataclass
 class ShotData:
     first_frame_idx: int
     last_frame_idx: int
+    type: str
 
     def center_frame_idx(self):
         return int((self.first_frame_idx + self.last_frame_idx) / 2)
+
+    def n_frames(self):
+        return self.last_frame_idx - self.first_frame_idx + 1
 
 
 @dataclass

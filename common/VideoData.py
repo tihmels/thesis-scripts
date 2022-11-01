@@ -313,8 +313,9 @@ def read_banner_captions_from_file(file: Path) -> [CaptionData]:
 
 
 def read_shots_from_file(file: Path) -> [ShotData]:
-    df = pd.read_csv(file, usecols=['first_frame_idx', 'last_frame_idx'])
-    return list(map(lambda val: ShotData(val[0], val[1]), df.values.tolist()))
+    columns = ['first_frame_idx', 'last_frame_idx', 'type']
+    df = pd.read_csv(file, usecols=lambda x: x in columns)
+    return [ShotData(val[0], val[1], val[2] if 'type' in df else None) for val in df.values.tolist()]
 
 
 def read_classifications_from_file(file: Path) -> [ShotClassificationData]:

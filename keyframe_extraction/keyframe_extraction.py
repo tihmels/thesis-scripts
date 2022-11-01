@@ -3,7 +3,7 @@
 import argparse
 import re
 from pathlib import Path
-from shutil import copy2
+from shutil import copy
 
 import numpy as np
 from PIL import Image
@@ -125,7 +125,7 @@ def main(args):
 
         with alive_bar(vd.n_shots, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
             for kf_idx in detect_keyframes(vd, get_center_kf_idx if args.center else get_magnitude_gradient_kf_idx):
-                copy2(vd.frames[kf_idx], vd.keyframe_dir)
+                copy(vd.frames[kf_idx], vd.keyframe_dir)
                 bar()
 
 

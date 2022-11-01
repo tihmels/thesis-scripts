@@ -12,7 +12,7 @@ from spellchecker import SpellChecker
 
 from banner_ocr.ocr import extract_caption_data_from_frame
 from common.VideoData import VideoData, get_shot_file, get_date_time, get_banner_caption_file, get_story_file, \
-    get_topic_file, is_summary
+    get_topic_file, is_summary, read_shots_from_file
 from common.constants import TV_FILENAME_RE
 
 parser = ArgumentParser('Scene Segmentation')
@@ -127,6 +127,10 @@ def check_requirements(video: Path):
 
     if not shot_file.is_file():
         print(f'{video.name} has no detected shots.')
+        return False
+
+    if not is_summary(video) and any(shot.type is None for shot in read_shots_from_file(shot_file)):
+        print(f'{video.name} has no detected shot types.')
         return False
 
     topic_file = get_banner_caption_file(video) if is_summary(video) else get_topic_file(video)
