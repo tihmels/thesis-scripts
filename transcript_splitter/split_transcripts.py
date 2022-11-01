@@ -7,7 +7,7 @@ from pathlib import Path
 from common.VideoData import get_date_time, VideoData, get_main_transcript_file, get_story_file, get_story_transcripts, \
     read_scenes_from_file
 from common.constants import TV_FILENAME_RE
-from common.fs_utils import frame_idx_to_time
+from common.fs_utils import frame_idx_to_time, create_dir
 
 parser = ArgumentParser('Automatic Speech Recognition using OpenAI Whisper')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help='Tagesschau video file(s)')
@@ -70,7 +70,7 @@ def main(args):
 
         print(f'[{idx + 1}/{len(video_files)}] {vd}')
 
-        vd.transcripts_dir.mkdir(exist_ok=True)
+        create_dir(vd.transcripts_dir)
 
         for story_idx, transcript in enumerate(split_story_transcripts(vd)):
             text = ' '.join([transcript.text for transcript in transcript])
