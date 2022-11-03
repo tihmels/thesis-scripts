@@ -11,6 +11,7 @@ from fuzzywuzzy import fuzz
 from spellchecker import SpellChecker
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 
+from common.DataModel import TranscriptData
 from common.VideoData import VideoData, get_shot_file, get_date_time, get_banner_caption_file, get_story_file, \
     get_topic_file, is_summary, read_shots_from_file
 from common.constants import TV_FILENAME_RE
@@ -28,25 +29,42 @@ simple_kw_extractor = yake.KeywordExtractor(lan='de', top=1, n=2)
 tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-xl")
 model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-xl")
 
-input_text = "translate English to German: How old are you?"
-input_ids = tokenizer(input_text, return_tensors="pt").input_ids
 
-outputs = model.generate(input_ids)
-print(tokenizer.decode(outputs[0]))
+def get_text(tds: [TranscriptData]):
+    return ' '.join([td.text for td in tds])
+
+
+def match_anchor_and_topic(topics, anchor_shots, anchor_transcripts):
+    anchor_to_topic = {}
+
+    for topic_idx, topic in topics.items():
+
+        remaining_shots = [idx for idx in anchor_shots.keys() if idx not in anchor_to_topic.keys()]
+
+        for anchor_idx in remaining_shots:
+
+            transcript = anchor_transcripts[anchor_idx]
+            input_text = f'Headline: {topic}. Text: {transcript}. Does the Headline match the Text?'
+
+            input_ids = tokenizer(input_text, return_tensors="pt").input_ids
+
+            outputs = model.generate(input_ids)
+            output = tokenizer.decode(outputs[0][1])
+
+            if 'yes' in output:
+                anchor_to_topic[anchor_idx] = topic_idx
+
+    return anchor_to_topic
 
 
 def segment_ts15(vd: VideoData):
     shots = {idx: shot for idx, shot in enumerate(vd.shots)}
-    topics = vd.topics
+    topics = {idx: topic for idx, topic in enumerate(vd.topics)}
 
-    is_anchorshot = lambda c: c.clazz == 'anchor'
+    anchor_shots = {idx: sd for idx, sd in shots.items() if sd.type == 'anchor'}
+    anchor_transcripts = {idx: get_text(vd.get_shot_transcripts(idx)) for idx in anchor_shots}
 
-    anchorshot_indices = [idx for idx, clazz in classifications.items() if is_anchorshot(clazz)]
-
-    anchor_transcripts = [vd.get_shot_transcripts(idx) for idx in anchorshot_indices]
-
-    topic = vd.topics[0]
-    transcript = ' '.join(anchor_transcripts[0])
+    anchor_to_topic = match_anchor_and_topic(topics, anchor_shots, anchor_transcripts)
 
     return None
 
@@ -175,7 +193,7 @@ def main(args):
 
     video_files = sorted(video_files, key=get_date_time)
 
-    print(f'Scene Segmentation for {len(video_files)} videos ... \n')
+    print(f'Story Segmentation for {len(video_files)} videos ... \n')
 
     for idx, vf in enumerate(video_files):
         vd = VideoData(vf)
