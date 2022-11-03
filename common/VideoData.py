@@ -32,12 +32,6 @@ class VideoData:
         self._captions: [CaptionData] = None
 
     @property
-    def classifications(self) -> [ShotClassificationData]:
-        if self._classifications is None:
-            self._classifications = read_classifications_from_file(get_shot_classification_file(self))
-        return self._classifications
-
-    @property
     def topics(self) -> [str]:
         if self._topics is None:
             self._topics = read_topics_from_file(get_topic_file(self))

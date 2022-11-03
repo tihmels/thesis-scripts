@@ -20,11 +20,11 @@ welcoming_1 = "ich begrüße Sie zur tagesschau"
 welcoming_2 = "Willkommen zur tagesschau"
 
 
-
 def fix_first_anchorshot_segment(vd: VideoData, shots):
     transcript = vd.transcript
 
     for idx, td in enumerate(transcript):
+
         if fuzz.token_set_ratio(td.text, welcoming_1) > 90 or fuzz.token_set_ratio(td.text, welcoming_2) > 90:
             first_news_sentence = transcript[idx + 1]
             first_news_frame_idx = sec_to_frame_idx(first_news_sentence.start.second)

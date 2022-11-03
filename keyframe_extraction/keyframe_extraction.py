@@ -5,8 +5,8 @@ import re
 from pathlib import Path
 from shutil import copy
 
+import cv2
 import numpy as np
-from PIL import Image
 from alive_progress import alive_bar
 from scipy import ndimage
 
@@ -14,7 +14,7 @@ from common.VideoData import VideoData, get_frame_dir, get_frame_paths, get_shot
     get_keyframe_paths, \
     read_shots_from_file, get_date_time
 from common.constants import TV_FILENAME_RE
-from common.fs_utils import create_dir
+from common.fs_utils import create_dir, read_images
 
 parser = argparse.ArgumentParser('Keyframe Extraction')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help='Tagesschau video file(s)')
@@ -66,18 +66,16 @@ def get_magnitude_gradient_kf_idx(frames):
 def detect_keyframes(vd: VideoData, kf_func):
     shots = vd.shots
 
-    for shot_idx, sd in enumerate(shots):
+    for shot in shots:
 
-        frames = [Image.open(frame).convert('L') for frame in
-                  vd.frames[sd.first_frame_idx + 5:sd.last_frame_idx - 5]]
-        frames = [np.array(frame) for frame in frames]
+        frames = read_images(vd.frames[shot.first_frame_idx + 5:shot.last_frame_idx - 5], cv2.COLOR_BGR2GRAY)
 
         if vd.is_summary:
             frames = [frame[:220, :] for frame in frames]
 
         keyframe_idx = kf_func(frames)
 
-        yield keyframe_idx + sd.first_frame_idx
+        yield keyframe_idx + shot.first_frame_idx
 
 
 def check_requirements(video: Path):

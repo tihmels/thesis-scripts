@@ -9,8 +9,8 @@ import spacy
 import yake
 from fuzzywuzzy import fuzz
 from spellchecker import SpellChecker
+from transformers import T5Tokenizer, T5ForConditionalGeneration
 
-from banner_ocr.ocr import extract_caption_data_from_frame
 from common.VideoData import VideoData, get_shot_file, get_date_time, get_banner_caption_file, get_story_file, \
     get_topic_file, is_summary, read_shots_from_file
 from common.constants import TV_FILENAME_RE
@@ -25,9 +25,18 @@ spell.word_frequency.load_text_file('/Users/tihmels/TS/topics_dict.txt')
 spacy_de = spacy.load('de_core_news_sm')
 simple_kw_extractor = yake.KeywordExtractor(lan='de', top=1, n=2)
 
+tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-xl")
+model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-xl")
+
+input_text = "translate English to German: How old are you?"
+input_ids = tokenizer(input_text, return_tensors="pt").input_ids
+
+outputs = model.generate(input_ids)
+print(tokenizer.decode(outputs[0]))
+
 
 def segment_ts15(vd: VideoData):
-    classifications = {idx: classification for idx, classification in enumerate(vd.classifications)}
+    shots = {idx: shot for idx, shot in enumerate(vd.shots)}
     topics = vd.topics
 
     is_anchorshot = lambda c: c.clazz == 'anchor'
@@ -36,9 +45,8 @@ def segment_ts15(vd: VideoData):
 
     anchor_transcripts = [vd.get_shot_transcripts(idx) for idx in anchorshot_indices]
 
-    test_frame_idx = vd.shots[anchorshot_indices[0]].center_frame_idx()
-
-    frame_text = extract_caption_data_from_frame(vd.frames[test_frame_idx], 4, True)
+    topic = vd.topics[0]
+    transcript = ' '.join(anchor_transcripts[0])
 
     return None
 
