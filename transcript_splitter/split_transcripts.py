@@ -5,7 +5,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 from common.VideoData import get_date_time, VideoData, get_main_transcript_file, get_story_file, get_story_transcripts, \
-    read_scenes_from_file
+    read_stories_from_file
 from common.constants import TV_FILENAME_RE
 from common.fs_utils import frame_idx_to_time, create_dir, add_sec_to_time
 
@@ -47,7 +47,7 @@ def check_requirements(video: Path):
 
 def was_processed(video: Path):
     story_transcripts = get_story_transcripts(video)
-    stories = read_scenes_from_file(get_story_file(video))
+    stories = read_stories_from_file(get_story_file(video))
 
     return len(story_transcripts) == len(stories)
 
@@ -69,7 +69,7 @@ def main(args):
 
         print(f'[{idx + 1}/{len(video_files)}] {vd}')
 
-        create_dir(vd.transcripts_dir)
+        create_dir(vd.transcripts_dir, rm_if_exist=True)
 
         for story_idx, transcript in enumerate(split_story_transcripts(vd)):
             text = ' '.join([transcript.text for transcript in transcript])

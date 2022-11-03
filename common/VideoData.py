@@ -56,7 +56,7 @@ class VideoData:
     @property
     def stories(self) -> [StoryData]:
         if self._scenes is None:
-            self._scenes = read_scenes_from_file(get_story_file(self))
+            self._scenes = read_stories_from_file(get_story_file(self))
         return self._scenes
 
     @property
@@ -292,7 +292,7 @@ def get_xml_transcript_file(video: VideoPathType) -> Path:
         return get_xml_transcript_file(video.path)
 
 
-def read_scenes_from_file(file: Path) -> [StoryData]:
+def read_stories_from_file(file: Path) -> [StoryData]:
     df = pd.read_csv(file, usecols=['news_title',
                                     'first_frame_idx', 'last_frame_idx', 'n_frames',
                                     'first_shot_idx', 'last_shot_idx', 'n_shots',
