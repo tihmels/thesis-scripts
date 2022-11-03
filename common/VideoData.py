@@ -54,7 +54,7 @@ class VideoData:
         return self._captions
 
     @property
-    def scenes(self) -> [StoryData]:
+    def stories(self) -> [StoryData]:
         if self._scenes is None:
             self._scenes = read_scenes_from_file(get_story_file(self))
         return self._scenes
@@ -72,7 +72,7 @@ class VideoData:
         return self._frames
 
     @property
-    def transcript(self) -> [TranscriptData]:
+    def transcripts(self) -> [TranscriptData]:
         if self._transcript is None:
             self._transcript = read_transcript_from_file(get_main_transcript_file(self))
         return self._transcript
