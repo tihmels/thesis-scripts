@@ -8,10 +8,11 @@ import pandas as pd
 import spacy
 import yake
 from fuzzywuzzy import fuzz
-from spellchecker import SpellChecker
+from more_itertools import pairwise
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 
 from common.DataModel import TranscriptData
+from common.Schemas import STORY_COLUMNS
 from common.VideoData import VideoData, get_shot_file, get_date_time, get_banner_caption_file, get_story_file, \
     get_topic_file, is_summary, read_shots_from_file
 from common.constants import TV_FILENAME_RE
@@ -20,10 +21,7 @@ parser = ArgumentParser('Scene Segmentation')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
-spell = SpellChecker(language=None, distance=1)  # loads default word frequency list
-spell.word_frequency.load_text_file('/Users/tihmels/TS/topics_dict.txt')
-
-spacy_de = spacy.load('de_core_news_sm')
+spacy_de = spacy.load('de_core_news_md')
 simple_kw_extractor = yake.KeywordExtractor(lan='de', top=1, n=2)
 
 tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-xl")
@@ -34,25 +32,31 @@ def get_text(tds: [TranscriptData]):
     return ' '.join([td.text for td in tds])
 
 
+def is_matching_headline(headline, text):
+    input_text = f'Headline: {headline}. Text: {text}. Does the Headline match the Text?'
+
+    input_ids = tokenizer(input_text, return_tensors="pt").input_ids
+
+    outputs = model.generate(input_ids)
+    output = tokenizer.decode(outputs[0])
+
+    return 'yes' in output.lower()
+
+
 def match_anchor_and_topic(topics, anchor_shots, anchor_transcripts):
     anchor_to_topic = {}
 
     for topic_idx, topic in topics.items():
 
-        remaining_shots = [idx for idx in anchor_shots.keys() if idx not in anchor_to_topic.keys()]
+        anchorshot_idxs = [idx for idx in anchor_shots.keys() if idx not in anchor_to_topic.keys()]
 
-        for anchor_idx in remaining_shots:
+        for anchor_idx in anchorshot_idxs:
 
-            transcript = anchor_transcripts[anchor_idx]
-            input_text = f'Headline: {topic}. Text: {transcript}. Does the Headline match the Text?'
+            transcript = get_text(anchor_transcripts[anchor_idx])
 
-            input_ids = tokenizer(input_text, return_tensors="pt").input_ids
-
-            outputs = model.generate(input_ids)
-            output = tokenizer.decode(outputs[0][1])
-
-            if 'yes' in output:
+            if is_matching_headline(topic, transcript):
                 anchor_to_topic[anchor_idx] = topic_idx
+                break
 
     return anchor_to_topic
 
@@ -62,11 +66,43 @@ def segment_ts15(vd: VideoData):
     topics = {idx: topic for idx, topic in enumerate(vd.topics)}
 
     anchor_shots = {idx: sd for idx, sd in shots.items() if sd.type == 'anchor'}
-    anchor_transcripts = {idx: get_text(vd.get_shot_transcripts(idx)) for idx in anchor_shots}
+    anchor_transcripts = {idx: vd.get_shot_transcripts(idx) for idx in anchor_shots}
 
     anchor_to_topic = match_anchor_and_topic(topics, anchor_shots, anchor_transcripts)
+    anchor_keys = list(sorted(anchor_to_topic.keys()))
 
-    return None
+    missing_topics = [idx for idx in topics.keys() if idx not in anchor_to_topic.values()]
+    if len(missing_topics) > 0:
+        print(f'Topics {missing_topics} could not be assigned!')
+
+    story_indices = [list(range(a1, a2)) for a1, a2 in pairwise(anchor_keys)]
+
+    stories = []
+
+    for story in story_indices:
+        story_title = topics[anchor_to_topic[story[0]]]
+
+        first_shot_idx, last_shot_idx = min(story), max(story)
+        first_frame_idx, last_frame_idx = vd.shots[first_shot_idx].first_frame_idx, vd.shots[
+            last_shot_idx].last_frame_idx
+
+        from_timestamp = np.divide(first_frame_idx, 25)
+        to_timestamp = np.divide(last_frame_idx, 25)
+
+        n_shots = last_shot_idx - first_shot_idx + 1
+        n_frames = last_frame_idx - first_frame_idx + 1
+        total_ss = np.round(to_timestamp - from_timestamp, 2)
+
+        data = (story_title,
+                first_frame_idx, last_frame_idx, n_frames,
+                first_shot_idx, last_shot_idx, n_shots,
+                from_timestamp, to_timestamp, total_ss)
+
+        stories.append(data)
+
+    df = pd.DataFrame(data=stories, columns=STORY_COLUMNS)
+
+    return df
 
 
 def is_named_entity_only(text):
@@ -77,10 +113,12 @@ def is_named_entity_only(text):
 
 
 def preprocess_captions(captions):
-    if is_named_entity_only(captions[0].text):  # check if first banner text contains anchor name
+    if is_named_entity_only(captions[0].text):  # check if first banner text is anchor name
         captions.pop(0)
-    # the last shot in a story is often very short, which is why the banner text is not captured by OCR.
-    # we fix this assuming that this shot belongs to the previous caption
+
+    # the last shot in a news story is often very short and the banner disappears early,
+    # which is why the banner text is not captured by OCR.
+    # we fix this by assuming that this shot belongs to the previous caption.
     for idx, cd in captions.items():
         if (not cd.text.strip() or cd.confidence < 0.7) and idx - 1 in captions:
             predecessor = captions[idx - 1]
@@ -121,7 +159,8 @@ def segment_ts100(vd: VideoData):
         story_title = max(story_captions, key=lambda k: k.confidence).text
 
         first_shot_idx, last_shot_idx = min(story), max(story)
-        first_frame_idx, last_frame_idx = vd.shots[first_shot_idx][0], vd.shots[last_shot_idx][1]
+        first_frame_idx, last_frame_idx = vd.shots[first_shot_idx].first_frame_idx, vd.shots[
+            last_shot_idx].last_frame_idx
 
         from_timestamp = np.divide(first_frame_idx, 25)
         to_timestamp = np.divide(last_frame_idx, 25)
@@ -137,10 +176,7 @@ def segment_ts100(vd: VideoData):
 
         stories.append(data)
 
-    df = pd.DataFrame(data=stories,
-                      columns=['news_title', 'first_frame_idx',
-                               'last_frame_idx', 'n_frames', 'first_shot_idx', 'last_shot_idx', 'n_shots', 'from_ss',
-                               'to_ss', 'total_ss'])
+    df = pd.DataFrame(data=stories, columns=STORY_COLUMNS)
 
     return df
 
@@ -172,14 +208,7 @@ def was_processed(video: Path):
     return get_story_file(video).is_file()
 
 
-def extract_keyword(text):
-    language = "de"
-    max_ngram_size = 3
-    deduplication_threshold = 0.9
-    n_keywords = 1
-    custom_kw_extractor = yake.KeywordExtractor(lan=language, n=max_ngram_size, dedupLim=deduplication_threshold,
-                                                top=n_keywords, features=None)
-
+def extract_keywords(text):
     return simple_kw_extractor.extract_keywords(text)[0]
 
 
@@ -206,7 +235,7 @@ def main(args):
         df.to_csv(get_story_file(vd), index=False)
 
         news_stories = df['news_title'].values.tolist()
-        keywords = [extract_keyword(text) for text in news_stories]
+        keywords = [extract_keywords(text) for text in news_stories]
 
         print(' '.join([str(sidx + 1) + f'. {kw[0]}' for sidx, kw in enumerate(keywords)]))
 
