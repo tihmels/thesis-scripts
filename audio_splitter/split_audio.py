@@ -22,16 +22,16 @@ parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
 
 def split_audio_by_scenes(vd: VideoData):
     audio = get_main_audio_file(vd)
-    scenes = vd.scenes[['first_frame_idx', 'last_frame_idx']].to_records(index=False)
+    stories = vd.stories
 
-    for scene_idx, (first_frame_idx, last_frame_idx) in enumerate(scenes):
-        start_ms = np.divide(first_frame_idx, 25) * 1000
-        end_ms = np.divide(last_frame_idx, 25) * 1000
+    for story_idx, story in enumerate(stories):
+        start_ms = np.divide(story.first_frame_idx, 25) * 1000
+        end_ms = np.divide(story.last_frame_idx, 25) * 1000
 
         audio_segment = audio[start_ms:end_ms]
 
         audio_segment.export(
-            Path(vd.audio_dir, 'story_' + str(scene_idx + 1) + '.wav'), format='wav')
+            Path(vd.audio_dir, 'story_' + str(story_idx + 1) + '.wav'), format='wav')
 
         yield
 

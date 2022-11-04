@@ -9,7 +9,8 @@ import spacy
 import yake
 from fuzzywuzzy import fuzz
 from more_itertools import pairwise
-from transformers import T5Tokenizer, T5ForConditionalGeneration
+from transformers import T5ForConditionalGeneration
+from transformers.models.t5.tokenization_t5_fast import T5Tokenizer
 
 from common.DataModel import TranscriptData
 from common.Schemas import STORY_COLUMNS
@@ -33,7 +34,7 @@ def get_text(tds: [TranscriptData]):
 
 
 def is_matching_headline(headline, text):
-    input_text = f'Headline: {headline}. Text: {text}. Does the Headline match the Text?'
+    input_text = f'Headline: "{headline}". Story: "{text}". Q: Does the Headline fit the Story?'
 
     input_ids = tokenizer(input_text, return_tensors="pt").input_ids
 
@@ -43,7 +44,7 @@ def is_matching_headline(headline, text):
     return 'yes' in output.lower()
 
 
-def match_anchor_and_topic(topics, anchor_shots, anchor_transcripts):
+def anchor_topic_detection(topics, anchor_shots, anchor_transcripts):
     anchor_to_topic = {}
 
     for topic_idx, topic in topics.items():
@@ -63,12 +64,16 @@ def match_anchor_and_topic(topics, anchor_shots, anchor_transcripts):
 
 def segment_ts15(vd: VideoData):
     shots = {idx: shot for idx, shot in enumerate(vd.shots)}
-    topics = {idx: topic for idx, topic in enumerate(vd.topics)}
+    topics = {idx: topic for idx, topic in enumerate(vd.topics[:-1])}
 
     anchor_shots = {idx: sd for idx, sd in shots.items() if sd.type == 'anchor'}
-    anchor_transcripts = {idx: vd.get_shot_transcripts(idx) for idx in anchor_shots}
+    anchor_transcripts = {
+        idx: vd.get_shot_transcripts(idx,
+                                     min(next((next_idx - 1 for next_idx in anchor_shots.keys() if next_idx > idx),
+                                              idx), idx + 5))
+        for idx in anchor_shots}
 
-    anchor_to_topic = match_anchor_and_topic(topics, anchor_shots, anchor_transcripts)
+    anchor_to_topic = anchor_topic_detection(topics, anchor_shots, anchor_transcripts)
     anchor_keys = list(sorted(anchor_to_topic.keys()))
 
     missing_topics = [idx for idx in topics.keys() if idx not in anchor_to_topic.values()]
@@ -125,11 +130,7 @@ def preprocess_captions(captions):
             captions[idx] = predecessor
 
 
-def segment_ts100(vd: VideoData):
-    captions = {idx: cd for idx, cd in enumerate(vd.captions[:-1])}  # last shot is always weather
-
-    preprocess_captions(captions)
-
+def get_story_indices_by_captions(captions):
     first_idx, last_idx = min(captions.keys()), max(captions.keys())
     current_caption = captions[first_idx].text
 
@@ -146,6 +147,16 @@ def segment_ts100(vd: VideoData):
             story_indices.append([idx])
 
         current_caption = next_caption
+
+    return story_indices
+
+
+def segment_ts100(vd: VideoData):
+    captions = {idx: cd for idx, cd in enumerate(vd.captions[:-1])}  # last shot is always weather
+
+    preprocess_captions(captions)
+
+    story_indices = get_story_indices_by_captions(captions)
 
     stories = []
 
@@ -230,8 +241,8 @@ def main(args):
         print(f'[{idx + 1}/{len(video_files)}] {vd} | ', end='')
 
         segmentor = segment_ts100 if vd.is_summary else segment_ts15
-        df = segmentor(vd)
 
+        df = segmentor(vd)
         df.to_csv(get_story_file(vd), index=False)
 
         news_stories = df['news_title'].values.tolist()
