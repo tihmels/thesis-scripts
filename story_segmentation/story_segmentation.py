@@ -8,7 +8,6 @@ import pandas as pd
 import spacy
 import yake
 from fuzzywuzzy import fuzz
-from more_itertools import pairwise
 from transformers import T5ForConditionalGeneration
 from transformers.models.t5.tokenization_t5_fast import T5Tokenizer
 
@@ -25,8 +24,8 @@ parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 spacy_de = spacy.load('de_core_news_md')
 simple_kw_extractor = yake.KeywordExtractor(lan='de', top=1, n=2)
 
-tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-xl")
-model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-xl")
+tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-xxl")
+model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-xxl")
 
 
 def get_text(tds: [TranscriptData]):
@@ -70,7 +69,7 @@ def segment_ts15(vd: VideoData):
     anchor_transcripts = {
         idx: vd.get_shot_transcripts(idx,
                                      min(next((next_idx - 1 for next_idx in anchor_shots.keys() if next_idx > idx),
-                                              idx), idx + 5))
+                                              idx), idx + 5, vd.n_shots))
         for idx in anchor_shots}
 
     anchor_to_topic = anchor_topic_detection(topics, anchor_shots, anchor_transcripts)
@@ -80,7 +79,10 @@ def segment_ts15(vd: VideoData):
     if len(missing_topics) > 0:
         print(f'Topics {missing_topics} could not be assigned!')
 
-    story_indices = [list(range(a1, a2)) for a1, a2 in pairwise(anchor_keys)]
+    story_indices = [list(range(a1, next((next_idx - 1 for next_idx in anchor_shots.keys() if next_idx > a1)))) for a1
+                     in anchor_keys]
+
+    # story_indices = [list(range(a1, a2)) for a1, a2 in pairwise(anchor_keys)]
 
     stories = []
 
@@ -105,9 +107,9 @@ def segment_ts15(vd: VideoData):
 
         stories.append(data)
 
-    df = pd.DataFrame(data=stories, columns=STORY_COLUMNS)
+        df = pd.DataFrame(data=stories, columns=STORY_COLUMNS)
 
-    return df
+        return df
 
 
 def is_named_entity_only(text):
