@@ -17,7 +17,7 @@ from common.VideoData import VideoData, get_shot_file, get_date_time, get_banner
     get_topic_file, is_summary, read_shots_from_file
 from common.constants import TV_FILENAME_RE
 
-parser = ArgumentParser('Scene Segmentation')
+parser = ArgumentParser('Story Segmentation')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
