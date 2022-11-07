@@ -33,9 +33,11 @@ class ShotData:
     last_frame_idx: int
     type: str
 
+    @property
     def center_frame_idx(self):
         return int((self.first_frame_idx + self.last_frame_idx) / 2)
 
+    @property
     def n_frames(self):
         return self.last_frame_idx - self.first_frame_idx + 1
 

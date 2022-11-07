@@ -1,6 +1,7 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
 import re
 from argparse import ArgumentParser
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -8,24 +9,25 @@ import pandas as pd
 import spacy
 import yake
 from fuzzywuzzy import fuzz
-from transformers import T5ForConditionalGeneration
-from transformers.models.t5.tokenization_t5_fast import T5Tokenizer
+from transformers import T5ForConditionalGeneration, T5Tokenizer
 
 from common.DataModel import TranscriptData
 from common.Schemas import STORY_COLUMNS
 from common.VideoData import VideoData, get_shot_file, get_date_time, get_banner_caption_file, get_story_file, \
     get_topic_file, is_summary, read_shots_from_file
 from common.constants import TV_FILENAME_RE
+from common.fs_utils import frame_idx_to_sec, sec_to_time
 
 parser = ArgumentParser('Story Segmentation')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
-spacy_de = spacy.load('de_core_news_md')
+spacy_de = spacy.load('de_core_news_sm')
 simple_kw_extractor = yake.KeywordExtractor(lan='de', top=1, n=2)
 
-tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-xxl")
-model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-xxl")
+
+tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-xl")
+model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-xl")
 
 
 def get_text(tds: [TranscriptData]):
@@ -46,7 +48,7 @@ def is_matching_headline(headline, text):
 def anchor_topic_detection(topics, anchor_shots, anchor_transcripts):
     anchor_to_topic = {}
 
-    for topic_idx, topic in topics.items():
+    for topic_idx, headline in topics.items():
 
         anchorshot_idxs = [idx for idx in anchor_shots.keys() if idx not in anchor_to_topic.keys()]
 
@@ -54,7 +56,7 @@ def anchor_topic_detection(topics, anchor_shots, anchor_transcripts):
 
             transcript = get_text(anchor_transcripts[anchor_idx])
 
-            if is_matching_headline(topic, transcript):
+            if is_matching_headline(headline, transcript):
                 anchor_to_topic[anchor_idx] = topic_idx
                 break
 
@@ -93,17 +95,20 @@ def segment_ts15(vd: VideoData):
         first_frame_idx, last_frame_idx = vd.shots[first_shot_idx].first_frame_idx, vd.shots[
             last_shot_idx].last_frame_idx
 
-        from_timestamp = np.divide(first_frame_idx, 25)
-        to_timestamp = np.divide(last_frame_idx, 25)
+        from_timestamp = sec_to_time(frame_idx_to_sec(first_frame_idx))
+        to_timestamp = sec_to_time(frame_idx_to_sec(last_frame_idx))
 
         n_shots = last_shot_idx - first_shot_idx + 1
         n_frames = last_frame_idx - first_frame_idx + 1
-        total_ss = np.round(to_timestamp - from_timestamp, 2)
+
+        timedelta = to_datetime(to_timestamp) - to_datetime(from_timestamp)
+        total_ss = timedelta.total_seconds()
 
         data = (story_title,
                 first_frame_idx, last_frame_idx, n_frames,
                 first_shot_idx, last_shot_idx, n_shots,
-                from_timestamp, to_timestamp, total_ss)
+                from_timestamp.strftime('%H:%M:%S'), to_timestamp.strftime('%H:%M:%S'), total_ss)
+
 
         stories.append(data)
 
@@ -153,6 +158,10 @@ def get_story_indices_by_captions(captions):
     return story_indices
 
 
+def to_datetime(time):
+    return datetime(2000, 1, 1, time.hour, time.minute, time.second)
+
+
 def segment_ts100(vd: VideoData):
     captions = {idx: cd for idx, cd in enumerate(vd.captions[:-1])}  # last shot is always weather
 
@@ -175,17 +184,19 @@ def segment_ts100(vd: VideoData):
         first_frame_idx, last_frame_idx = vd.shots[first_shot_idx].first_frame_idx, vd.shots[
             last_shot_idx].last_frame_idx
 
-        from_timestamp = np.divide(first_frame_idx, 25)
-        to_timestamp = np.divide(last_frame_idx, 25)
+        from_timestamp = sec_to_time(frame_idx_to_sec(first_frame_idx))
+        to_timestamp = sec_to_time(frame_idx_to_sec(last_frame_idx))
 
         n_shots = last_shot_idx - first_shot_idx + 1
         n_frames = last_frame_idx - first_frame_idx + 1
-        total_ss = np.round(to_timestamp - from_timestamp, 2)
+
+        timedelta = to_datetime(to_timestamp) - to_datetime(from_timestamp)
+        total_ss = timedelta.total_seconds()
 
         data = (story_title,
                 first_frame_idx, last_frame_idx, n_frames,
                 first_shot_idx, last_shot_idx, n_shots,
-                from_timestamp, to_timestamp, total_ss)
+                from_timestamp.strftime('%H:%M:%S'), to_timestamp.strftime('%H:%M:%S'), total_ss)
 
         stories.append(data)
 
@@ -240,17 +251,12 @@ def main(args):
     for idx, vf in enumerate(video_files):
         vd = VideoData(vf)
 
-        print(f'[{idx + 1}/{len(video_files)}] {vd} | ', end='')
+        print(f'[{idx + 1}/{len(video_files)}] {vd} ', end='... ')
 
         segmentor = segment_ts100 if vd.is_summary else segment_ts15
 
         df = segmentor(vd)
         df.to_csv(get_story_file(vd), index=False)
-
-        news_stories = df['news_title'].values.tolist()
-        keywords = [extract_keywords(text) for text in news_stories]
-
-        print(' '.join([str(sidx + 1) + f'. {kw[0]}' for sidx, kw in enumerate(keywords)]))
 
 
 if __name__ == "__main__":

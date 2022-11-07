@@ -81,11 +81,10 @@ def extract_caption_data_from_shots(vd: VideoData, resize_factor=4):
 
     is_nightly = is_nightly_version(vd)
 
-    for sd in shots:
-        center_frame_index = int(((sd.first_frame_idx + sd.last_frame_idx) / 2))
-        center_frame_path = vd.frames[center_frame_index]
+    for shot in shots:
+        center_frame = vd.frames[shot.center_frame_index]
 
-        image_data = extract_caption_data_from_frame(center_frame_path, resize_factor, is_nightly)
+        image_data = extract_caption_data_from_frame(center_frame, resize_factor, is_nightly)
 
         yield image_data
 
