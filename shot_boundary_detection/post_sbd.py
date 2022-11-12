@@ -21,7 +21,7 @@ welcoming_2 = "Willkommen zur tagesschau"
 
 
 def fix_first_anchorshot_segment(vd: VideoData, shots):
-    transcript = vd.transcript
+    transcript = vd.transcripts
 
     for idx, td in enumerate(transcript):
 
@@ -81,7 +81,7 @@ def main(args):
 
         print(f'[{idx + 1}/{len(video_files)}] {vd}')
 
-        transcript = vd.transcript
+        transcript = vd.transcripts
         shots = np.array([(shot.first_frame_idx, shot.last_frame_idx) for shot in vd.shots])
 
         segments = fix_first_anchorshot_segment(transcript, shots)

@@ -4,7 +4,6 @@ from argparse import ArgumentParser
 from datetime import datetime
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import spacy
 import yake
@@ -24,7 +23,6 @@ parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
 spacy_de = spacy.load('de_core_news_sm')
 simple_kw_extractor = yake.KeywordExtractor(lan='de', top=1, n=2)
-
 
 tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-xl")
 model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-xl")
@@ -65,12 +63,16 @@ def anchor_topic_detection(topics, anchor_shots, anchor_transcripts):
 
 def segment_ts15(vd: VideoData):
     shots = {idx: shot for idx, shot in enumerate(vd.shots)}
-    topics = {idx: topic for idx, topic in enumerate(vd.topics[:-1])}
+    topics = {idx: topic for idx, topic in enumerate(vd.topics)}
+
+    first_weather_shot = next(idx for idx, shot in shots.items() if shot.type == 'weather')
 
     anchor_shots = {idx: sd for idx, sd in shots.items() if sd.type == 'anchor'}
+
+    anchor_shots_trimmed = {idx: sd for idx, sd in anchor_shots.items() if idx < first_weather_shot}
     anchor_transcripts = {
         idx: vd.get_shot_transcripts(idx,
-                                     min(next((next_idx - 1 for next_idx in anchor_shots.keys() if next_idx > idx),
+                                     min(next((next_idx - 1 for next_idx in anchor_shots_trimmed.keys() if next_idx > idx),
                                               idx), idx + 5, vd.n_shots))
         for idx in anchor_shots}
 
@@ -81,14 +83,14 @@ def segment_ts15(vd: VideoData):
     if len(missing_topics) > 0:
         print(f'Topics {missing_topics} could not be assigned!')
 
-    story_indices = [list(range(a1, next((next_idx - 1 for next_idx in anchor_shots.keys() if next_idx > a1)))) for a1
+    story_indices = [list(range(a1, next((next_idx for next_idx in anchor_shots.keys() if next_idx > a1)))) for a1
                      in anchor_keys]
 
     # story_indices = [list(range(a1, a2)) for a1, a2 in pairwise(anchor_keys)]
 
     stories = []
 
-    for story in story_indices:
+    for story in story_indices[:-1]:
         story_title = topics[anchor_to_topic[story[0]]]
 
         first_shot_idx, last_shot_idx = min(story), max(story)
@@ -109,12 +111,11 @@ def segment_ts15(vd: VideoData):
                 first_shot_idx, last_shot_idx, n_shots,
                 from_timestamp.strftime('%H:%M:%S'), to_timestamp.strftime('%H:%M:%S'), total_ss)
 
-
         stories.append(data)
 
-        df = pd.DataFrame(data=stories, columns=STORY_COLUMNS)
+    df = pd.DataFrame(data=stories, columns=STORY_COLUMNS)
 
-        return df
+    return df
 
 
 def is_named_entity_only(text):
