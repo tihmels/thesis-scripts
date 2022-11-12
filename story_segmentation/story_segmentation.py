@@ -115,6 +115,8 @@ def segment_ts15(vd: VideoData):
     missing_topics = [idx for idx in news_titles.keys() if idx not in topic_to_anchor.keys()]
     if len(missing_topics) > 0:
         print(f'Topics {missing_topics} could not be assigned!')
+    else:
+        print()
 
     stories = []
 

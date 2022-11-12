@@ -312,5 +312,5 @@ def read_shots_from_file(file: Path) -> [ShotData]:
 
 
 def read_topics_from_file(file: Path) -> [str]:
-    df = pd.read_csv(file, header=None, keep_default_na=False)
+    df = pd.read_csv(file, header=None, keep_default_na=False, decimal=',')
     return [topic.strip() for sublist in df.values.tolist() for topic in sublist]
