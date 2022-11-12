@@ -4,11 +4,13 @@ from argparse import ArgumentParser
 from datetime import datetime
 from pathlib import Path
 
+import nltk
+import numpy as np
 import pandas as pd
 import spacy
-import yake
 from fuzzywuzzy import fuzz
-from transformers import T5ForConditionalGeneration, T5Tokenizer
+from nltk.corpus import stopwords
+from sklearn.feature_extraction.text import CountVectorizer
 
 from common.DataModel import TranscriptData
 from common.Schemas import STORY_COLUMNS
@@ -22,14 +24,20 @@ parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs=
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
 spacy_de = spacy.load('de_core_news_sm')
-simple_kw_extractor = yake.KeywordExtractor(lan='de', top=1, n=2)
 
-tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-xl")
-model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-xl")
+# tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-xl")
+# model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-xl")
+
+nltk.download('stopwords')
+german_stop_words = stopwords.words('german')
 
 
 def get_text(tds: [TranscriptData]):
     return ' '.join([td.text for td in tds])
+
+
+def to_datetime(time):
+    return datetime(2000, 1, 1, time.hour, time.minute, time.second)
 
 
 def is_matching_headline(headline, text):
@@ -61,39 +69,62 @@ def anchor_topic_detection(topics, anchor_shots, anchor_transcripts):
     return anchor_to_topic
 
 
-def segment_ts15(vd: VideoData):
-    shots = {idx: shot for idx, shot in enumerate(vd.shots)}
-    topics = {idx: topic for idx, topic in enumerate(vd.topics)}
+def get_count_vectorizer(text) -> CountVectorizer:
+    vectorizer = CountVectorizer(lowercase=True, stop_words=german_stop_words)
+    vectorizer.fit([text])
 
-    first_weather_shot = next(idx for idx, shot in shots.items() if shot.type == 'weather')
+    return vectorizer
 
-    anchor_shots = {idx: sd for idx, sd in shots.items() if sd.type == 'anchor'}
 
-    anchor_shots_trimmed = {idx: sd for idx, sd in anchor_shots.items() if idx < first_weather_shot}
-    anchor_transcripts = {
+def get_anchor_indices(topics, anchor_shots, anchor_transcripts):
+    dt_matrix = np.zeros(shape=(len(topics), len(anchor_shots)), dtype=np.int8)
+
+    for idx, headline in topics.items():
+        vectorizer = get_count_vectorizer(headline)
+        vectors = vectorizer.transform([get_text(tds) for tds in anchor_transcripts.values()])
+
+        matched_words_vector = [sum(vec) for vec in vectors.toarray()]
+        dt_matrix[idx] = matched_words_vector
+
+    argmax, values = np.argmax(dt_matrix, axis=1), np.max(dt_matrix, axis=1)
+
+    return np.where(values > 0, np.array(list(anchor_shots.keys()))[argmax], -1)
+
+
+def get_anchor_transcripts(vd: VideoData, anchor_shots, max_shots=5):
+    return {
         idx: vd.get_shot_transcripts(idx,
-                                     min(next((next_idx - 1 for next_idx in anchor_shots_trimmed.keys() if next_idx > idx),
-                                              idx), idx + 5, vd.n_shots))
+                                     min(next(
+                                         (next_idx - 1 for next_idx in anchor_shots.keys() if next_idx > idx),
+                                         idx), idx + max_shots, vd.n_shots))
         for idx in anchor_shots}
 
-    anchor_to_topic = anchor_topic_detection(topics, anchor_shots, anchor_transcripts)
-    anchor_keys = list(sorted(anchor_to_topic.keys()))
 
-    missing_topics = [idx for idx in topics.keys() if idx not in anchor_to_topic.values()]
+def segment_ts15(vd: VideoData):
+    anchor_shots = {idx: shot for idx, shot in enumerate(vd.shots) if shot.type == 'anchor'}
+    news_titles = {idx: title for idx, title in enumerate(vd.topics[:-1])}  # last shot is always weather
+
+    first_weather_idx = next(idx for idx, shot in enumerate(vd.shots) if shot.type == 'weather')
+    anchor_shots = {idx: sd for idx, sd in anchor_shots.items() if idx < first_weather_idx}
+
+    anchor_transcripts = get_anchor_transcripts(vd, anchor_shots, 5)
+
+    anchor_indices = get_anchor_indices(news_titles, anchor_shots, anchor_transcripts)
+    topic_to_anchor = {topic_idx: anchor_idx for topic_idx, anchor_idx in enumerate(anchor_indices) if anchor_idx >= 0}
+
+    missing_topics = [idx for idx in news_titles.keys() if idx not in topic_to_anchor.keys()]
     if len(missing_topics) > 0:
         print(f'Topics {missing_topics} could not be assigned!')
 
-    story_indices = [list(range(a1, next((next_idx for next_idx in anchor_shots.keys() if next_idx > a1)))) for a1
-                     in anchor_keys]
-
-    # story_indices = [list(range(a1, a2)) for a1, a2 in pairwise(anchor_keys)]
-
     stories = []
 
-    for story in story_indices[:-1]:
-        story_title = topics[anchor_to_topic[story[0]]]
+    for topic_idx, anchor_idx in topic_to_anchor.items():
+        story_title = news_titles[topic_idx]
 
-        first_shot_idx, last_shot_idx = min(story), max(story)
+        first_shot_idx = anchor_idx
+        last_shot_idx = next((next_idx for next_idx in list(anchor_indices) if next_idx > anchor_idx),
+                             list(anchor_shots.keys())[-1]) - 1
+
         first_frame_idx, last_frame_idx = vd.shots[first_shot_idx].first_frame_idx, vd.shots[
             last_shot_idx].last_frame_idx
 
@@ -157,10 +188,6 @@ def get_story_indices_by_captions(captions):
         current_caption = next_caption
 
     return story_indices
-
-
-def to_datetime(time):
-    return datetime(2000, 1, 1, time.hour, time.minute, time.second)
 
 
 def segment_ts100(vd: VideoData):
@@ -231,10 +258,6 @@ def check_requirements(video: Path):
 
 def was_processed(video: Path):
     return get_story_file(video).is_file()
-
-
-def extract_keywords(text):
-    return simple_kw_extractor.extract_keywords(text)[0]
 
 
 def main(args):
