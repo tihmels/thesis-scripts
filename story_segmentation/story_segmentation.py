@@ -81,10 +81,10 @@ def get_anchor_indices(topics, anchor_shots, anchor_transcripts):
 
     for idx, headline in topics.items():
         vectorizer = get_count_vectorizer(headline)
-        vectors = vectorizer.transform([get_text(tds) for tds in anchor_transcripts.values()])
+        bow = vectorizer.transform([get_text(tds) for tds in anchor_transcripts.values()])
 
-        matched_words_vector = [sum(vec) for vec in vectors.toarray()]
-        dt_matrix[idx] = matched_words_vector
+        bow_sum = [sum(vec) for vec in bow.toarray()]
+        dt_matrix[idx] = bow_sum
 
     argmax, values = np.argmax(dt_matrix, axis=1), np.max(dt_matrix, axis=1)
 
