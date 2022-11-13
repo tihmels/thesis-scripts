@@ -56,8 +56,6 @@ def main(args):
     for idx, video in enumerate(video_files):
         vao = VAO(video)
 
-        print(f'[{idx + 1}/{len(video_files)}] {vao}')
-
         results = []
 
         with alive_bar(vao.n_shots, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vao}', length=20) as bar:

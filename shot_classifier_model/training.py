@@ -47,7 +47,7 @@ def generators(path, classes, target_size, batch_size, preprocessing):
 
 
 def create_model(input_shape, n_classes, optimizer, fine_tune=0):
-    conv_base = tf.keras.applications.EfficientNetB7(
+    conv_base = tf.keras.applications.InceptionResNetV2(
         weights='imagenet',
         input_shape=input_shape,
         include_top=False)
@@ -87,7 +87,7 @@ def main(args):
         clazz in subdirs for clazz in classes), f'each class need to be present as subdirectory in {base_dir}'
 
     train_ds, val_ds = generators(base_dir, classes, args.shape, args.bs,
-                                  tf.keras.applications.efficientnet.preprocess_input)
+                                  tf.keras.applications.inception_resnet_v2.preprocess_input)
 
     width, height = args.shape
 
