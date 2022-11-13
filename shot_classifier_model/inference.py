@@ -30,7 +30,7 @@ def classify_video_shots(vao: VAO, top_n=5):
     keyframes = [np.expand_dims(frame, axis=0) for frame in keyframes]
 
     for kf in keyframes:
-        kf = tf.keras.applications.vgg19.preprocess_input(kf)
+        kf = tf.keras.applications.efficientnet.preprocess_input(kf)
         prediction = model.predict(kf)[0]
 
         result = [(classes[i], np.round(float(prediction[i]) * 100.0, 2)) for i in range(len(prediction))]

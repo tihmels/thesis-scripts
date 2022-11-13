@@ -91,7 +91,7 @@ def get_anchor_indices(topics, anchor_shots, anchor_transcripts):
     return np.where(values > 0, np.array(list(anchor_shots.keys()))[argmax], -1)
 
 
-def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=8):
+def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=5):
     return {
         idx: vao.get_shot_transcripts(idx,
                                       min(next(
@@ -103,8 +103,8 @@ def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=8):
 def extract_story_data(vao: VAO, first_shot_idx: int, last_shot_idx: int):
     n_shots = last_shot_idx - first_shot_idx + 1
 
-    first_frame_idx, last_frame_idx = vao.data.shots[first_shot_idx].first_frame_idx, vao.data.shots[
-        last_shot_idx].last_frame_idx
+    first_frame_idx = vao.data.shots[first_shot_idx].first_frame_idx
+    last_frame_idx = vao.data.shots[last_shot_idx].last_frame_idx
 
     n_frames = last_frame_idx - first_frame_idx + 1
 
@@ -149,7 +149,7 @@ def segment_ts15(vao: VAO):
 
         story_data = extract_story_data(vao, first_shot_idx, last_shot_idx)
 
-        stories.append(story_title + story_data)
+        stories.append((story_title, *story_data))
 
     df = pd.DataFrame(data=stories, columns=STORY_COLUMNS)
 
@@ -217,7 +217,7 @@ def segment_ts100(vao: VAO):
 
         story_data = extract_story_data(vao, min(story), max(story))
 
-        stories.append(story_title + story_data)
+        stories.append((story_title, *story_data))
 
     df = pd.DataFrame(data=stories, columns=STORY_COLUMNS)
 
