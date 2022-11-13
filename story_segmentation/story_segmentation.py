@@ -76,7 +76,7 @@ def get_count_vectorizer(text) -> CountVectorizer:
     return vectorizer
 
 
-def get_anchor_indices(topics, anchor_shots, anchor_transcripts):
+def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts):
     dt_matrix = np.zeros(shape=(len(topics), len(anchor_shots)), dtype=np.int8)
 
     for idx, headline in topics.items():
@@ -88,7 +88,7 @@ def get_anchor_indices(topics, anchor_shots, anchor_transcripts):
 
     argmax, values = np.argmax(dt_matrix, axis=1), np.max(dt_matrix, axis=1)
 
-    return np.where(values > 0, np.array(list(anchor_shots.keys()))[argmax], -1)
+    return {topic_idx: anchor_idx for topic_idx, anchor_idx in zip(topics, argmax) if values[anchor_idx] > 0}
 
 
 def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=5):
@@ -129,8 +129,7 @@ def segment_ts15(vao: VAO):
 
     anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 8)
 
-    anchor_indices = get_anchor_indices(news_topics, anchor_shots, anchor_transcripts)
-    topic_to_anchor = {topic_idx: anchor_idx for topic_idx, anchor_idx in enumerate(anchor_indices) if anchor_idx >= 0}
+    topic_to_anchor = topic_to_anchor_by_transcript(news_topics, anchor_shots, anchor_transcripts)
 
     missing_topics = [idx for idx in news_topics.keys() if idx not in topic_to_anchor.keys()]
     if len(missing_topics) > 0:
@@ -144,7 +143,7 @@ def segment_ts15(vao: VAO):
         story_title = news_topics[topic_idx]
 
         first_shot_idx = anchor_idx
-        last_shot_idx = next((next_idx for next_idx in list(anchor_indices) if next_idx > anchor_idx),
+        last_shot_idx = next((next_idx for next_idx in list(topic_to_anchor.values()) if next_idx > anchor_idx),
                              list(anchor_shots.keys())[-1]) - 1
 
         story_data = extract_story_data(vao, first_shot_idx, last_shot_idx)
