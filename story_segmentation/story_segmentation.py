@@ -100,19 +100,39 @@ def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=8):
         for idx in anchor_shots}
 
 
+def extract_story_data(vao: VAO, first_shot_idx: int, last_shot_idx: int):
+    n_shots = last_shot_idx - first_shot_idx + 1
+
+    first_frame_idx, last_frame_idx = vao.data.shots[first_shot_idx].first_frame_idx, vao.data.shots[
+        last_shot_idx].last_frame_idx
+
+    n_frames = last_frame_idx - first_frame_idx + 1
+
+    from_time = sec_to_time(frame_idx_to_sec(first_frame_idx))
+    to_time = sec_to_time(frame_idx_to_sec(last_frame_idx))
+
+    timedelta = to_datetime(to_time) - to_datetime(from_time)
+    total_ss = timedelta.total_seconds()
+
+    return (first_frame_idx, last_frame_idx, n_frames, first_shot_idx, last_shot_idx, n_shots,
+            from_time.strftime('%H:%M:%S'), to_time.strftime('%H:%M:%S'), total_ss)
+
+
 def segment_ts15(vao: VAO):
     anchor_shots = {idx: shot for idx, shot in enumerate(vao.data.shots) if shot.type == 'anchor'}
-    news_titles = {idx: title for idx, title in enumerate(vao.data.topics[:-1])}  # last shot is always weather
+    news_topics = {idx: title for idx, title in enumerate(vao.data.topics[:-1]) if
+                   not 'Lottozahlen' in title}  # last shot is always weather
 
-    first_weather_idx = next(idx for idx, shot in enumerate(vao.data.shots) if shot.type == 'weather')
-    anchor_shots = {idx: sd for idx, sd in anchor_shots.items() if idx < first_weather_idx}
+    shot_cutoff_idx = next(
+        idx for idx, shot in enumerate(vao.data.shots) if shot.type == 'weather' or shot.type == 'lotto')
+    anchor_shots = {idx: sd for idx, sd in anchor_shots.items() if idx < shot_cutoff_idx}
 
-    anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 5)
+    anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 8)
 
-    anchor_indices = get_anchor_indices(news_titles, anchor_shots, anchor_transcripts)
+    anchor_indices = get_anchor_indices(news_topics, anchor_shots, anchor_transcripts)
     topic_to_anchor = {topic_idx: anchor_idx for topic_idx, anchor_idx in enumerate(anchor_indices) if anchor_idx >= 0}
 
-    missing_topics = [idx for idx in news_titles.keys() if idx not in topic_to_anchor.keys()]
+    missing_topics = [idx for idx in news_topics.keys() if idx not in topic_to_anchor.keys()]
     if len(missing_topics) > 0:
         print(f'Topics {missing_topics} could not be assigned!')
     else:
@@ -121,30 +141,15 @@ def segment_ts15(vao: VAO):
     stories = []
 
     for topic_idx, anchor_idx in topic_to_anchor.items():
-        story_title = news_titles[topic_idx]
+        story_title = news_topics[topic_idx]
 
         first_shot_idx = anchor_idx
         last_shot_idx = next((next_idx for next_idx in list(anchor_indices) if next_idx > anchor_idx),
                              list(anchor_shots.keys())[-1]) - 1
 
-        first_frame_idx, last_frame_idx = vao.data.shots[first_shot_idx].first_frame_idx, vao.data.shots[
-            last_shot_idx].last_frame_idx
+        story_data = extract_story_data(vao, first_shot_idx, last_shot_idx)
 
-        from_timestamp = sec_to_time(frame_idx_to_sec(first_frame_idx))
-        to_timestamp = sec_to_time(frame_idx_to_sec(last_frame_idx))
-
-        n_shots = last_shot_idx - first_shot_idx + 1
-        n_frames = last_frame_idx - first_frame_idx + 1
-
-        timedelta = to_datetime(to_timestamp) - to_datetime(from_timestamp)
-        total_ss = timedelta.total_seconds()
-
-        data = (story_title,
-                first_frame_idx, last_frame_idx, n_frames,
-                first_shot_idx, last_shot_idx, n_shots,
-                from_timestamp.strftime('%H:%M:%S'), to_timestamp.strftime('%H:%M:%S'), total_ss)
-
-        stories.append(data)
+        stories.append(story_title + story_data)
 
     df = pd.DataFrame(data=stories, columns=STORY_COLUMNS)
 
@@ -210,25 +215,9 @@ def segment_ts100(vao: VAO):
 
         story_title = max(story_captions, key=lambda k: k.confidence).text
 
-        first_shot_idx, last_shot_idx = min(story), max(story)
-        first_frame_idx, last_frame_idx = vao.data.shots[first_shot_idx].first_frame_idx, vao.data.shots[
-            last_shot_idx].last_frame_idx
+        story_data = extract_story_data(vao, min(story), max(story))
 
-        from_timestamp = sec_to_time(frame_idx_to_sec(first_frame_idx))
-        to_timestamp = sec_to_time(frame_idx_to_sec(last_frame_idx))
-
-        n_shots = last_shot_idx - first_shot_idx + 1
-        n_frames = last_frame_idx - first_frame_idx + 1
-
-        timedelta = to_datetime(to_timestamp) - to_datetime(from_timestamp)
-        total_ss = timedelta.total_seconds()
-
-        data = (story_title,
-                first_frame_idx, last_frame_idx, n_frames,
-                first_shot_idx, last_shot_idx, n_shots,
-                from_timestamp.strftime('%H:%M:%S'), to_timestamp.strftime('%H:%M:%S'), total_ss)
-
-        stories.append(data)
+        stories.append(story_title + story_data)
 
     df = pd.DataFrame(data=stories, columns=STORY_COLUMNS)
 
