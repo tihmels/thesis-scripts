@@ -8,7 +8,7 @@ from xml.dom.minidom import parse
 
 from pandas import DataFrame
 
-from common.VideoData import get_date_time, VideoData, get_xml_transcript_file, is_summary, \
+from common.VAO import get_date_time, VAO, get_xml_transcript_file, is_summary, \
     get_main_transcript_file
 from common.constants import TV_FILENAME_RE
 
@@ -49,8 +49,8 @@ def parse_xml(dom):
     return intervals, captions
 
 
-def process_video(vd: VideoData):
-    xml_transcript = get_xml_transcript_file(vd)
+def process_video(vao: VAO):
+    xml_transcript = get_xml_transcript_file(vao)
 
     dom = parse(str(xml_transcript))
 
@@ -61,10 +61,10 @@ def process_video(vd: VideoData):
 
     df = DataFrame(zip(start, end, caption, color), columns=['start', 'end', 'caption', 'color'])
 
-    df.to_csv(get_main_transcript_file(vd), index=False, header=True)
+    df.to_csv(get_main_transcript_file(vao), index=False, header=True)
 
 
-def was_processed(video):
+def was_processed(video: Path):
     return get_main_transcript_file(video).is_file()
 
 
@@ -92,11 +92,11 @@ def main(args):
     video_files = sorted(video_files, key=get_date_time)
 
     for idx, vf in enumerate(video_files):
-        vd = VideoData(vf)
+        vao = VAO(vf)
 
-        print(f'[{idx + 1}/{len(video_files)}] {vd}')
+        print(f'[{idx + 1}/{len(video_files)}] {vao}')
 
-        process_video(vd)
+        process_video(vao)
 
 
 if __name__ == "__main__":

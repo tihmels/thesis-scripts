@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import tensorflow as tf
 
-from common.VideoData import get_keyframe_dir, get_date_time, VideoData
+from common.VAO import get_keyframe_dir, get_date_time, VAO
 from common.constants import TV_FILENAME_RE
 
 model = tf.keras.models.load_model(Path(Path(__file__).resolve().parent, 'model', 'ts_anchor_model'))
@@ -24,8 +24,8 @@ with open(Path(Path(__file__).resolve().parent, 'model', 'classes.txt'), 'r') as
     classes = json.load(file)
 
 
-def classify_video_shots(vd: VideoData, top_n=5):
-    keyframes = [tf.keras.preprocessing.image.load_img(frame, target_size=input_shape) for frame in vd.keyframes]
+def classify_video_shots(vao: VAO, top_n=5):
+    keyframes = [tf.keras.preprocessing.image.load_img(frame, target_size=input_shape) for frame in vao.data.keyframes]
     keyframes = [tf.keras.preprocessing.image.img_to_array(frame) for frame in keyframes]
     keyframes = [np.expand_dims(frame, axis=0) for frame in keyframes]
 
@@ -64,10 +64,10 @@ def main(args):
     video_files = sorted(video_files, key=get_date_time)
 
     for vf in video_files:
-        vd = VideoData(vf)
+        vao = VAO(vf)
 
-        for idx, result in enumerate(classify_video_shots(vd, args.topn)):
-            frame = vd.keyframes[idx]
+        for idx, result in enumerate(classify_video_shots(vao, args.topn)):
+            frame = vao.data.keyframes[idx]
             print("[" + str(idx) + "] " + str(result) + " (" + frame.stem + ")")
 
 

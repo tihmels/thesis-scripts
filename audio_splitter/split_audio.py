@@ -7,9 +7,8 @@ import numpy as np
 import pydub
 from alive_progress import alive_bar
 
-from common.VideoData import VideoData, get_audio_dir, get_shot_file, \
-    read_shots_from_file, \
-    get_date_time, get_main_audio_file, get_shot_audio_files
+from common.VAO import get_main_audio_file, get_audio_dir, get_shot_file, get_shot_audio_files, read_shots_from_file, \
+    get_date_time, VAO
 from common.constants import TV_FILENAME_RE
 
 pydub.AudioSegment.ffmpeg = '/usr/local/bin/ffmpeg'
@@ -20,9 +19,9 @@ parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
                     help="Re-split audio tracks for all videos")
 
 
-def split_audio_by_scenes(vd: VideoData):
-    audio = get_main_audio_file(vd)
-    stories = vd.stories
+def split_audio_by_scenes(vao: VAO):
+    audio = get_main_audio_file(vao)
+    stories = vao.data.stories
 
     for story_idx, story in enumerate(stories):
         start_ms = np.divide(story.first_frame_idx, 25) * 1000
@@ -31,23 +30,23 @@ def split_audio_by_scenes(vd: VideoData):
         audio_segment = audio[start_ms:end_ms]
 
         audio_segment.export(
-            Path(vd.audio_dir, 'story_' + str(story_idx + 1) + '.wav'), format='wav')
+            Path(vao.dirs.audio_dir, 'story_' + str(story_idx + 1) + '.wav'), format='wav')
 
         yield
 
 
-def split_audio_by_shots(vd: VideoData):
-    audio = vd.audio
-    shots = vd.shots
+def split_audio_by_shots(vao: VAO):
+    audio = vao.data.audio
+    shots = vao.data.shots
 
-    for shot_idx, sd  in enumerate(shots):
+    for shot_idx, sd in enumerate(shots):
         start_ms = np.divide(sd.first_frame_idx, 25) * 1000
         end_ms = np.divide(sd.last_frame_idx, 25) * 1000
 
         audio_segment = audio[start_ms:end_ms]
 
         audio_segment.export(
-            Path(vd.audio_dir, 'shot_' + str(shot_idx + 1) + '.wav'), format='wav')
+            Path(vao.dirs, 'shot_' + str(shot_idx + 1) + '.wav'), format='wav')
 
         yield
 
@@ -90,10 +89,10 @@ def main(args):
     print(f'Splitting audio tracks from {len(video_files)} videos ... \n')
 
     for idx, vf in enumerate(video_files):
-        vd = VideoData(vf)
+        vao = VAO(vf)
 
-        with alive_bar(vd.n_stories, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
-            for _ in split_audio_by_shots(vd):
+        with alive_bar(vao.n_stories, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vao}', length=20) as bar:
+            for _ in split_audio_by_shots(vao):
                 bar()
 
 

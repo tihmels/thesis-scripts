@@ -5,7 +5,7 @@ from typing import Union
 
 import pandas as pd
 
-from common.DataModel import CaptionData, TranscriptData, StoryData, ShotData, ShotClassificationData
+from common.DataModel import CaptionData, TranscriptData, StoryData, ShotData
 from common.Schemas import SHOT_COLUMNS, CAPTION_COLUMNS, STORY_COLUMNS, TRANSCRIPT_COLUMNS
 from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT_AUDIO_FILENAME_RE, \
     STORY_TRANSCRIPT_FILENAME_RE, AUDIO_DIR, FRAME_DIR, KF_DIR, TRANSCRIPT_DIR, SM_DIR, TOPICS_FILENAME, \
@@ -13,86 +13,29 @@ from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT
 from common.fs_utils import frame_idx_to_time, add_sec_to_time
 
 
-class VideoData:
+class VAO:
     def __init__(self, path: Path):
         self.id: str = path.stem
         self.path: Path = path
         self.date: datetime = get_date_time(path)
-        self.frame_dir: Path = get_frame_dir(path)
-        self.keyframe_dir: Path = get_keyframe_dir(path)
-        self.audio_dir: Path = get_audio_dir(path)
-        self.transcripts_dir: Path = get_transcription_dir(path)
-        self.sm_dir: Path = get_sm_dir(path)
-        self._topics: [str] = None
-        self._frames: [Path] = None
-        self._keyframes: [Path] = None
-        self._classifications: [ShotClassificationData] = None
-        self._shots: [ShotData] = None
-        self._scenes: [StoryData] = None
-        self._transcript: [TranscriptData] = None
-        self._captions: [CaptionData] = None
-
-    @property
-    def frames(self) -> [Path]:
-        if self._frames is None:
-            self._frames = sorted(get_frame_paths(self))
-        return self._frames
-
-    @property
-    def keyframes(self) -> [Path]:
-        if self._keyframes is None:
-            self._keyframes = sorted(get_keyframe_paths(self))
-        return self._keyframes
-
-    @property
-    def topics(self) -> [str]:
-        if self._topics is None:
-            self._topics = read_topics_from_file(get_topic_file(self))
-        return self._topics
-
-    @property
-    def audio(self) -> Path:
-        return get_main_audio_file(self)
-
-    @property
-    def shots(self) -> [ShotData]:
-        if self._shots is None:
-            self._shots = read_shots_from_file(get_shot_file(self))
-        return self._shots
-
-    @property
-    def captions(self) -> [CaptionData]:
-        if self._captions is None:
-            self._captions = read_banner_captions_from_file(get_banner_caption_file(self.path))
-        return self._captions
-
-    @property
-    def stories(self) -> [StoryData]:
-        if self._scenes is None:
-            self._scenes = read_stories_from_file(get_story_file(self))
-        return self._scenes
-
-    @property
-    def transcripts(self) -> [TranscriptData]:
-        if self._transcript is None:
-            self._transcript = read_transcript_from_file(get_main_transcript_file(self))
-        return self._transcript
+        self.dirs = self.Dirs(path)
+        self.data = self.Data(path)
 
     @property
     def n_frames(self) -> int:
-        return len(self.frames)
+        return len(self.data.frames)
 
     @property
     def n_shots(self) -> int:
-        return len(self.shots)
+        return len(self.data.shots)
 
     @property
     def n_stories(self) -> int:
-        return len(self.stories)
+        return len(self.data.stories)
 
     @property
     def n_topics(self) -> int:
-        return len(self.topics)
+        return len(self.data.topics)
 
     @property
     def timecode(self) -> str:
@@ -107,21 +50,86 @@ class VideoData:
         return is_summary(self)
 
     def get_shot_transcripts(self, from_shot_idx, to_shot_idx=None) -> [TranscriptData]:
-        from_shot = self.shots[from_shot_idx]
-        to_shot = self.shots[to_shot_idx] if to_shot_idx else self.shots[from_shot_idx]
+        from_shot = self.data.shots[from_shot_idx]
+        to_shot = self.data.shots[to_shot_idx] if to_shot_idx else self.data.shots[from_shot_idx]
 
         from_time, to_time = frame_idx_to_time(from_shot.first_frame_idx), frame_idx_to_time(to_shot.last_frame_idx)
 
         from_time = from_time.replace(microsecond=0)
         to_time = add_sec_to_time(to_time, 1).replace(microsecond=0)
 
-        return [trans for trans in self.transcripts if from_time <= trans.start and trans.end <= to_time]
+        return [trans for trans in self.data.transcripts if from_time <= trans.start and trans.end <= to_time]
 
     def __str__(self):
         return str(self.path.relative_to(self.path.parent.parent)).split('.')[0]
 
+    class Dirs:
+        def __init__(self, path: Path):
+            self.frame_dir: Path = get_frame_dir(path)
+            self.keyframe_dir: Path = get_keyframe_dir(path)
+            self.audio_dir: Path = get_audio_dir(path)
+            self.transcripts_dir: Path = get_transcription_dir(path)
+            self.sm_dir: Path = get_sm_dir(path)
 
-VideoPathType = Union[VideoData, Path]
+    class Data:
+        def __init__(self, path: Path):
+            self._path: Path = path
+            self._topics: [str] = None
+            self._frames: [Path] = None
+            self._keyframes: [Path] = None
+            self._shots: [ShotData] = None
+            self._stories: [StoryData] = None
+            self._transcript: [TranscriptData] = None
+            self._captions: [CaptionData] = None
+
+        @property
+        def frames(self) -> [Path]:
+            if self._frames is None:
+                self._frames = sorted(get_frame_paths(self._path))
+            return self._frames
+
+        @property
+        def keyframes(self) -> [Path]:
+            if self._keyframes is None:
+                self._keyframes = sorted(get_keyframe_paths(self._path))
+            return self._keyframes
+
+        @property
+        def topics(self) -> [str]:
+            if self._topics is None:
+                self._topics = read_topics_from_file(get_topic_file(self._path))
+            return self._topics
+
+        @property
+        def audio(self) -> Path:
+            return get_main_audio_file(self._path)
+
+        @property
+        def shots(self) -> [ShotData]:
+            if self._shots is None:
+                self._shots = read_shots_from_file(get_shot_file(self._path))
+            return self._shots
+
+        @property
+        def captions(self) -> [CaptionData]:
+            if self._captions is None:
+                self._captions = read_banner_captions_from_file(get_banner_caption_file(self._path))
+            return self._captions
+
+        @property
+        def stories(self) -> [StoryData]:
+            if self._stories is None:
+                self._stories = read_stories_from_file(get_story_file(self._path))
+            return self._stories
+
+        @property
+        def transcripts(self) -> [TranscriptData]:
+            if self._transcript is None:
+                self._transcript = read_transcript_from_file(get_main_transcript_file(self._path))
+            return self._transcript
+
+
+VideoPathType = Union[VAO, Path]
 
 
 def get_date_time(video: VideoPathType):

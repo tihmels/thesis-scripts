@@ -14,7 +14,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 from common.DataModel import TranscriptData
 from common.Schemas import STORY_COLUMNS
-from common.VideoData import VideoData, get_shot_file, get_date_time, get_banner_caption_file, get_story_file, \
+from common.VAO import VAO, get_shot_file, get_date_time, get_banner_caption_file, get_story_file, \
     get_topic_file, is_summary, read_shots_from_file
 from common.constants import TV_FILENAME_RE
 from common.fs_utils import frame_idx_to_sec, sec_to_time
@@ -91,23 +91,23 @@ def get_anchor_indices(topics, anchor_shots, anchor_transcripts):
     return np.where(values > 0, np.array(list(anchor_shots.keys()))[argmax], -1)
 
 
-def get_anchor_transcripts(vd: VideoData, anchor_shots, max_shots=5):
+def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=8):
     return {
-        idx: vd.get_shot_transcripts(idx,
-                                     min(next(
-                                         (next_idx - 1 for next_idx in anchor_shots.keys() if next_idx > idx),
-                                         idx), idx + max_shots, vd.n_shots))
+        idx: vao.get_shot_transcripts(idx,
+                                      min(next(
+                                          (next_idx - 1 for next_idx in anchor_shots.keys() if next_idx > idx),
+                                          idx), idx + max_shots, vao.n_shots))
         for idx in anchor_shots}
 
 
-def segment_ts15(vd: VideoData):
-    anchor_shots = {idx: shot for idx, shot in enumerate(vd.shots) if shot.type == 'anchor'}
-    news_titles = {idx: title for idx, title in enumerate(vd.topics[:-1])}  # last shot is always weather
+def segment_ts15(vao: VAO):
+    anchor_shots = {idx: shot for idx, shot in enumerate(vao.data.shots) if shot.type == 'anchor'}
+    news_titles = {idx: title for idx, title in enumerate(vao.data.topics[:-1])}  # last shot is always weather
 
-    first_weather_idx = next(idx for idx, shot in enumerate(vd.shots) if shot.type == 'weather')
+    first_weather_idx = next(idx for idx, shot in enumerate(vao.data.shots) if shot.type == 'weather')
     anchor_shots = {idx: sd for idx, sd in anchor_shots.items() if idx < first_weather_idx}
 
-    anchor_transcripts = get_anchor_transcripts(vd, anchor_shots, 5)
+    anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 5)
 
     anchor_indices = get_anchor_indices(news_titles, anchor_shots, anchor_transcripts)
     topic_to_anchor = {topic_idx: anchor_idx for topic_idx, anchor_idx in enumerate(anchor_indices) if anchor_idx >= 0}
@@ -127,7 +127,7 @@ def segment_ts15(vd: VideoData):
         last_shot_idx = next((next_idx for next_idx in list(anchor_indices) if next_idx > anchor_idx),
                              list(anchor_shots.keys())[-1]) - 1
 
-        first_frame_idx, last_frame_idx = vd.shots[first_shot_idx].first_frame_idx, vd.shots[
+        first_frame_idx, last_frame_idx = vao.data.shots[first_shot_idx].first_frame_idx, vao.data.shots[
             last_shot_idx].last_frame_idx
 
         from_timestamp = sec_to_time(frame_idx_to_sec(first_frame_idx))
@@ -192,8 +192,8 @@ def get_story_indices_by_captions(captions):
     return story_indices
 
 
-def segment_ts100(vd: VideoData):
-    captions = {idx: cd for idx, cd in enumerate(vd.captions[:-1])}  # last shot is always weather
+def segment_ts100(vao: VAO):
+    captions = {idx: cd for idx, cd in enumerate(vao.data.captions[:-1])}  # last shot is always weather
 
     preprocess_captions(captions)
 
@@ -211,7 +211,7 @@ def segment_ts100(vd: VideoData):
         story_title = max(story_captions, key=lambda k: k.confidence).text
 
         first_shot_idx, last_shot_idx = min(story), max(story)
-        first_frame_idx, last_frame_idx = vd.shots[first_shot_idx].first_frame_idx, vd.shots[
+        first_frame_idx, last_frame_idx = vao.data.shots[first_shot_idx].first_frame_idx, vao.data.shots[
             last_shot_idx].last_frame_idx
 
         from_timestamp = sec_to_time(frame_idx_to_sec(first_frame_idx))
@@ -275,14 +275,14 @@ def main(args):
     print(f'Story Segmentation for {len(video_files)} videos ... \n')
 
     for idx, vf in enumerate(video_files):
-        vd = VideoData(vf)
+        vao = VAO(vf)
 
-        print(f'[{idx + 1}/{len(video_files)}] {vd} ', end='... ')
+        print(f'[{idx + 1}/{len(video_files)}] {vao} ', end='... ')
 
-        segmentor = segment_ts100 if vd.is_summary else segment_ts15
+        segmentor = segment_ts100 if vao.is_summary else segment_ts15
 
-        df = segmentor(vd)
-        df.to_csv(get_story_file(vd), index=False)
+        df = segmentor(vao)
+        df.to_csv(get_story_file(vao), index=False)
 
 
 if __name__ == "__main__":

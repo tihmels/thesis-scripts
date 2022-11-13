@@ -10,7 +10,7 @@ import numpy as np
 from alive_progress import alive_bar
 from scipy import ndimage
 
-from common.VideoData import VideoData, get_frame_dir, get_frame_paths, get_shot_file, get_keyframe_dir, \
+from common.VAO import VAO, get_frame_dir, get_frame_paths, get_shot_file, get_keyframe_dir, \
     get_keyframe_paths, \
     read_shots_from_file, get_date_time
 from common.constants import TV_FILENAME_RE
@@ -63,12 +63,12 @@ def get_magnitude_gradient_kf_idx(frames):
     return keyframe_idx
 
 
-def detect_keyframes(vd: VideoData, kf_func):
-    shots = vd.shots
+def detect_keyframes(vd: VAO, kf_func):
+    shots = vd.data.shots
 
     for shot in shots:
 
-        frames = read_images(vd.frames[shot.first_frame_idx + 5:shot.last_frame_idx - 5], cv2.COLOR_BGR2GRAY)
+        frames = read_images(vd.data.frames[shot.first_frame_idx + 5:shot.last_frame_idx - 5], cv2.COLOR_BGR2GRAY)
 
         if vd.is_summary:
             frames = [frame[:220, :] for frame in frames]
@@ -117,13 +117,13 @@ def main(args):
     print(f'Extracting shot keyframes for {len(video_files)} videos ... ', end='\n\n')
 
     for idx, vf in enumerate(video_files):
-        vd = VideoData(vf)
+        vd = VAO(vf)
 
-        create_dir(vd.keyframe_dir, rm_if_exist=True)
+        create_dir(vd.dirs.keyframe_dir, rm_if_exist=True)
 
         with alive_bar(vd.n_shots, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
             for kf_idx in detect_keyframes(vd, get_center_kf_idx if args.center else get_magnitude_gradient_kf_idx):
-                copy(vd.frames[kf_idx], vd.keyframe_dir)
+                copy(vd.data.frames[kf_idx], vd.dirs.keyframe_dir)
                 bar()
 
 

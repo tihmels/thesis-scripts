@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from alive_progress import alive_bar
 
-from common.VideoData import get_date_time, VideoData, get_shot_classification_file, get_shot_file, get_keyframe_dir, \
+from common.VAO import get_date_time, VAO, get_shot_classification_file, get_shot_file, get_keyframe_dir, \
     get_keyframe_paths, read_shots_from_file
 from common.constants import TV_FILENAME_RE
 from shot_classifier_model.inference import classify_video_shots
@@ -54,22 +54,22 @@ def main(args):
     video_files = sorted(video_files, key=get_date_time)
 
     for idx, video in enumerate(video_files):
-        vd = VideoData(video)
+        vao = VAO(video)
 
-        print(f'[{idx + 1}/{len(video_files)}] {vd}')
+        print(f'[{idx + 1}/{len(video_files)}] {vao}')
 
         results = []
 
-        with alive_bar(vd.n_shots, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
-            for result in classify_video_shots(vd, top_n=1):
+        with alive_bar(vao.n_shots, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vao}', length=20) as bar:
+            for result in classify_video_shots(vao, top_n=1):
                 results.append(result[0][0])
                 bar()
 
-        shots = [(sd.first_frame_idx, sd.last_frame_idx) for sd in vd.shots]
+        shots = [(sd.first_frame_idx, sd.last_frame_idx) for sd in vao.data.shots]
         shots_and_type = [(first_idx, last_idx, shot_type) for (first_idx, last_idx), shot_type in zip(shots, results)]
 
         df = pd.DataFrame(data=np.array(shots_and_type), columns=['first_frame_idx', 'last_frame_idx', 'type'])
-        df.to_csv(get_shot_file(vd), index=False)
+        df.to_csv(get_shot_file(vao), index=False)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from fuzzywuzzy import fuzz
 
-from common.VideoData import VideoData, get_date_time, is_summary, get_main_transcript_file, get_shot_file
+from common.VAO import VAO, get_date_time, is_summary, get_main_transcript_file, get_shot_file
 from common.constants import TV_FILENAME_RE
 from common.fs_utils import sec_to_frame_idx
 
@@ -20,8 +20,8 @@ welcoming_1 = "ich begrüße Sie zur tagesschau"
 welcoming_2 = "Willkommen zur tagesschau"
 
 
-def fix_first_anchorshot_segment(vd: VideoData, shots):
-    transcript = vd.transcripts
+def fix_first_anchorshot_segment(vao: VAO, shots):
+    transcript = vao.data.transcripts
 
     for idx, td in enumerate(transcript):
 
@@ -77,18 +77,18 @@ def main(args):
     print(f'Detecting shot boundaries for {len(video_files)} videos ...', end='\n\n')
 
     for idx, vf in enumerate(video_files):
-        vd = VideoData(vf)
+        vao = VAO(vf)
 
-        print(f'[{idx + 1}/{len(video_files)}] {vd}')
+        print(f'[{idx + 1}/{len(video_files)}] {vao}')
 
-        transcript = vd.transcripts
-        shots = np.array([(shot.first_frame_idx, shot.last_frame_idx) for shot in vd.shots])
+        transcript = vao.data.transcripts
+        shots = np.array([(shot.first_frame_idx, shot.last_frame_idx) for shot in vao.data.shots])
 
         segments = fix_first_anchorshot_segment(transcript, shots)
 
         df = pd.DataFrame(data=segments, columns=['first_frame_idx', 'last_frame_idx'])
 
-        df.to_csv(get_shot_file(vd), index=False)
+        df.to_csv(get_shot_file(vao), index=False)
 
 
 if __name__ == "__main__":

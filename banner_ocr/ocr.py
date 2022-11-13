@@ -13,7 +13,7 @@ from skimage.feature import match_template
 from skimage.filters.edges import sobel
 from skimage.filters.thresholding import try_all_threshold
 
-from common.VideoData import get_date_time, VideoData, get_banner_caption_file, get_shot_file, is_summary, \
+from common.VAO import get_date_time, VAO, get_banner_caption_file, get_shot_file, is_summary, \
     get_frame_dir, get_frame_paths
 from common.constants import TV_FILENAME_RE, TS_LOGO
 
@@ -45,10 +45,10 @@ def get_caption_area(frame, is_nightly, resize_factor=4):
         return frame[-46 * resize_factor:-17 * resize_factor, -420 * resize_factor:]
 
 
-def is_nightly_version(vd: VideoData):
+def is_nightly_version(vao: VAO):
     ts_logo_area = (35, 225, 110, 250)
 
-    center_frame_cropped = Image.open(vd.frames[int(vd.n_frames / 2)]).convert('L').crop(ts_logo_area)
+    center_frame_cropped = Image.open(vao.data.frames[int(vao.n_frames / 2)]).convert('L').crop(ts_logo_area)
     center_frame_cropped = np.array(center_frame_cropped)
 
     corr_coeff = match_template(center_frame_cropped, TS_LOGO)
@@ -76,13 +76,13 @@ def extract_caption_data_from_frame(frame: Path, resize_factor, is_nightly, cust
     return caption_data
 
 
-def extract_caption_data_from_shots(vd: VideoData, resize_factor=4):
-    shots = vd.shots
+def extract_caption_data_from_shots(vao: VAO, resize_factor=4):
+    shots = vao.data.shots
 
-    is_nightly = is_nightly_version(vd)
+    is_nightly = is_nightly_version(vao)
 
     for shot in shots:
-        center_frame = vd.frames[shot.center_frame_index]
+        center_frame = vao.data.frames[shot.center_frame_idx]
 
         image_data = extract_caption_data_from_frame(center_frame, resize_factor, is_nightly)
 
@@ -129,15 +129,15 @@ def main(args):
 
     for vf_idx, vf in enumerate(video_files):
 
-        vd = VideoData(vf)
+        vao = VAO(vf)
 
-        with alive_bar(vd.n_shots, ctrl_c=False,
-                       title=f'[{vf_idx + 1}/{len(video_files)}] {vd} ' + ('☾' if is_nightly_version(vd) else '☼'),
+        with alive_bar(vao.n_shots, ctrl_c=False,
+                       title=f'[{vf_idx + 1}/{len(video_files)}] {vao} ' + ('☾' if is_nightly_version(vao) else '☼'),
                        length=20) as bar:
 
             captions = []
 
-            for shot_idx, caption_data in enumerate(extract_caption_data_from_shots(vd)):
+            for shot_idx, caption_data in enumerate(extract_caption_data_from_shots(vao)):
 
                 positive_confidences = np.array(caption_data['conf']) > 0.0
                 non_empty_texts = list(map(lambda idx: True if caption_data['text'][idx].strip() else False,
@@ -179,7 +179,7 @@ def main(args):
                 bar()
 
             df = pd.DataFrame(data=captions, columns=['headline', 'subline', 'confidence'])
-            df.to_csv(get_banner_caption_file(vd), index=False)
+            df.to_csv(get_banner_caption_file(vao), index=False)
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from common.VideoData import VideoData, get_shot_file, get_data_dir, get_frame_dir, get_frame_paths, get_date_time, \
+from common.VAO import VAO, get_shot_file, get_data_dir, get_frame_dir, get_frame_paths, get_date_time, \
     get_main_transcript_file
 from common.constants import TV_FILENAME_RE
 from common.fs_utils import read_images
@@ -32,13 +32,13 @@ def shot_transition_detection(frames, threshold=0.2):
     return shots, img
 
 
-def process_video(vd: VideoData, threshold):
-    frames = read_images(vd.frames, resize=(48, 27))
+def process_video(vao: VAO, threshold):
+    frames = read_images(vao.data.frames, resize=(48, 27))
 
     shots, img = shot_transition_detection(np.array(frames), threshold)
 
-    if not vd.is_summary and get_main_transcript_file(vd).is_file():
-        shots = fix_first_anchorshot_segment(vd, shots)
+    if not vao.is_summary and get_main_transcript_file(vao).is_file():
+        shots = fix_first_anchorshot_segment(vao, shots)
 
     shots = shots[shots[:, 1] - shots[:, 0] > 13]
 
@@ -75,16 +75,16 @@ def main(args):
     print(f'Detecting shot boundaries for {len(video_files)} videos ...', end='\n\n')
 
     for idx, vf in enumerate(video_files):
-        vd = VideoData(vf)
+        vao = VAO(vf)
 
-        print(f'[{idx + 1}/{len(video_files)}] {vd}')
+        print(f'[{idx + 1}/{len(video_files)}] {vao}')
 
-        shots, img = process_video(vd, args.threshold)
+        shots, img = process_video(vao, args.threshold)
 
         df = pd.DataFrame(data=shots, columns=['first_frame_idx', 'last_frame_idx'])
 
-        df.to_csv(get_shot_file(vd), index=False)
-        img.save(Path(get_data_dir(vd), 'shots.png').absolute())
+        df.to_csv(get_shot_file(vao), index=False)
+        img.save(Path(get_data_dir(vao), 'shots.png').absolute())
 
 
 if __name__ == "__main__":

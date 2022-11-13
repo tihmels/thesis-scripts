@@ -8,7 +8,7 @@ from pathlib import Path
 import whisper
 from pandas import DataFrame
 
-from common.VideoData import VideoData, get_audio_dir, get_shot_file, get_date_time, \
+from common.VAO import VAO, get_audio_dir, get_shot_file, get_date_time, \
     get_main_audio_file, get_main_transcript_file
 from common.constants import TV_FILENAME_RE
 
@@ -57,7 +57,7 @@ def main(args):
     print(f'Transcribing audio of {len(video_files)} videos ... \n')
 
     for idx, vf in enumerate(video_files):
-        vd = VideoData(vf)
+        vd = VAO(vf)
 
         print(f'[{idx + 1}/{len(video_files)}] {vd} ', end='')
 

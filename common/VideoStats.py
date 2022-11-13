@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from VideoData import VideoData
+from VAO import VAO
 
 
 class VideoType(Enum):
@@ -14,14 +14,14 @@ class VideoType(Enum):
 
 
 class VideoStats:
-    def __init__(self, vd: VideoData, vt: VideoType, segment_vector: np.array):
-        self.id = vd.id
-        self.path = vd.path
-        self.date = vd.date.strftime("%Y%m%d")
+    def __init__(self, vao: VAO, vt: VideoType, segment_vector: np.array):
+        self.id = vao.id
+        self.path = vao.path
+        self.date = vao.date.strftime("%Y%m%d")
         self.type = vt.name
 
-        data = np.array([*vd.shots], dtype=np.int32)
-        data = np.column_stack((data, np.array([(s2 - s1 + 1) for s1, s2 in vd.shots], dtype=np.int32)))
+        data = np.array([*vao.data.shots], dtype=np.int32)
+        data = np.column_stack((data, np.array([(s2 - s1 + 1) for s1, s2 in vao.data.shots], dtype=np.int32)))
 
         if vt == VideoType.FULL:
             data = np.column_stack((data, segment_vector.astype(np.int32)))
@@ -30,11 +30,11 @@ class VideoStats:
             data = np.column_stack((data, sum_seg_matched.astype(int)))
             data = np.column_stack((data, np.nan_to_num(sum_seg_dist, posinf=-1, neginf=-1).astype(int)))
 
-        start_frame_paths = np.array(vd.frames)[[seg[0] for seg in vd.shots]]
-        end_frame_paths = np.array(vd.frames)[[seg[1] for seg in vd.shots]]
+        start_frame_paths = np.array(vao.data.frames)[[seg[0] for seg in vao.data.shots]]
+        end_frame_paths = np.array(vao.data.frames)[[seg[1] for seg in vao.data.shots]]
 
-        segment_center_indices = [np.round((s1 + s2) / 2).astype(int) for s1, s2 in vd.shots]
-        center_frame_paths = np.array(vd.frames)[segment_center_indices]
+        segment_center_indices = [np.round((s1 + s2) / 2).astype(int) for s1, s2 in vao.data.shots]
+        center_frame_paths = np.array(vao.data.frames)[segment_center_indices]
 
         data = np.column_stack((data, start_frame_paths))
         data = np.column_stack((data, center_frame_paths))

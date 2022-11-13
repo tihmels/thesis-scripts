@@ -4,7 +4,7 @@ import re
 from argparse import ArgumentParser
 from pathlib import Path
 
-from common.VideoData import get_date_time, VideoData, get_main_transcript_file, get_story_file, get_story_transcripts, \
+from common.VAO import get_date_time, VAO, get_main_transcript_file, get_story_file, get_story_transcripts, \
     read_stories_from_file
 from common.constants import TV_FILENAME_RE
 from common.fs_utils import frame_idx_to_time, create_dir, add_sec_to_time
@@ -14,9 +14,9 @@ parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs=
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing', help='')
 
 
-def split_story_transcripts(vd: VideoData):
-    stories = vd.stories
-    transcripts = vd.transcripts
+def split_story_transcripts(vd: VAO):
+    stories = vd.data.stories
+    transcripts = vd.data.transcripts
 
     for story in stories:
         start = frame_idx_to_time(story.first_frame_idx)
@@ -65,16 +65,16 @@ def main(args):
     print(f'Split audio of {len(video_files)} videos ... \n')
 
     for idx, vf in enumerate(video_files):
-        vd = VideoData(vf)
+        vd = VAO(vf)
 
         print(f'[{idx + 1}/{len(video_files)}] {vd}')
 
-        create_dir(vd.transcripts_dir, rm_if_exist=True)
+        create_dir(vd.dirs.transcripts_dir, rm_if_exist=True)
 
         for story_idx, transcript in enumerate(split_story_transcripts(vd)):
             text = ' '.join([transcript.text for transcript in transcript])
 
-            target_file = Path(vd.transcripts_dir, 'story_' + str(story_idx) + '.txt')
+            target_file = Path(vd.dirs.transcripts_dir, 'story_' + str(story_idx) + '.txt')
 
             with open(target_file, 'w') as file:
                 file.write(text)

@@ -13,7 +13,7 @@ import numpy as np
 from PIL import Image
 from PIL.Image import Resampling
 
-from common.VideoData import VideoData, get_sm_dir, get_frame_dir, get_shot_file, get_date_time, get_data_dir, get_frame_paths
+from common.VAO import VAO, get_sm_dir, get_frame_dir, get_shot_file, get_date_time, get_data_dir, get_frame_paths
 from common.VideoStats import VideoStats, VideoType, get_vs_evaluation_df
 from common.constants import TV_FILENAME_RE, BASE_PATH
 from common.fs_utils import get_summary_videos
@@ -39,7 +39,7 @@ def get_image(path: Path):
     return Image.open(str(path)).convert('L').resize((9, 8), Resampling.LANCZOS)
 
 
-def was_processed(path: Path, video: VideoData):
+def was_processed(path: Path, video: VAO):
     date, timecode = video.date_str, video.timecode
     pattern = re.compile(r"^TV-" + re.escape(date) + r"-" + re.escape(timecode) + r"-\S*.csv$")
 
@@ -50,7 +50,7 @@ def was_processed(path: Path, video: VideoData):
     return False
 
 
-def process_videos(date: str, main_video: VideoData, summary_videos: [VideoData], cutoff: int, skip_existing=False,
+def process_videos(date: str, main_video: VAO, summary_videos: [VAO], cutoff: int, skip_existing=False,
                    to_csv=False):
     sm_dir = get_sm_dir(main_video.path)
 
@@ -186,10 +186,10 @@ if __name__ == "__main__":
 
         (rangeStart, rangeEnd) = date - timedelta(hours=4), date + timedelta(hours=20)
 
-        summary_videos_data = [VideoData(video) for date, video in summaries_by_date.items() if
+        summary_videos_data = [VAO(video) for date, video in summaries_by_date.items() if
                                rangeStart <= date <= rangeEnd]
 
-        main_video_data = VideoData(video)
+        main_video_data = VAO(video)
 
         print(
             f'\n[{idx + 1}/{len(videos_by_date)}] {date.strftime("%Y-%m-%d")}'
