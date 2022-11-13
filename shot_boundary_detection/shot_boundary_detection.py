@@ -17,6 +17,7 @@ from transnetv2 import TransNetV2
 parser = argparse.ArgumentParser('Shot Boundary Detection (SBD) using TransNet V2')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")
 parser.add_argument('--threshold', type=float, default=0.2, help='Shot transition threshold')
+parser.add_argument('--img', action='store_true')
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
                     help="Re-calculate shot boundaries for all videos")
 
@@ -84,7 +85,9 @@ def main(args):
         df = pd.DataFrame(data=shots, columns=['first_frame_idx', 'last_frame_idx'])
 
         df.to_csv(get_shot_file(vao), index=False)
-        img.save(Path(get_data_dir(vao), 'shots.png').absolute())
+
+        if args.img:
+            img.save(Path(get_data_dir(vao), 'shots.png').absolute())
 
 
 if __name__ == "__main__":
