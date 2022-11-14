@@ -8,10 +8,10 @@ import nltk
 import numpy as np
 import pandas as pd
 import spacy
+from HanTa import HanoverTagger as ht
 from fuzzywuzzy import fuzz
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import CountVectorizer
-from HanTa import HanoverTagger as ht
 
 from common.DataModel import TranscriptData
 from common.Schemas import STORY_COLUMNS
@@ -71,17 +71,18 @@ def anchor_topic_detection(topics, anchor_shots, anchor_transcripts):
 
 
 def get_count_vectorizer(text) -> CountVectorizer:
-    # vectorizer = CountVectorizer(lowercase=True, stop_words=german_stop_words, preprocessor=spacy_lemmatizer)
+    # vectorizer = CountVectorizer(lowercase=True, stop_words=german_stop_words, preprocessor=lemmatizer)
     vectorizer = CountVectorizer(lowercase=True, stop_words=german_stop_words)
     vectorizer.fit([text])
 
     return vectorizer
 
 
-def spacy_lemmatizer(text):
-    tagger = ht.HanoverTagger('morphmodel_ger.pgz')
-    lemmatized = [lemma for lemma, type in tagger.analyze(text)]
-    return ' '.join(lemmatized)
+tagger = ht.HanoverTagger('morphmodel_ger.pgz')
+
+
+def lemmatizer(word):
+    return tagger.tag_word(word)[0]
 
 
 def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts):
@@ -145,7 +146,7 @@ def segment_ts15(vao: VAO):
 
     missing_topics = [idx for idx in news_topics.keys() if idx not in topic_to_anchor.keys()]
     if len(missing_topics) > 0:
-        print(f'{missing_topics} could not be assigned!')
+        print(f'{missing_topics} could not be assigned')
     else:
         print()
 
