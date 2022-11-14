@@ -24,6 +24,7 @@ parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs=
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
 spacy_de = spacy.load('de_core_news_sm')
+spacy_de_lg = spacy.load('de_core_news_lg')
 
 # tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-xl")
 # model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-xl")
@@ -70,10 +71,16 @@ def anchor_topic_detection(topics, anchor_shots, anchor_transcripts):
 
 
 def get_count_vectorizer(text) -> CountVectorizer:
+    # vectorizer = CountVectorizer(lowercase=True, stop_words=german_stop_words, preprocessor=spacy_lemmatizer)
     vectorizer = CountVectorizer(lowercase=True, stop_words=german_stop_words)
     vectorizer.fit([text])
 
     return vectorizer
+
+
+def spacy_lemmatizer(text):
+    lemmatized = [token.lemma_ for token in spacy_de_lg(text)]
+    return ' '.join(lemmatized)
 
 
 def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts):
@@ -86,11 +93,13 @@ def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts):
         bow_sum = [sum(vec) for vec in bow.toarray()]
         dt_matrix[idx] = bow_sum
 
-    to_shot_idx = np.vectorize(lambda dt_idx: list(anchor_shots.keys())[dt_idx])
-    shot_idxs, values = to_shot_idx(np.argmax(dt_matrix, axis=1)), np.max(dt_matrix, axis=1)
+    argmax, values = np.argmax(dt_matrix, axis=1), np.max(dt_matrix, axis=1)
 
-    return {topic_idx: shot_idx for idx, (topic_idx, shot_idx) in
-            enumerate(zip(topics, shot_idxs)) if values[idx] > 0 and all(id < shot_idx for id in shot_idxs[:idx])}
+    to_shot_idx = np.vectorize(lambda dt_idx: list(anchor_shots.keys())[dt_idx])
+    shot_idxs = to_shot_idx(argmax)
+
+    return {topic_idx: shot_idx for idx, (topic_idx, shot_idx) in enumerate(zip(topics, shot_idxs)) if
+            (values[idx] > 0 and all(pre_shot_idx < shot_idx for pre_shot_idx in shot_idxs[:idx]))}
 
 
 def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=5):
@@ -129,13 +138,13 @@ def segment_ts15(vao: VAO):
         idx for idx, shot in enumerate(vao.data.shots) if shot.type == 'weather' or shot.type == 'lotto')
     anchor_shots = {idx: sd for idx, sd in anchor_shots.items() if idx < shot_cutoff_idx}
 
-    anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 8)
+    anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 3)
 
     topic_to_anchor = topic_to_anchor_by_transcript(news_topics, anchor_shots, anchor_transcripts)
 
     missing_topics = [idx for idx in news_topics.keys() if idx not in topic_to_anchor.keys()]
     if len(missing_topics) > 0:
-        print(f'Topics {missing_topics} could not be assigned!')
+        print(f'{missing_topics} could not be assigned!')
     else:
         print()
 
