@@ -1,4 +1,5 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
+import operator
 import re
 from argparse import ArgumentParser
 from datetime import datetime
@@ -131,6 +132,21 @@ def extract_story_data(vao: VAO, first_shot_idx: int, last_shot_idx: int):
             from_time.strftime('%H:%M:%S'), to_time.strftime('%H:%M:%S'), total_ss)
 
 
+def post_processing(topic_to_anchor, news_topics, anchor_shots):
+    assigned_topics = topic_to_anchor.keys()
+    missing_topics = [idx for idx in news_topics.keys() if idx not in assigned_topics]
+
+    for topic_idx in missing_topics:
+        if topic_idx - 1 in assigned_topics and topic_idx + 1 in assigned_topics and len(
+                [idx for idx in anchor_shots.keys() if
+                 topic_to_anchor[topic_idx - 1] < idx < topic_to_anchor[topic_idx + 1]]) == 1:
+            topic_to_anchor[topic_idx] = next(
+                idx for idx in anchor_shots.keys() if idx > topic_to_anchor[topic_idx - 1])
+
+    return {topic_idx: shot_idx for topic_idx, shot_idx in
+            sorted(topic_to_anchor.items(), key=operator.itemgetter(1))}
+
+
 def segment_ts15(vao: VAO):
     anchor_shots = {idx: shot for idx, shot in enumerate(vao.data.shots) if shot.type == 'anchor'}
     news_topics = {idx: title for idx, title in enumerate(vao.data.topics[:-1]) if
@@ -143,6 +159,7 @@ def segment_ts15(vao: VAO):
     anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 3)
 
     topic_to_anchor = topic_to_anchor_by_transcript(news_topics, anchor_shots, anchor_transcripts)
+    topic_to_anchor = post_processing(topic_to_anchor, news_topics, anchor_shots)
 
     missing_topics = [idx for idx in news_topics.keys() if idx not in topic_to_anchor.keys()]
     if len(missing_topics) > 0:
