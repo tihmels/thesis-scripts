@@ -33,6 +33,8 @@ spacy_de = spacy.load('de_core_news_sm')
 nltk.download('stopwords')
 german_stop_words = stopwords.words('german')
 
+tagger = ht.HanoverTagger('morphmodel_ger.pgz')
+
 
 def get_text(tds: [TranscriptData]):
     return ' '.join([td.text for td in tds])
@@ -42,48 +44,37 @@ def to_datetime(time):
     return datetime(2000, 1, 1, time.hour, time.minute, time.second)
 
 
-def is_matching_headline(headline, text):
-    input_text = f'Headline: "{headline}". Story: "{text}". Q: Does the Headline fit the Story?'
+def extract_story_data(vao: VAO, first_shot_idx: int, last_shot_idx: int):
+    n_shots = last_shot_idx - first_shot_idx + 1
 
-    input_ids = tokenizer(input_text, return_tensors="pt").input_ids
+    first_frame_idx = vao.data.shots[first_shot_idx].first_frame_idx
+    last_frame_idx = vao.data.shots[last_shot_idx].last_frame_idx
 
-    outputs = model.generate(input_ids)
-    output = tokenizer.decode(outputs[0])
+    n_frames = last_frame_idx - first_frame_idx + 1
 
-    return 'yes' in output.lower()
+    from_time = sec_to_time(frame_idx_to_sec(first_frame_idx))
+    to_time = sec_to_time(frame_idx_to_sec(last_frame_idx))
+
+    timedelta = to_datetime(to_time) - to_datetime(from_time)
+    total_ss = timedelta.total_seconds()
+
+    return (first_frame_idx, last_frame_idx, n_frames, first_shot_idx, last_shot_idx, n_shots,
+            from_time.strftime('%H:%M:%S'), to_time.strftime('%H:%M:%S'), total_ss)
 
 
-def anchor_topic_detection(topics, anchor_shots, anchor_transcripts):
-    anchor_to_topic = {}
+def custom_preprocessor(text):
+    text = text.lower()
+    text = re.sub("\\W", " ", text)  # remove special chars
 
-    for topic_idx, headline in topics.items():
-
-        anchorshot_idxs = [idx for idx in anchor_shots.keys() if idx not in anchor_to_topic.keys()]
-
-        for anchor_idx in anchorshot_idxs:
-
-            transcript = get_text(anchor_transcripts[anchor_idx])
-
-            if is_matching_headline(headline, transcript):
-                anchor_to_topic[anchor_idx] = topic_idx
-                break
-
-    return anchor_to_topic
+    return tagger.analyze(text)[0]
 
 
 def get_count_vectorizer(text) -> CountVectorizer:
-    # vectorizer = CountVectorizer(lowercase=True, stop_words=german_stop_words, preprocessor=lemmatizer)
+    # vectorizer = CountVectorizer(lowercase=True, stop_words=german_stop_words, preprocessor=custom_preprocessor)
     vectorizer = CountVectorizer(lowercase=True, stop_words=german_stop_words)
     vectorizer.fit([text])
 
     return vectorizer
-
-
-tagger = ht.HanoverTagger('morphmodel_ger.pgz')
-
-
-def lemmatizer(word):
-    return tagger.tag_word(word)[0]
 
 
 def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts):
@@ -112,24 +103,6 @@ def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=5):
                                           (next_idx - 1 for next_idx in anchor_shots.keys() if next_idx > idx),
                                           idx), idx + max_shots, vao.n_shots))
         for idx in anchor_shots}
-
-
-def extract_story_data(vao: VAO, first_shot_idx: int, last_shot_idx: int):
-    n_shots = last_shot_idx - first_shot_idx + 1
-
-    first_frame_idx = vao.data.shots[first_shot_idx].first_frame_idx
-    last_frame_idx = vao.data.shots[last_shot_idx].last_frame_idx
-
-    n_frames = last_frame_idx - first_frame_idx + 1
-
-    from_time = sec_to_time(frame_idx_to_sec(first_frame_idx))
-    to_time = sec_to_time(frame_idx_to_sec(last_frame_idx))
-
-    timedelta = to_datetime(to_time) - to_datetime(from_time)
-    total_ss = timedelta.total_seconds()
-
-    return (first_frame_idx, last_frame_idx, n_frames, first_shot_idx, last_shot_idx, n_shots,
-            from_time.strftime('%H:%M:%S'), to_time.strftime('%H:%M:%S'), total_ss)
 
 
 def post_processing(topic_to_anchor, news_topics, anchor_shots):
