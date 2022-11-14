@@ -58,7 +58,7 @@ class VAO:
         from_time = from_time.replace(microsecond=0)
         to_time = add_sec_to_time(to_time, 1).replace(microsecond=0)
 
-        return [trans for trans in self.data.transcripts if from_time <= trans.start and trans.end <= to_time]
+        return [trans for trans in self.data.transcripts if from_time <= trans.end and trans.start <= to_time]
 
     def __str__(self):
         return str(self.path.relative_to(self.path.parent.parent)).split('.')[0]

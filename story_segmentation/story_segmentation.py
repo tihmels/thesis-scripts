@@ -86,10 +86,11 @@ def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts):
         bow_sum = [sum(vec) for vec in bow.toarray()]
         dt_matrix[idx] = bow_sum
 
-    argmax, values = np.argmax(dt_matrix, axis=1), np.max(dt_matrix, axis=1)
+    to_shot_idx = np.vectorize(lambda dt_idx: list(anchor_shots.keys())[dt_idx])
+    shot_idxs, values = to_shot_idx(np.argmax(dt_matrix, axis=1)), np.max(dt_matrix, axis=1)
 
-    return {topic_idx: list(anchor_shots.keys())[shot_idx] for idx, (topic_idx, shot_idx) in
-            enumerate(zip(topics, argmax)) if values[idx] > 0}
+    return {topic_idx: shot_idx for idx, (topic_idx, shot_idx) in
+            enumerate(zip(topics, shot_idxs)) if values[idx] > 0 and all(id < shot_idx for id in shot_idxs[:idx])}
 
 
 def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=5):
