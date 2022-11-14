@@ -14,9 +14,9 @@ parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs=
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing', help='')
 
 
-def split_story_transcripts(vd: VAO):
-    stories = vd.data.stories
-    transcripts = vd.data.transcripts
+def split_story_transcripts(vao: VAO):
+    stories = vao.data.stories
+    transcripts = vao.data.transcripts
 
     for story in stories:
         start = frame_idx_to_time(story.first_frame_idx)
@@ -65,16 +65,16 @@ def main(args):
     print(f'Split audio of {len(video_files)} videos ... \n')
 
     for idx, vf in enumerate(video_files):
-        vd = VAO(vf)
+        vao = VAO(vf)
 
-        print(f'[{idx + 1}/{len(video_files)}] {vd}')
+        print(f'[{idx + 1}/{len(video_files)}] {vao}')
 
-        create_dir(vd.dirs.transcripts_dir, rm_if_exist=True)
+        create_dir(vao.dirs.transcripts_dir, rm_if_exist=True)
 
-        for story_idx, transcript in enumerate(split_story_transcripts(vd)):
+        for story_idx, transcript in enumerate(split_story_transcripts(vao)):
             text = ' '.join([transcript.text for transcript in transcript])
 
-            target_file = Path(vd.dirs.transcripts_dir, 'story_' + str(story_idx) + '.txt')
+            target_file = Path(vao.dirs.transcripts_dir, 'story_' + str(story_idx) + '.txt')
 
             with open(target_file, 'w') as file:
                 file.write(text)
