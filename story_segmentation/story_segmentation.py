@@ -11,6 +11,7 @@ import spacy
 from fuzzywuzzy import fuzz
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import CountVectorizer
+from HanTa import HanoverTagger as ht
 
 from common.DataModel import TranscriptData
 from common.Schemas import STORY_COLUMNS
@@ -24,7 +25,6 @@ parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs=
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
 spacy_de = spacy.load('de_core_news_sm')
-spacy_de_lg = spacy.load('de_core_news_lg')
 
 # tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-xl")
 # model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-xl")
@@ -79,7 +79,8 @@ def get_count_vectorizer(text) -> CountVectorizer:
 
 
 def spacy_lemmatizer(text):
-    lemmatized = [token.lemma_ for token in spacy_de_lg(text)]
+    tagger = ht.HanoverTagger('morphmodel_ger.pgz')
+    lemmatized = [lemma for lemma, type in tagger.analyze(text)]
     return ' '.join(lemmatized)
 
 
