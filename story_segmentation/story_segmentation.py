@@ -79,8 +79,8 @@ def get_count_vectorizer(text) -> CountVectorizer:
 def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts):
     dt_matrix = np.zeros(shape=(len(topics), len(anchor_shots)), dtype=np.int8)
 
-    for idx, headline in topics.items():
-        vectorizer = get_count_vectorizer(headline)
+    for idx, topic in topics.items():
+        vectorizer = get_count_vectorizer(topic)
         bow = vectorizer.transform([get_text(tds) for tds in anchor_transcripts.values()])
 
         bow_sum = [sum(vec) for vec in bow.toarray()]
@@ -88,7 +88,8 @@ def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts):
 
     argmax, values = np.argmax(dt_matrix, axis=1), np.max(dt_matrix, axis=1)
 
-    return {topic_idx: anchor_idx for topic_idx, anchor_idx in zip(topics, argmax) if values[anchor_idx] > 0}
+    return {topic_idx: list(anchor_shots.keys())[shot_idx] for idx, (topic_idx, shot_idx) in
+            enumerate(zip(topics, argmax)) if values[idx] > 0}
 
 
 def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=5):
