@@ -4,7 +4,6 @@ import operator
 import re
 from argparse import ArgumentParser
 from pathlib import Path
-from string import punctuation
 
 import numpy as np
 import pandas as pd
@@ -12,8 +11,9 @@ import spacy
 from HanTa import HanoverTagger as ht
 from fuzzywuzzy import fuzz
 from nltk.corpus import stopwords
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 
+from charsplit.splitter import Splitter
 from common.DataModel import TranscriptData
 from common.Schemas import STORY_COLUMNS
 from common.VAO import VAO, get_shot_file, get_date_time, get_banner_caption_file, get_story_file, \
@@ -29,14 +29,10 @@ spacy_de = spacy.load('de_core_news_sm')
 german_stop_words = stopwords.words('german')
 
 tagger = ht.HanoverTagger('morphmodel_ger.pgz')
+splitter = Splitter()
 
 
 def lemmatizer(text):
-    """
-    Lemmetize words using spacy
-    :param: text as string
-    :return: lemmetized text as string
-    """
     return [tag for word in text for tag in tagger.analyze(word)[:1]]
 
 
@@ -83,24 +79,22 @@ def umlauts(text):
     return temp_var
 
 
-abbrvs = {'AKW': 'Atomkraftwerk'}
+abbreviations = {'AKW': 'Atomkraftwerk', 'WM': 'Weltmeisterschaft'}
 
 
-def abbreviations(text):
-    for abbrv in abbrvs:
-        text = re.sub(abbrv[0], abbrv[1], text)
+def abbrvs(text):
+    for abbrv, sub in abbreviations.items():
+        text = re.sub(abbrv, sub, text)
     return text
 
 
 def custom_preprocessor(text):
-    # text = abbreviations(text)
+    text = abbrvs(text)
 
     text = text.lower()
-    text = re.sub("\\W", " ", text)  # remove special chars
-
     text = umlauts(text)
-    remove_pun = str.maketrans('', '', punctuation)
-    text = text.translate(remove_pun)
+
+    text = re.sub("\\W", " ", text)  # remove special chars
 
     german_stop_words_to_use = []  # List to hold words after conversion
 
@@ -113,23 +107,27 @@ def custom_preprocessor(text):
 
 
 def custom_tokenizer(text):
-    return lemmatizer(text)
+    splits = [list(split[1:]) for word in text for split in splitter.split_compound(word) if split[0] > 0.9]
+    splits = [item for t in splits for item in t]
+
+    return lemmatizer(text + splits)
 
 
-def get_count_vectorizer(text) -> CountVectorizer:
-    vectorizer = CountVectorizer(preprocessor=custom_preprocessor, tokenizer=custom_tokenizer, token_pattern=None)
-    # vectorizer = CountVectorizer(lowercase=True, stop_words=german_stop_words)
+def get_vectorizer(text) -> TfidfVectorizer:
+    vectorizer = TfidfVectorizer(preprocessor=custom_preprocessor, tokenizer=custom_tokenizer, token_pattern=None)
     vectorizer.fit([text])
 
     return vectorizer
 
 
 def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts):
-    dt_matrix = np.zeros(shape=(len(topics), len(anchor_shots)), dtype=np.int8)
+    dt_matrix = np.zeros(shape=(len(topics), len(anchor_shots)))
 
     for idx, topic in topics.items():
-        vectorizer = get_count_vectorizer(topic)
-        bow = vectorizer.transform([get_text(tds) for tds in anchor_transcripts.values()])
+        vectorizer = get_vectorizer(topic)
+        bow = vectorizer.transform([transcript for transcript in anchor_transcripts.values()])
+
+        voc = vectorizer.vocabulary_
 
         bow_sum = [sum(vec) for vec in bow.toarray()]
         dt_matrix[idx] = bow_sum
@@ -145,10 +143,10 @@ def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts):
 
 def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=5):
     return {
-        idx: vao.get_shot_transcripts(idx,
-                                      min(next(
-                                          (next_idx - 1 for next_idx in anchor_shots.keys() if next_idx > idx),
-                                          idx), idx + max_shots, vao.n_shots))
+        idx: get_text(vao.get_shot_transcripts(idx,
+                                               min(next(
+                                                   (next_idx - 1 for next_idx in anchor_shots.keys() if next_idx > idx),
+                                                   idx), idx + max_shots, vao.n_shots)))
         for idx in anchor_shots}
 
 
@@ -176,7 +174,7 @@ def segment_ts15(vao: VAO):
         idx for idx, shot in enumerate(vao.data.shots) if shot.type == 'weather' or shot.type == 'lotto')
     anchor_shots = {idx: sd for idx, sd in enumerate(vao.data.shots) if sd.type == 'anchor' and idx < shot_cutoff_idx}
 
-    anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 2)
+    anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 5)
 
     topic_to_anchor = topic_to_anchor_by_transcript(news_topics, anchor_shots, anchor_transcripts)
     topic_to_anchor = post_processing(topic_to_anchor, news_topics, anchor_shots)

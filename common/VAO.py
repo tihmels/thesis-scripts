@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from functools import cached_property
 from pathlib import Path
 from typing import Union
 
@@ -11,18 +12,6 @@ from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT
     STORY_TRANSCRIPT_FILENAME_RE, AUDIO_DIR, FRAME_DIR, KF_DIR, TRANSCRIPT_DIR, SM_DIR, TOPICS_FILENAME, \
     CAPTIONS_FILENAME, SHOT_CLASS_FILENAME, SHOT_FILENAME, TRANSCRIPT_FILENAME, STORY_FILENAME
 from common.fs_utils import frame_idx_to_time, add_sec_to_time
-
-
-def lazy_property(fn):
-    attr_name = '_lazy_' + fn.__name__
-
-    @property
-    def _lazy_property(self):
-        if not hasattr(self, attr_name):
-            setattr(self, attr_name, fn(self))
-        return getattr(self, attr_name)
-
-    return _lazy_property
 
 
 class VAO:
@@ -87,35 +76,35 @@ class VAO:
         def __init__(self, path: Path):
             self._path: Path = path
 
-        @lazy_property
+        @cached_property
         def frames(self) -> [Path]:
             return sorted(get_frame_paths(self._path))
 
-        @lazy_property
+        @cached_property
         def keyframes(self) -> [Path]:
             return sorted(get_keyframe_paths(self._path))
 
-        @lazy_property
+        @cached_property
         def topics(self) -> [str]:
             return read_topics_from_file(get_topic_file(self._path))
 
-        @lazy_property
+        @cached_property
         def audio(self) -> Path:
             return get_main_audio_file(self._path)
 
-        @lazy_property
+        @cached_property
         def shots(self) -> [ShotData]:
             return read_shots_from_file(get_shot_file(self._path))
 
-        @lazy_property
+        @cached_property
         def captions(self) -> [CaptionData]:
             return read_banner_captions_from_file(get_banner_caption_file(self._path))
 
-        @lazy_property
+        @cached_property
         def stories(self) -> [StoryData]:
             return read_stories_from_file(get_story_file(self._path))
 
-        @lazy_property
+        @cached_property
         def transcripts(self) -> [TranscriptData]:
             return read_transcript_from_file(get_main_transcript_file(self._path))
 
