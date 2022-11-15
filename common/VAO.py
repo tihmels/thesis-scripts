@@ -13,6 +13,18 @@ from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT
 from common.fs_utils import frame_idx_to_time, add_sec_to_time
 
 
+def lazy_property(fn):
+    attr_name = '_lazy_' + fn.__name__
+
+    @property
+    def _lazy_property(self):
+        if not hasattr(self, attr_name):
+            setattr(self, attr_name, fn(self))
+        return getattr(self, attr_name)
+
+    return _lazy_property
+
+
 class VAO:
     def __init__(self, path: Path):
         self.id: str = path.stem
@@ -74,59 +86,38 @@ class VAO:
     class Data:
         def __init__(self, path: Path):
             self._path: Path = path
-            self._topics: [str] = None
-            self._frames: [Path] = None
-            self._keyframes: [Path] = None
-            self._shots: [ShotData] = None
-            self._stories: [StoryData] = None
-            self._transcript: [TranscriptData] = None
-            self._captions: [CaptionData] = None
 
-        @property
+        @lazy_property
         def frames(self) -> [Path]:
-            if self._frames is None:
-                self._frames = sorted(get_frame_paths(self._path))
-            return self._frames
+            return sorted(get_frame_paths(self._path))
 
-        @property
+        @lazy_property
         def keyframes(self) -> [Path]:
-            if self._keyframes is None:
-                self._keyframes = sorted(get_keyframe_paths(self._path))
-            return self._keyframes
+            return sorted(get_keyframe_paths(self._path))
 
-        @property
+        @lazy_property
         def topics(self) -> [str]:
-            if self._topics is None:
-                self._topics = read_topics_from_file(get_topic_file(self._path))
-            return self._topics
+            return read_topics_from_file(get_topic_file(self._path))
 
-        @property
+        @lazy_property
         def audio(self) -> Path:
             return get_main_audio_file(self._path)
 
-        @property
+        @lazy_property
         def shots(self) -> [ShotData]:
-            if self._shots is None:
-                self._shots = read_shots_from_file(get_shot_file(self._path))
-            return self._shots
+            return read_shots_from_file(get_shot_file(self._path))
 
-        @property
+        @lazy_property
         def captions(self) -> [CaptionData]:
-            if self._captions is None:
-                self._captions = read_banner_captions_from_file(get_banner_caption_file(self._path))
-            return self._captions
+            return read_banner_captions_from_file(get_banner_caption_file(self._path))
 
-        @property
+        @lazy_property
         def stories(self) -> [StoryData]:
-            if self._stories is None:
-                self._stories = read_stories_from_file(get_story_file(self._path))
-            return self._stories
+            return read_stories_from_file(get_story_file(self._path))
 
-        @property
+        @lazy_property
         def transcripts(self) -> [TranscriptData]:
-            if self._transcript is None:
-                self._transcript = read_transcript_from_file(get_main_transcript_file(self._path))
-            return self._transcript
+            return read_transcript_from_file(get_main_transcript_file(self._path))
 
 
 VideoPathType = Union[VAO, Path]
