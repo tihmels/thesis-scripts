@@ -1,11 +1,11 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
+
 import operator
 import re
 from argparse import ArgumentParser
-from datetime import datetime
 from pathlib import Path
+from string import punctuation
 
-import nltk
 import numpy as np
 import pandas as pd
 import spacy
@@ -19,29 +19,29 @@ from common.Schemas import STORY_COLUMNS
 from common.VAO import VAO, get_shot_file, get_date_time, get_banner_caption_file, get_story_file, \
     get_topic_file, is_summary, read_shots_from_file
 from common.constants import TV_FILENAME_RE
-from common.fs_utils import frame_idx_to_sec, sec_to_time
+from common.fs_utils import frame_idx_to_sec, sec_to_time, time_to_datetime
 
 parser = ArgumentParser('Story Segmentation')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
 spacy_de = spacy.load('de_core_news_sm')
-
-# tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-xl")
-# model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-xl")
-
-nltk.download('stopwords')
 german_stop_words = stopwords.words('german')
 
 tagger = ht.HanoverTagger('morphmodel_ger.pgz')
 
 
+def lemmatizer(text):
+    """
+    Lemmetize words using spacy
+    :param: text as string
+    :return: lemmetized text as string
+    """
+    return [tag for word in text for tag in tagger.analyze(word)[:1]]
+
+
 def get_text(tds: [TranscriptData]):
     return ' '.join([td.text for td in tds])
-
-
-def to_datetime(time):
-    return datetime(2000, 1, 1, time.hour, time.minute, time.second)
 
 
 def extract_story_data(vao: VAO, first_shot_idx: int, last_shot_idx: int):
@@ -55,23 +55,70 @@ def extract_story_data(vao: VAO, first_shot_idx: int, last_shot_idx: int):
     from_time = sec_to_time(frame_idx_to_sec(first_frame_idx))
     to_time = sec_to_time(frame_idx_to_sec(last_frame_idx))
 
-    timedelta = to_datetime(to_time) - to_datetime(from_time)
+    timedelta = time_to_datetime(to_time) - time_to_datetime(from_time)
     total_ss = timedelta.total_seconds()
 
     return (first_frame_idx, last_frame_idx, n_frames, first_shot_idx, last_shot_idx, n_shots,
             from_time.strftime('%H:%M:%S'), to_time.strftime('%H:%M:%S'), total_ss)
 
 
+def umlauts(text):
+    """
+    Replace umlauts for a given text
+
+    :param text: text as string
+    :return: manipulated text as str
+    """
+
+    temp_var = text  # local variable
+
+    temp_var = temp_var.replace('ä', 'ae')
+    temp_var = temp_var.replace('ö', 'oe')
+    temp_var = temp_var.replace('ü', 'ue')
+    temp_var = temp_var.replace('Ä', 'Ae')
+    temp_var = temp_var.replace('Ö', 'Oe')
+    temp_var = temp_var.replace('Ü', 'Ue')
+    temp_var = temp_var.replace('ß', 'ss')
+
+    return temp_var
+
+
+abbrvs = {'AKW': 'Atomkraftwerk'}
+
+
+def abbreviations(text):
+    for abbrv in abbrvs:
+        text = re.sub(abbrv[0], abbrv[1], text)
+    return text
+
+
 def custom_preprocessor(text):
+    # text = abbreviations(text)
+
     text = text.lower()
     text = re.sub("\\W", " ", text)  # remove special chars
 
-    return tagger.analyze(text)[0]
+    text = umlauts(text)
+    remove_pun = str.maketrans('', '', punctuation)
+    text = text.translate(remove_pun)
+
+    german_stop_words_to_use = []  # List to hold words after conversion
+
+    for word in german_stop_words:
+        german_stop_words_to_use.append(umlauts(word))
+
+    text_wo_stop_words = [word for word in text.split() if word.lower() not in german_stop_words_to_use]
+
+    return text_wo_stop_words
+
+
+def custom_tokenizer(text):
+    return lemmatizer(text)
 
 
 def get_count_vectorizer(text) -> CountVectorizer:
-    # vectorizer = CountVectorizer(lowercase=True, stop_words=german_stop_words, preprocessor=custom_preprocessor)
-    vectorizer = CountVectorizer(lowercase=True, stop_words=german_stop_words)
+    vectorizer = CountVectorizer(preprocessor=custom_preprocessor, tokenizer=custom_tokenizer, token_pattern=None)
+    # vectorizer = CountVectorizer(lowercase=True, stop_words=german_stop_words)
     vectorizer.fit([text])
 
     return vectorizer
@@ -121,15 +168,15 @@ def post_processing(topic_to_anchor, news_topics, anchor_shots):
 
 
 def segment_ts15(vao: VAO):
-    anchor_shots = {idx: shot for idx, shot in enumerate(vao.data.shots) if shot.type == 'anchor'}
-    news_topics = {idx: title for idx, title in enumerate(vao.data.topics[:-1]) if
-                   not 'Lottozahlen' in title}  # last shot is always weather
+    topics_cutoff_idx = next(
+        idx for idx, topic in enumerate(vao.data.topics) if re.search(r"^(Die Lottozahlen|Das Wetter)$", topic))
+    news_topics = {idx: title for idx, title, in enumerate(vao.data.topics) if idx < topics_cutoff_idx}
 
     shot_cutoff_idx = next(
         idx for idx, shot in enumerate(vao.data.shots) if shot.type == 'weather' or shot.type == 'lotto')
-    anchor_shots = {idx: sd for idx, sd in anchor_shots.items() if idx < shot_cutoff_idx}
+    anchor_shots = {idx: sd for idx, sd in enumerate(vao.data.shots) if sd.type == 'anchor' and idx < shot_cutoff_idx}
 
-    anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 3)
+    anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 2)
 
     topic_to_anchor = topic_to_anchor_by_transcript(news_topics, anchor_shots, anchor_transcripts)
     topic_to_anchor = post_processing(topic_to_anchor, news_topics, anchor_shots)
