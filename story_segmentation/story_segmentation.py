@@ -11,7 +11,7 @@ import spacy
 from HanTa import HanoverTagger as ht
 from fuzzywuzzy import fuzz
 from nltk.corpus import stopwords
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from charsplit.splitter import Splitter
 from common.DataModel import TranscriptData
@@ -175,6 +175,12 @@ def segment_ts15(vao: VAO):
     anchor_shots = {idx: sd for idx, sd in enumerate(vao.data.shots) if sd.type == 'anchor' and idx < shot_cutoff_idx}
 
     anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 5)
+
+    # if len(news_topics) == len(anchor_shots) or len(news_topics) == len(anchor_shots) - 1:
+    #     topic_to_anchor = {topic_idx: shot_idx for topic_idx, shot_idx in zip(news_topics.keys(), anchor_shots.keys())}
+    # else:
+    #     topic_to_anchor = topic_to_anchor_by_transcript(news_topics, anchor_shots, anchor_transcripts)
+    #     topic_to_anchor = post_processing(topic_to_anchor, news_topics, anchor_shots)
 
     topic_to_anchor = topic_to_anchor_by_transcript(news_topics, anchor_shots, anchor_transcripts)
     topic_to_anchor = post_processing(topic_to_anchor, news_topics, anchor_shots)

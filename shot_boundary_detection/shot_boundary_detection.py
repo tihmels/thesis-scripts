@@ -56,6 +56,8 @@ def check_requirements(video: Path):
         print(f'{video.name} has no extracted frames.')
         return False
 
+
+
     return True
 
 
@@ -68,7 +70,7 @@ def was_processed(video: Path):
     frames = get_frame_paths(video)
 
     shots = read_shots_from_file(shot_file)
-    return shots[-1].last_frame_idx == len(frames)
+    return len(frames) - 15 < shots[-1].last_frame_idx < len(frames)
 
 
 def main(args):

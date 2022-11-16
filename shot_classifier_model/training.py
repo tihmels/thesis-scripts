@@ -12,9 +12,9 @@ parser = ArgumentParser()
 parser.add_argument('-d', '--dataset', type=lambda p: Path(p).resolve(strict=True),
                     default="/Users/tihmels/TS/ts-dataset")
 parser.add_argument('-c', '--classes', type=str, default=[], nargs='+')
-parser.add_argument('-e', '--epochs', type=int, default=15, help="number of epochs")
+parser.add_argument('-e', '--epochs', type=int, default=25, help="number of epochs")
 parser.add_argument('--bs', '--batch_size', type=int, default=32, help="batch size")
-parser.add_argument('--shape', type=lambda s: list(map(int, s.split('x'))), default="331x331", help="<width>x<height>")
+parser.add_argument('--shape', type=lambda s: list(map(int, s.split('x'))), default="299x299", help="<width>x<height>")
 parser.add_argument('--ft', '--finetune', type=int, default=0)
 
 
@@ -93,8 +93,8 @@ def main(args):
 
     input_shape = (height, width, 3)
 
-    optim_1 = tf.keras.optimizers.Adam(learning_rate=0.001)
-    optim_2 = tf.keras.optimizers.Adam(lr=0.0001)
+    optim_1 = tf.keras.optimizers.Adam(lr=1e-4)
+    optim_2 = tf.keras.optimizers.Adam(lr=1e-5)
 
     model = create_model(input_shape, len(classes), optim_1 if args.ft == 0 else optim_2, args.ft)
 
