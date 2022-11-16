@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from common.VAO import VAO, get_shot_file, get_data_dir, get_frame_dir, get_frame_paths, get_date_time, \
-    get_main_transcript_file
+    get_main_transcript_file, read_shots_from_file
 from common.constants import TV_FILENAME_RE
 from common.fs_utils import read_images
 from post_sbd import fix_first_anchorshot_segment
@@ -60,7 +60,15 @@ def check_requirements(video: Path):
 
 
 def was_processed(video: Path):
-    return get_shot_file(video).is_file()
+    shot_file = get_shot_file(video)
+
+    if not shot_file.is_file():
+        return False
+
+    frames = get_frame_paths(video)
+
+    shots = read_shots_from_file(shot_file)
+    return shots[-1].last_frame_idx == len(frames)
 
 
 def main(args):

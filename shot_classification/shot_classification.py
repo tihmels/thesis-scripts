@@ -6,9 +6,9 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from alive_progress import alive_bar
+from alive_progress import alive_bar, alive_it
 
-from common.VAO import get_date_time, VAO, get_shot_classification_file, get_shot_file, get_keyframe_dir, \
+from common.VAO import get_date_time, VAO, get_shot_file, get_keyframe_dir, \
     get_keyframe_paths, read_shots_from_file
 from common.constants import TV_FILENAME_RE
 from shot_classifier_model.inference import classify_video_shots
@@ -63,7 +63,7 @@ def main(args):
                 results.append(result[0][0])
                 bar()
 
-        shots = [(sd.first_frame_idx, sd.last_frame_idx) for sd in vao.data.shots]
+        shots = [(shot.first_frame_idx, shot.last_frame_idx) for shot in vao.data.shots]
         shots_and_type = [(first_idx, last_idx, shot_type) for (first_idx, last_idx), shot_type in zip(shots, results)]
 
         df = pd.DataFrame(data=np.array(shots_and_type), columns=['first_frame_idx', 'last_frame_idx', 'type'])
