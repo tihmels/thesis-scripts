@@ -9,9 +9,11 @@ import numpy as np
 import pandas as pd
 import spacy
 from HanTa import HanoverTagger as ht
+from PIL import Image, ImageEnhance
 from fuzzywuzzy import fuzz
 from nltk.corpus import stopwords
-from sklearn.feature_extraction.text import TfidfVectorizer
+from pytesseract import pytesseract
+from sklearn.feature_extraction.text import CountVectorizer
 
 from charsplit.splitter import Splitter
 from common.DataModel import TranscriptData
@@ -110,26 +112,29 @@ def custom_tokenizer(text):
     splits = [list(split[1:]) for word in text for split in splitter.split_compound(word) if split[0] > 0.9]
     splits = [item for t in splits for item in t]
 
-    return lemmatizer(text + splits)
+    return lemmatizer(set(text + splits))
 
 
-def get_vectorizer(text) -> TfidfVectorizer:
-    vectorizer = TfidfVectorizer(preprocessor=custom_preprocessor, tokenizer=custom_tokenizer, token_pattern=None)
+def get_vectorizer(text) -> CountVectorizer:
+    vectorizer = CountVectorizer(preprocessor=custom_preprocessor, tokenizer=custom_tokenizer, token_pattern=None)
     vectorizer.fit([text])
 
     return vectorizer
 
 
-def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts):
+def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts, anchor_captions):
     dt_matrix = np.zeros(shape=(len(topics), len(anchor_shots)))
 
     for idx, topic in topics.items():
         vectorizer = get_vectorizer(topic)
-        bow = vectorizer.transform([transcript for transcript in anchor_transcripts.values()])
 
+        bow_caption = vectorizer.transform([caption for caption in anchor_captions.values()])
+        bow_transcript = vectorizer.transform([transcript for transcript in anchor_transcripts.values()])
+
+        bow = bow_transcript.toarray() + bow_caption.toarray()
         voc = vectorizer.vocabulary_
 
-        bow_sum = [sum(vec) for vec in bow.toarray()]
+        bow_sum = [sum(vec) for vec in bow]
         dt_matrix[idx] = bow_sum
 
     argmax, values = np.argmax(dt_matrix, axis=1), np.max(dt_matrix, axis=1)
@@ -148,6 +153,37 @@ def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=5):
                                                    (next_idx - 1 for next_idx in anchor_shots.keys() if next_idx > idx),
                                                    idx), idx + max_shots, vao.n_shots)))
         for idx in anchor_shots}
+
+
+def get_caption_area(frame, resize_factor):
+    return frame[155 * resize_factor:225 * resize_factor, 50 * resize_factor:280 * resize_factor]
+
+
+def get_caption(frame: Path, resize_factor=3):
+    frame = Image.open(frame).convert('L')
+
+    sharpness_enhancer = ImageEnhance.Sharpness(frame)
+    frame = sharpness_enhancer.enhance(2)
+
+    frame = frame.resize(
+        (frame.size[0] * resize_factor, frame.size[1] * resize_factor))
+    frame = np.array(frame)
+
+    caption_area = get_caption_area(frame, resize_factor)
+
+    caption_area = caption_area > 165
+
+    Image.fromarray(caption_area).save('/Users/tihmels/Desktop/test.jpg')
+
+    caption_data = pytesseract.image_to_string(caption_area, lang='deu', config='--psm 6 --oem 1')
+
+    return re.sub(r"[^a-zA-Z0-9 ]", " ", caption_data)
+
+
+def get_anchor_captions(vao: VAO, anchor_shots):
+    return {
+        idx: get_caption(vao.data.frames[shot.center_frame_idx]) for idx, shot in anchor_shots.items()
+    }
 
 
 def post_processing(topic_to_anchor, news_topics, anchor_shots):
@@ -174,7 +210,8 @@ def segment_ts15(vao: VAO):
         idx for idx, shot in enumerate(vao.data.shots) if shot.type == 'weather' or shot.type == 'lotto')
     anchor_shots = {idx: sd for idx, sd in enumerate(vao.data.shots) if sd.type == 'anchor' and idx < shot_cutoff_idx}
 
-    anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 5)
+    anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 3)
+    anchor_captions = get_anchor_captions(vao, anchor_shots)
 
     # if len(news_topics) == len(anchor_shots) or len(news_topics) == len(anchor_shots) - 1:
     #     topic_to_anchor = {topic_idx: shot_idx for topic_idx, shot_idx in zip(news_topics.keys(), anchor_shots.keys())}
@@ -182,7 +219,7 @@ def segment_ts15(vao: VAO):
     #     topic_to_anchor = topic_to_anchor_by_transcript(news_topics, anchor_shots, anchor_transcripts)
     #     topic_to_anchor = post_processing(topic_to_anchor, news_topics, anchor_shots)
 
-    topic_to_anchor = topic_to_anchor_by_transcript(news_topics, anchor_shots, anchor_transcripts)
+    topic_to_anchor = topic_to_anchor_by_transcript(news_topics, anchor_shots, anchor_transcripts, anchor_captions)
     topic_to_anchor = post_processing(topic_to_anchor, news_topics, anchor_shots)
 
     missing_topics = [idx for idx in news_topics.keys() if idx not in topic_to_anchor.keys()]
@@ -202,7 +239,7 @@ def segment_ts15(vao: VAO):
 
         story_data = extract_story_data(vao, first_shot_idx, last_shot_idx)
 
-        stories.append((story_title, *story_data))
+        stories.append((topic_idx, story_title, *story_data))
 
     df = pd.DataFrame(data=stories, columns=STORY_COLUMNS)
 
@@ -259,7 +296,7 @@ def segment_ts100(vao: VAO):
 
     stories = []
 
-    for story in story_indices:
+    for topic_idx, story in enumerate(story_indices):
 
         story_captions = [captions[idx] for idx in story]
 
@@ -270,7 +307,7 @@ def segment_ts100(vao: VAO):
 
         story_data = extract_story_data(vao, min(story), max(story))
 
-        stories.append((story_title, *story_data))
+        stories.append((topic_idx, story_title, *story_data))
 
     df = pd.DataFrame(data=stories, columns=STORY_COLUMNS)
 

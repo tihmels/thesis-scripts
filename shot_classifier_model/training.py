@@ -111,10 +111,10 @@ def main(args):
                                restore_best_weights=True)
 
     model.fit(train_ds,
-                     epochs=args.epochs,
-                     validation_data=val_ds,
-                     callbacks=[checkpoint, early_stop]
-                     )
+              epochs=args.epochs,
+              validation_data=val_ds,
+              callbacks=[checkpoint, early_stop]
+              )
 
     model.save(
         Path(Path(__file__).resolve().parent, 'model', 'ts_anchor_model'),
