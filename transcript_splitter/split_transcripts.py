@@ -7,7 +7,7 @@ from pathlib import Path
 from common.VAO import get_date_time, VAO, get_main_transcript_file, get_story_file, get_story_transcripts, \
     read_stories_from_file
 from common.constants import TV_FILENAME_RE
-from common.fs_utils import frame_idx_to_time, create_dir, add_sec_to_time
+from common.utils import frame_idx_to_time, create_dir, add_sec_to_time
 
 parser = ArgumentParser('Automatic Speech Recognition using OpenAI Whisper')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help='Tagesschau video file(s)')

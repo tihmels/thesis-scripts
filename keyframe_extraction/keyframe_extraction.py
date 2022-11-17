@@ -14,7 +14,7 @@ from common.VAO import VAO, get_frame_dir, get_frame_paths, get_shot_file, get_k
     get_keyframe_paths, \
     read_shots_from_file, get_date_time
 from common.constants import TV_FILENAME_RE
-from common.fs_utils import create_dir, read_images
+from common.utils import create_dir, read_images
 
 parser = argparse.ArgumentParser('Keyframe Extraction')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help='Tagesschau video file(s)')

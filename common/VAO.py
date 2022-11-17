@@ -11,7 +11,7 @@ from common.Schemas import SHOT_COLUMNS, CAPTION_COLUMNS, STORY_COLUMNS, TRANSCR
 from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT_AUDIO_FILENAME_RE, \
     STORY_TRANSCRIPT_FILENAME_RE, AUDIO_DIR, FRAME_DIR, KF_DIR, TRANSCRIPT_DIR, SM_DIR, TOPICS_FILENAME, \
     CAPTIONS_FILENAME, SHOT_CLASS_FILENAME, SHOT_FILENAME, TRANSCRIPT_FILENAME, STORY_FILENAME
-from common.fs_utils import frame_idx_to_time, add_sec_to_time
+from common.utils import frame_idx_to_time, add_sec_to_time
 
 
 class VAO:

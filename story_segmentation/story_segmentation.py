@@ -21,7 +21,7 @@ from common.Schemas import STORY_COLUMNS
 from common.VAO import VAO, get_shot_file, get_date_time, get_banner_caption_file, get_story_file, \
     get_topic_file, is_summary, read_shots_from_file
 from common.constants import TV_FILENAME_RE
-from common.fs_utils import frame_idx_to_sec, sec_to_time, time_to_datetime
+from common.utils import frame_idx_to_sec, sec_to_time, time_to_datetime
 
 parser = ArgumentParser('Story Segmentation')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')

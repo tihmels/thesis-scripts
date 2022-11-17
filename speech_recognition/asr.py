@@ -8,7 +8,7 @@ from pathlib import Path
 import whisper
 from pandas import DataFrame
 
-from common.VAO import VAO, get_audio_dir, get_shot_file, get_date_time, \
+from common.VAO import VAO, get_audio_dir, get_date_time, \
     get_main_audio_file, get_main_transcript_file
 from common.constants import TV_FILENAME_RE
 
