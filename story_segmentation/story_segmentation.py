@@ -112,11 +112,12 @@ def custom_tokenizer(text):
     splits = [list(split[1:]) for word in text for split in splitter.split_compound(word) if split[0] > 0.9]
     splits = [item for t in splits for item in t]
 
-    return lemmatizer(set(text + splits))
+    return lemmatizer(text + splits)
 
 
 def get_vectorizer(text) -> CountVectorizer:
-    vectorizer = CountVectorizer(preprocessor=custom_preprocessor, tokenizer=custom_tokenizer, token_pattern=None)
+    vectorizer = CountVectorizer(preprocessor=custom_preprocessor, tokenizer=custom_tokenizer, ngram_range=(1, 2),
+                                 token_pattern=None)
     vectorizer.fit([text])
 
     return vectorizer
@@ -128,11 +129,12 @@ def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts, anch
     for idx, topic in topics.items():
         vectorizer = get_vectorizer(topic)
 
+        voc = vectorizer.vocabulary_
+
         bow_caption = vectorizer.transform([caption for caption in anchor_captions.values()])
         bow_transcript = vectorizer.transform([transcript for transcript in anchor_transcripts.values()])
 
-        bow = bow_transcript.toarray() + bow_caption.toarray()
-        voc = vectorizer.vocabulary_
+        bow = np.multiply(bow_caption.toarray(), 2) + bow_transcript.toarray()
 
         bow_sum = [sum(vec) for vec in bow]
         dt_matrix[idx] = bow_sum
@@ -213,12 +215,6 @@ def segment_ts15(vao: VAO):
     anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 3)
     anchor_captions = get_anchor_captions(vao, anchor_shots)
 
-    # if len(news_topics) == len(anchor_shots) or len(news_topics) == len(anchor_shots) - 1:
-    #     topic_to_anchor = {topic_idx: shot_idx for topic_idx, shot_idx in zip(news_topics.keys(), anchor_shots.keys())}
-    # else:
-    #     topic_to_anchor = topic_to_anchor_by_transcript(news_topics, anchor_shots, anchor_transcripts)
-    #     topic_to_anchor = post_processing(topic_to_anchor, news_topics, anchor_shots)
-
     topic_to_anchor = topic_to_anchor_by_transcript(news_topics, anchor_shots, anchor_transcripts, anchor_captions)
     topic_to_anchor = post_processing(topic_to_anchor, news_topics, anchor_shots)
 
@@ -234,7 +230,7 @@ def segment_ts15(vao: VAO):
         story_title = news_topics[topic_idx]
 
         first_shot_idx = anchor_idx
-        last_shot_idx = next((next_idx for next_idx in list(topic_to_anchor.values()) if next_idx > anchor_idx),
+        last_shot_idx = next((next_idx for next_idx in list(anchor_shots.keys()) if next_idx > anchor_idx),
                              list(anchor_shots.keys())[-1]) - 1
 
         story_data = extract_story_data(vao, first_shot_idx, last_shot_idx)

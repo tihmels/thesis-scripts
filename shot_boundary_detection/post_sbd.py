@@ -8,9 +8,10 @@ import numpy as np
 import pandas as pd
 from fuzzywuzzy import fuzz
 
-from common.VAO import VAO, get_date_time, is_summary, get_main_transcript_file, get_shot_file
+from common.VAO import VA
+O, get_date_time, is_summary, get_main_transcript_file, get_shot_file
 from common.constants import TV_FILENAME_RE
-from common.fs_utils import sec_to_frame_idx
+from common.utils import sec_to_frame_idx
 
 parser = argparse.ArgumentParser()
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")

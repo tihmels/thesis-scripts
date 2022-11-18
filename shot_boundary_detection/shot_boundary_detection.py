@@ -56,8 +56,6 @@ def check_requirements(video: Path):
         print(f'{video.name} has no extracted frames.')
         return False
 
-
-
     return True
 
 
