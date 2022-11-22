@@ -1,5 +1,3 @@
-### Directories
-
 BASE_PATH = "/Users/tihmels/TS"
 SUMMARY_VIDEOS_PATH = BASE_PATH + "/ts100"
 MAIN_VIDEOS_PATH = BASE_PATH + "/ts15"

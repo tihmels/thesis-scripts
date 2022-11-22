@@ -26,23 +26,32 @@ parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
 TS_LOGO = np.array(Image.open(TS_LOGO).convert('L'))
 
 
-def preprocess_caption_area(caption_area, is_nightly):
+def resize_frame(frame, resize_factor):
+    height, width = frame.size
+    return frame.resize((height * resize_factor, width * resize_factor))
+
+
+def binarize_frame(frame, is_nightly):
+    frame = np.array(frame)
+
     if is_nightly:
-        binary = caption_area > 205
+        binary = frame > 205
         binary = skimage.morphology.binary_dilation(binary, footprint=skimage.morphology.diamond(1))
         return binary
     else:
-        thresh = skimage.filters.thresholding.threshold_li(caption_area)
-        binary = caption_area > thresh
+        thresh = skimage.filters.thresholding.threshold_li(frame)
+        binary = frame > thresh
         binary = skimage.morphology.binary_erosion(binary, footprint=skimage.morphology.diamond(1))
         return binary
 
 
-def get_caption_area(frame, is_nightly, resize_factor=4):
-    if is_nightly:
-        return frame[-102 * resize_factor:-48 * resize_factor, 55 * resize_factor:]
-    else:
-        return frame[-46 * resize_factor:-17 * resize_factor, -420 * resize_factor:]
+def sharpen_frame(frame, factor):
+    sharpness_enhancer = ImageEnhance.Sharpness(frame)
+    return sharpness_enhancer.enhance(factor)
+
+
+def crop_frame(frame, area):
+    return frame.crop(area)
 
 
 def is_nightly_version(vao: VAO):
@@ -60,17 +69,24 @@ def is_nightly_version(vao: VAO):
 def extract_caption_data_from_frame(frame: Path, resize_factor, is_nightly, custom_oem_psm_config='--psm 4 --oem 1'):
     frame = Image.open(frame).convert('L')
 
-    sharpness_enhancer = ImageEnhance.Sharpness(frame)
-    frame = sharpness_enhancer.enhance(1.5)
+    frame.save('/Users/tihmels/Desktop/out/1_original.jpg')
 
-    frame = frame.resize(
-        (frame.size[0] * resize_factor, frame.size[1] * resize_factor))
-    center_frame_resized = np.array(frame)
+    width, height = frame.size
+    area = (54, 168, width, 225) if is_nightly else (60, 224, width, 254)
 
-    caption_area = get_caption_area(center_frame_resized, is_nightly)
-    caption_area = preprocess_caption_area(caption_area, is_nightly)
+    frame = crop_frame(frame, area)
+    frame.save('/Users/tihmels/Desktop/out/2_area.jpg')
 
-    caption_data = pytesseract.image_to_data(caption_area, output_type=Output.DICT, lang='deu',
+    frame = sharpen_frame(frame, 1.5)
+    frame.save('/Users/tihmels/Desktop/out/3_sharpened.jpg')
+
+    frame = resize_frame(frame, resize_factor)
+    frame.save('/Users/tihmels/Desktop/out/4_resized.jpg')
+
+    frame = binarize_frame(frame, is_nightly)
+    Image.fromarray(frame).save('/Users/tihmels/Desktop/out/5_binarized.jpg')
+
+    caption_data = pytesseract.image_to_data(frame, output_type=Output.DICT, lang='deu',
                                              config=custom_oem_psm_config)
 
     return caption_data
@@ -174,7 +190,7 @@ def main(args):
 
                 median_confidence = np.median(confidences) / 100
 
-                captions.append((headline, subline, np.around(median_confidence, 2)))
+                captions.append((headline, subline, np.around(median_confidence, 3)))
 
                 bar()
 

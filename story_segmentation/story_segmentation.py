@@ -1,5 +1,6 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
 
+import itertools
 import operator
 import re
 from argparse import ArgumentParser
@@ -109,8 +110,8 @@ def custom_preprocessor(text):
 
 
 def custom_tokenizer(text):
-    splits = [list(split[1:]) for word in text for split in splitter.split_compound(word) if split[0] > 0.9]
-    splits = [item for t in splits for item in t]
+    splits = [split[1:] for word in text for split in splitter.split_compound(word) if split[0] > 0.9]
+    splits = list(itertools.chain.from_iterable(splits))
 
     return lemmatizer(text + splits)
 
