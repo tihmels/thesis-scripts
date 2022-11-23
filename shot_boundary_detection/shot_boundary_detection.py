@@ -39,7 +39,8 @@ def process_video(vao: VAO, threshold):
     shots, img = shot_transition_detection(np.array(frames), threshold)
 
     if not vao.is_summary and get_main_transcript_file(vao).is_file():
-        shots = fix_first_anchorshot_segment(vao, shots)
+        transcript = vao.data.transcripts
+        shots = fix_first_anchorshot_segment(shots, transcript)
 
     shots = shots[shots[:, 1] - shots[:, 0] > 13]
 

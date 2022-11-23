@@ -8,8 +8,7 @@ import numpy as np
 import pandas as pd
 from fuzzywuzzy import fuzz
 
-from common.VAO import VA
-O, get_date_time, is_summary, get_main_transcript_file, get_shot_file
+from common.VAO import VAO, get_date_time, is_summary, get_main_transcript_file, get_shot_file
 from common.constants import TV_FILENAME_RE
 from common.utils import sec_to_frame_idx
 
@@ -17,21 +16,18 @@ parser = argparse.ArgumentParser()
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
-welcoming_1 = "ich begrüße Sie zur tagesschau"
-welcoming_2 = "Willkommen zur tagesschau"
+welcoming = "(Willkommen|Guten Abend) meine Damen und Herren, ich begrüße sie zur Tagesschau"
 
 
-def fix_first_anchorshot_segment(vao: VAO, shots):
-    transcript = vao.data.transcripts
-
+def fix_first_anchorshot_segment(shots, transcript):
     for idx, td in enumerate(transcript):
 
-        if fuzz.token_set_ratio(td.text, welcoming_1) > 90 or fuzz.token_set_ratio(td.text, welcoming_2) > 90:
+        if fuzz.token_set_ratio(td.text, welcoming) > 90:
             first_news_sentence = transcript[idx + 1]
             first_news_frame_idx = sec_to_frame_idx(first_news_sentence.start.second)
 
-            if np.logical_and(first_news_frame_idx - 10 < shots[:, 0],
-                              shots[:, 0] < first_news_frame_idx + 10).any():
+            if np.logical_and(first_news_frame_idx - 5 < shots[:, 0],
+                              shots[:, 0] < first_news_frame_idx + 5).any():
                 break
 
             after_shot_idx = np.argmax(shots[:, 0] > first_news_frame_idx)
@@ -82,10 +78,9 @@ def main(args):
 
         print(f'[{idx + 1}/{len(video_files)}] {vao}')
 
-        transcript = vao.data.transcripts
         shots = np.array([(shot.first_frame_idx, shot.last_frame_idx) for shot in vao.data.shots])
 
-        segments = fix_first_anchorshot_segment(transcript, shots)
+        segments = fix_first_anchorshot_segment(shots, vao.data.transcripts)
 
         df = pd.DataFrame(data=segments, columns=['first_frame_idx', 'last_frame_idx'])
 
