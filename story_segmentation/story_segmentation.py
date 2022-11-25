@@ -50,11 +50,11 @@ def get_text(tds: [TranscriptData]):
     return ' '.join([td.text for td in tds])
 
 
-def extract_story_data(vao: VAO, first_shot_idx: int, last_shot_idx: int):
+def extract_story_data(shots, first_shot_idx: int, last_shot_idx: int):
     n_shots = last_shot_idx - first_shot_idx + 1
 
-    first_frame_idx = vao.data.shots[first_shot_idx].first_frame_idx
-    last_frame_idx = vao.data.shots[last_shot_idx].last_frame_idx
+    first_frame_idx = shots[first_shot_idx].first_frame_idx
+    last_frame_idx = shots[last_shot_idx].last_frame_idx
 
     n_frames = last_frame_idx - first_frame_idx + 1
 
@@ -141,7 +141,7 @@ def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts, anch
             (values[idx] > 0 and all(pre_shot_idx < shot_idx for pre_shot_idx in shot_idxs[:idx]))}
 
 
-def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=5):
+def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=1):
     return {
         idx: get_text(vao.get_shot_transcripts(idx,
                                                min(next(
@@ -150,7 +150,7 @@ def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=5):
         for idx in anchor_shots}
 
 
-def confidence_text(ocr_data, threshold=90):
+def confidence_text(ocr_data, threshold=80):
     positive_confidences = np.array(ocr_data['conf']) > threshold
     non_empty_texts = list(map(lambda idx: True if ocr_data['text'][idx].strip() else False,
                                range(0, len(positive_confidences))))
@@ -211,10 +211,10 @@ def segment_ts15(vao: VAO):
 
     shot_cutoff_idx = next(
         idx for idx, shot in enumerate(vao.data.shots) if shot.type == 'weather' or shot.type == 'lotto')
-    anchor_shots = {idx: sd for idx, sd in enumerate(vao.data.shots) if sd.type == 'anchor' and idx < shot_cutoff_idx}
-    # anchor_shots = {idx: sd for idx, sd in enumerate(vao.data.shots) if idx < shot_cutoff_idx}
+    # anchor_shots = {idx: sd for idx, sd in enumerate(vao.data.shots) if sd.type == 'anchor' and idx < shot_cutoff_idx}
+    anchor_shots = {idx: sd for idx, sd in enumerate(vao.data.shots) if idx < shot_cutoff_idx}
 
-    anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 1)
+    anchor_transcripts = get_anchor_transcripts(vao, anchor_shots)
     anchor_captions = get_anchor_captions(vao, anchor_shots)
 
     topic_to_anchor = topic_to_anchor_by_transcript(news_topics, anchor_shots, anchor_transcripts, anchor_captions)
@@ -232,13 +232,12 @@ def segment_ts15(vao: VAO):
         story_title = news_topics[topic_idx]
 
         first_shot_idx = anchor_idx
-        last_shot_idx = next((next_idx for next_idx in list(anchor_shots.keys()) if next_idx > anchor_idx),
+        last_shot_idx = next((next_idx for next_idx in list(topic_to_anchor.values()) if next_idx > anchor_idx),
                              list(anchor_shots.keys())[-1]) - 1
 
-        story_data = extract_story_data(vao, first_shot_idx, last_shot_idx)
+        story_data = extract_story_data(vao.data.shots, first_shot_idx, last_shot_idx)
 
-        stories.append((topic_idx, story_title, *story_data
-                        ))
+        stories.append((topic_idx, story_title, *story_data))
 
     df = pd.DataFrame(data=stories, columns=STORY_COLUMNS)
 
@@ -304,7 +303,7 @@ def segment_ts100(vao: VAO):
 
         story_title = max(story_captions, key=lambda k: k.confidence).text
 
-        story_data = extract_story_data(vao, min(story), max(story))
+        story_data = extract_story_data(vao.data.shots, min(story), max(story))
 
         stories.append((topic_idx, story_title, *story_data))
 
