@@ -10,12 +10,13 @@ import numpy as np
 import pandas as pd
 import spacy
 from HanTa import HanoverTagger as ht
-from PIL import Image, ImageEnhance
+from PIL import Image
 from fuzzywuzzy import fuzz
 from nltk.corpus import stopwords
-from pytesseract import pytesseract
+from pytesseract import pytesseract, Output
 from sklearn.feature_extraction.text import CountVectorizer
 
+from banner_ocr.ocr import sharpen_frame, resize_frame, crop_frame
 from charsplit.splitter import Splitter
 from common.DataModel import TranscriptData
 from common.Schemas import STORY_COLUMNS
@@ -35,6 +36,7 @@ tagger = ht.HanoverTagger('morphmodel_ger.pgz')
 splitter = Splitter()
 
 abbrvs = {'AKW': 'Atomkraftwerk',
+          'EuGH': 'Europäischer Gerichtshof',
           'EU': 'Europäische Union',
           'WM': 'Weltmeisterschaft',
           'KZ': 'Konzentrationslager'}
@@ -122,10 +124,10 @@ def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts, anch
 
         voc = vectorizer.vocabulary_
 
-        #bow_caption = vectorizer.transform([caption for caption in anchor_captions.values()])
+        bow_caption = vectorizer.transform([caption for caption in anchor_captions.values()])
         bow_transcript = vectorizer.transform([transcript for transcript in anchor_transcripts.values()])
 
-        bow = bow_transcript.toarray()
+        bow = bow_transcript.toarray() + np.multiply(bow_caption.toarray(), 2)
 
         bow_sum = [sum(vec) for vec in bow]
         dt_matrix[idx] = bow_sum
@@ -148,29 +150,37 @@ def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=5):
         for idx in anchor_shots}
 
 
-def get_caption_area(frame, resize_factor):
-    return frame[155 * resize_factor:225 * resize_factor, 50 * resize_factor:280 * resize_factor]
+def confidence_text(ocr_data, threshold=90):
+    positive_confidences = np.array(ocr_data['conf']) > threshold
+    non_empty_texts = list(map(lambda idx: True if ocr_data['text'][idx].strip() else False,
+                               range(0, len(positive_confidences))))
+
+    positive_confidence_indices = (positive_confidences & non_empty_texts).nonzero()
+
+    if len(positive_confidence_indices[0]) == 0:
+        return ''
+
+    strings = np.array(ocr_data['text'])[positive_confidence_indices]
+
+    return re.sub("\\W", " ", ' '.join(strings))
 
 
 def get_caption(frame: Path, resize_factor=3):
     frame = Image.open(frame).convert('L')
 
-    sharpness_enhancer = ImageEnhance.Sharpness(frame)
-    frame = sharpness_enhancer.enhance(2)
+    area = (55, 157, 280, 223)
+    frame = crop_frame(frame, area)
 
-    frame = frame.resize(
-        (frame.size[0] * resize_factor, frame.size[1] * resize_factor))
-    frame = np.array(frame)
+    frame = sharpen_frame(frame, 2)
 
-    caption_area = get_caption_area(frame, resize_factor)
+    frame = resize_frame(frame, resize_factor)
 
-    caption_area = caption_area > 165
+    frame = np.array(frame) > 160
 
-    Image.fromarray(caption_area).save('/Users/tihmels/Desktop/test.jpg')
+    news_text_data = pytesseract.image_to_data(frame, output_type=Output.DICT, lang='deu',
+                                               config='--psm 6 --oem 1')
 
-    caption_data = pytesseract.image_to_string(caption_area, lang='deu', config='--psm 6 --oem 1')
-
-    return re.sub(r"[^a-zA-Z0-9 ]", " ", caption_data)
+    return confidence_text(news_text_data)
 
 
 def get_anchor_captions(vao: VAO, anchor_shots):
@@ -202,8 +212,9 @@ def segment_ts15(vao: VAO):
     shot_cutoff_idx = next(
         idx for idx, shot in enumerate(vao.data.shots) if shot.type == 'weather' or shot.type == 'lotto')
     anchor_shots = {idx: sd for idx, sd in enumerate(vao.data.shots) if sd.type == 'anchor' and idx < shot_cutoff_idx}
+    # anchor_shots = {idx: sd for idx, sd in enumerate(vao.data.shots) if idx < shot_cutoff_idx}
 
-    anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 3)
+    anchor_transcripts = get_anchor_transcripts(vao, anchor_shots, 1)
     anchor_captions = get_anchor_captions(vao, anchor_shots)
 
     topic_to_anchor = topic_to_anchor_by_transcript(news_topics, anchor_shots, anchor_transcripts, anchor_captions)
