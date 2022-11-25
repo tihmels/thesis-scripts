@@ -34,6 +34,11 @@ german_stop_words = stopwords.words('german')
 tagger = ht.HanoverTagger('morphmodel_ger.pgz')
 splitter = Splitter()
 
+abbrvs = {'AKW': 'Atomkraftwerk',
+          'EU': 'Europäische Union',
+          'WM': 'Weltmeisterschaft',
+          'KZ': 'Konzentrationslager'}
+
 
 def lemmatizer(text):
     return [tag for word in text for tag in tagger.analyze(word)[:1]]
@@ -62,49 +67,34 @@ def extract_story_data(vao: VAO, first_shot_idx: int, last_shot_idx: int):
 
 
 def umlauts(text):
-    """
-    Replace umlauts for a given text
+    text = text.replace('ä', 'ae')
+    text = text.replace('ö', 'oe')
+    text = text.replace('ü', 'ue')
+    text = text.replace('Ä', 'Ae')
+    text = text.replace('Ö', 'Oe')
+    text = text.replace('Ü', 'Ue')
+    text = text.replace('ß', 'ss')
 
-    :param text: text as string
-    :return: manipulated text as str
-    """
-
-    temp_var = text  # local variable
-
-    temp_var = temp_var.replace('ä', 'ae')
-    temp_var = temp_var.replace('ö', 'oe')
-    temp_var = temp_var.replace('ü', 'ue')
-    temp_var = temp_var.replace('Ä', 'Ae')
-    temp_var = temp_var.replace('Ö', 'Oe')
-    temp_var = temp_var.replace('Ü', 'Ue')
-    temp_var = temp_var.replace('ß', 'ss')
-
-    return temp_var
+    return text
 
 
-abbreviations = {'AKW': 'Atomkraftwerk', 'WM': 'Weltmeisterschaft'}
-
-
-def abbrvs(text):
-    for abbrv, sub in abbreviations.items():
-        text = re.sub(abbrv, sub, text)
+def abbreviations(text):
+    for abbrv, sub in abbrvs.items():
+        text = text.replace(abbrv, sub)
     return text
 
 
 def custom_preprocessor(text):
-    text = abbrvs(text)
+    text = abbreviations(text)
 
     text = text.lower()
     text = umlauts(text)
 
-    text = re.sub("\\W", " ", text)  # remove special chars
+    text = re.sub("\\W", " ", text)
 
-    german_stop_words_to_use = []  # List to hold words after conversion
+    stop_words = [umlauts(word) for word in german_stop_words]
 
-    for word in german_stop_words:
-        german_stop_words_to_use.append(umlauts(word))
-
-    text_wo_stop_words = [word for word in text.split() if word.lower() not in german_stop_words_to_use]
+    text_wo_stop_words = [word for word in text.split() if word not in stop_words]
 
     return text_wo_stop_words
 
@@ -132,10 +122,10 @@ def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts, anch
 
         voc = vectorizer.vocabulary_
 
-        bow_caption = vectorizer.transform([caption for caption in anchor_captions.values()])
+        #bow_caption = vectorizer.transform([caption for caption in anchor_captions.values()])
         bow_transcript = vectorizer.transform([transcript for transcript in anchor_transcripts.values()])
 
-        bow = np.multiply(bow_caption.toarray(), 2) + bow_transcript.toarray()
+        bow = bow_transcript.toarray()
 
         bow_sum = [sum(vec) for vec in bow]
         dt_matrix[idx] = bow_sum
@@ -236,7 +226,8 @@ def segment_ts15(vao: VAO):
 
         story_data = extract_story_data(vao, first_shot_idx, last_shot_idx)
 
-        stories.append((topic_idx, story_title, *story_data))
+        stories.append((topic_idx, story_title, *story_data
+                        ))
 
     df = pd.DataFrame(data=stories, columns=STORY_COLUMNS)
 
