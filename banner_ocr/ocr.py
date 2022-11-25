@@ -36,12 +36,13 @@ def binarize_frame(frame, is_nightly):
 
     if is_nightly:
         binary = frame > 205
-        binary = skimage.morphology.binary_dilation(binary, footprint=skimage.morphology.diamond(1))
+        # binary = skimage.morphology.binary_dilation(binary, footprint=skimage.morphology.diamond(1))
         return binary
     else:
-        thresh = skimage.filters.thresholding.threshold_li(frame)
+        thresh = skimage.filters.thresholding.threshold_li(frame, initial_guess=150)
+        # thresh = 165
         binary = frame > thresh
-        binary = skimage.morphology.binary_erosion(binary, footprint=skimage.morphology.diamond(1))
+        # binary = skimage.morphology.binary_erosion(binary, footprint=skimage.morphology.diamond(2))
         return binary
 
 
@@ -72,7 +73,7 @@ def extract_caption_data_from_frame(frame: Path, resize_factor, is_nightly, cust
     frame.save('/Users/tihmels/Desktop/out/1_original.jpg')
 
     width, height = frame.size
-    area = (54, 168, width, 225) if is_nightly else (60, 224, width, 254)
+    area = (54, 168, width, 225) if is_nightly else (60, 224, width, 253)
 
     frame = crop_frame(frame, area)
     frame.save('/Users/tihmels/Desktop/out/2_area.jpg')
@@ -92,7 +93,7 @@ def extract_caption_data_from_frame(frame: Path, resize_factor, is_nightly, cust
     return caption_data
 
 
-def extract_caption_data_from_shots(vao: VAO, resize_factor=4):
+def extract_caption_data_from_shots(vao: VAO, resize_factor=3):
     shots = vao.data.shots
 
     is_nightly = is_nightly_version(vao)
@@ -188,9 +189,7 @@ def main(args):
                 headline = ' '.join(headline).strip()
                 subline = ' '.join([sub for subline in sublines for sub in subline]).strip()
 
-                median_confidence = np.median(confidences) / 100
-
-                captions.append((headline, subline, np.around(median_confidence, 3)))
+                captions.append((headline, subline, int(np.rint(100 - (np.std(confidences))))))
 
                 bar()
 

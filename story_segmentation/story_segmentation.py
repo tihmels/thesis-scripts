@@ -62,7 +62,7 @@ def extract_story_data(shots, first_shot_idx: int, last_shot_idx: int):
     to_time = sec_to_time(frame_idx_to_sec(last_frame_idx))
 
     timedelta = time_to_datetime(to_time) - time_to_datetime(from_time)
-    total_ss = timedelta.total_seconds()
+    total_ss = int(timedelta.total_seconds())
 
     return (first_frame_idx, last_frame_idx, n_frames, first_shot_idx, last_shot_idx, n_shots,
             from_time.strftime('%H:%M:%S'), to_time.strftime('%H:%M:%S'), total_ss)
@@ -259,7 +259,7 @@ def preprocess_captions(captions):
     # which is why the banner text is not captured by OCR.
     # we fix this by assuming that this shot belongs to the previous caption.
     for idx, cd in captions.items():
-        if (not cd.text.strip() or cd.confidence < 0.7) and idx - 1 in captions:
+        if (not cd.text.strip() or cd.confidence < 70) and idx - 1 in captions:
             predecessor = captions[idx - 1]
             captions[idx] = predecessor
 
@@ -273,7 +273,7 @@ def get_story_indices_by_captions(captions):
     for idx in range(first_idx + 1, last_idx):
         next_caption = captions[idx].text
 
-        ratio = fuzz.token_sort_ratio(current_caption, next_caption)
+        ratio = fuzz.token_set_ratio(current_caption, next_caption)
 
         if ratio > 80:
             story_indices[-1].append(idx)
@@ -308,6 +308,8 @@ def segment_ts100(vao: VAO):
         stories.append((topic_idx, story_title, *story_data))
 
     df = pd.DataFrame(data=stories, columns=STORY_COLUMNS)
+
+    print()
 
     return df
 
