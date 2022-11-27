@@ -285,7 +285,7 @@ def get_xml_transcript_file(video: VideoPathType) -> Path:
 
 
 def read_stories_from_file(file: Path) -> [StoryData]:
-    df = pd.read_csv(file, usecols=STORY_COLUMNS, keep_default_na=False)
+    df = pd.read_csv(file, keep_default_na=False, usecols=STORY_COLUMNS[1:])
     return [StoryData(val[0], val[1], val[2], val[4], val[5]) for val in df.values.tolist()]
 
 

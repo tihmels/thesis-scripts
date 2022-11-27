@@ -7,6 +7,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 import numpy as np
+
 import pandas as pd
 import spacy
 from HanTa import HanoverTagger as ht
@@ -353,6 +354,9 @@ def main(args):
 
     print(f'Story Segmentation for {len(video_files)} videos ... \n')
 
+    total_topics = 0
+    unassigned_topics = 0
+
     for idx, vf in enumerate(video_files):
         vao = VAO(vf)
 
@@ -361,7 +365,20 @@ def main(args):
         segmentor = segment_ts100 if vao.is_summary else segment_ts15
 
         df = segmentor(vao)
+
+        if not vao.is_summary:
+            assigned_topics = df.shape[0]
+
+            topics_cutoff_idx = next(
+                idx for idx, topic in enumerate(vao.data.topics) if re.search(r"^(Die Lottozahlen|Das Wetter)$", topic))
+
+            n_topics = topics_cutoff_idx
+            total_topics += n_topics
+            unassigned_topics += n_topics - assigned_topics
+
         df.to_csv(get_story_file(vao), index=False)
+
+    print(f'{total_topics - unassigned_topics} / {total_topics} topics could be assigned.')
 
 
 if __name__ == "__main__":
