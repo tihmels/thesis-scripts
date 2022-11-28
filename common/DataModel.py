@@ -25,7 +25,7 @@ class TranscriptData:
 class ShotData:
     first_frame_idx: int
     last_frame_idx: int
-    type: str
+    type: str = None
 
     @property
     def center_frame_idx(self):
