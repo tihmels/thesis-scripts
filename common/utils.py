@@ -10,12 +10,12 @@ import cv2
 from common.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE
 
 
-def sec_to_frame_idx(second):
-    return second * 25
+def sec_to_frame_idx(second, fps=25):
+    return second * fps
 
 
-def frame_idx_to_sec(idx):
-    return idx / 25
+def frame_idx_to_sec(idx, fps=25):
+    return idx / fps
 
 
 def sec_to_time(seconds):
@@ -33,9 +33,9 @@ def read_images(img_paths: [Path], cvt_color=cv2.COLOR_BGR2RGB, resize=None):
 
 
 def add_sec_to_time(time, secs):
-    fulldate = datetime(100, 1, 1, time.hour, time.minute, time.second)
-    fulldate = fulldate + timedelta(seconds=secs)
-    return fulldate.time()
+    dt = time_to_datetime(time)
+    dt = dt + timedelta(seconds=secs)
+    return dt.time()
 
 
 def frame_idx_to_time(frame_idx):

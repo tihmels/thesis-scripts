@@ -7,7 +7,6 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 import numpy as np
-
 import pandas as pd
 import spacy
 from HanTa import HanoverTagger as ht
@@ -287,7 +286,7 @@ def get_story_indices_by_captions(captions):
 
 
 def segment_ts100(vao: VAO):
-    captions = {idx: cd for idx, cd in enumerate(vao.data.captions[:-1])}  # last shot is always weather
+    captions = {idx: cd for idx, cd in enumerate(vao.data.banners[:-1])}  # last shot is always weather
 
     preprocess_captions(captions)
 
@@ -296,17 +295,14 @@ def segment_ts100(vao: VAO):
     stories = []
 
     for topic_idx, story in enumerate(story_indices):
+        story_captions = {idx: cd for idx, cd in captions.items() if idx in story}
 
-        story_captions = [captions[idx] for idx in story]
-
-        if story[0] == story[-1] and story_captions[0].text == "":
-            continue
-
-        story_title = max(story_captions, key=lambda k: k.confidence).text
+        max_confidence = max([caption.confidence for caption in story_captions.values()])
+        story_caption = next((caption for caption in story_captions.items() if caption[1].confidence == max_confidence))
 
         story_data = extract_story_data(vao.data.shots, min(story), max(story))
 
-        stories.append((topic_idx, story_title, *story_data))
+        stories.append((story_caption[0], story_caption[1].text, *story_data))
 
     df = pd.DataFrame(data=stories, columns=STORY_COLUMNS)
 

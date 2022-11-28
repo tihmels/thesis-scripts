@@ -17,8 +17,8 @@ parser.add_argument('--db', type=int, default=0)
 
 
 class Transcript(EmbeddedJsonModel):
-    start: datetime.time
-    end: datetime.time
+    from_time: datetime.time
+    to_time: datetime.time
     text: str
 
 
@@ -28,10 +28,26 @@ class Shot(EmbeddedJsonModel):
     type: Optional[str]
 
 
-class Story(EmbeddedJsonModel):
+class Topic(EmbeddedJsonModel):
     title: str
+
+
+class Caption(EmbeddedJsonModel):
+    text: str
+    confidence: int
+
+
+class Story(EmbeddedJsonModel):
     first_shot_idx: int
     last_shot_idx: int
+
+
+class MainStory(Story):
+    topic: Topic
+
+
+class ShortStory(Story):
+    caption: Caption
 
 
 class VideoBaseModel(JsonModel, ABC):
@@ -39,42 +55,51 @@ class VideoBaseModel(JsonModel, ABC):
     date: datetime.datetime = Field(index=True)
     keyframes: List[str]
     shots: List[Shot]
-    stories: List[Story]
-    transcript: List[Transcript]
+    transcripts: List[Transcript]
 
     class Meta:
         global_key_prefix = 'tsv'
 
 
 class MainVideo(VideoBaseModel):
-    topics: List[str]
+    stories: List[MainStory]
+    topics: List[Topic]
 
     class Meta:
         model_key_prefix = 'ts15'
 
 
 class ShortVideo(VideoBaseModel):
-    captions: List[str]
+    stories: List[ShortStory]
+    captions: List[Caption]
 
     class Meta:
         model_key_prefix = 'ts100'
 
 
 def upload_video_data(vao: VAO):
+    shots = [Shot(first_frame_idx=shot.first_frame_idx,
+                  last_frame_idx=shot.last_frame_idx,
+                  type=shot.type) for shot in vao.data.shots]
+    transcripts = [Transcript(from_time=transcript.start,
+                              to_time=transcript.end,
+                              text=transcript.text) for transcript in vao.data.transcripts]
+
     if vao.is_summary:
+        captions = [Caption(text=caption.text, confidence=caption.confidence) for caption in vao.data.banners]
+        stories = [ShortStory(first_shot_idx=story.first_shot_idx,
+                              last_shot_idx=story.last_shot_idx,
+                              caption=captions[story.caption_idx]) for story in vao.data.stories]
+
         video = ShortVideo(path=str(vao.path),
                            date=vao.date,
                            keyframes=[str(kf) for kf in vao.data.keyframes],
-                           shots=[
-                               Shot(first_frame_idx=shot.first_frame_idx, last_frame_idx=shot.last_frame_idx,
-                                    type=shot.type) for shot in vao.data.shots],
-                           stories=[Story(title=story.title, first_shot_idx=story.first_shot_idx,
-                                          last_shot_idx=story.last_shot_idx) for story in vao.data.stories],
-                           transcript=[Transcript(start=transcript.start, end=transcript.end, text=transcript.text) for
-                                       transcript in
-                                       vao.data.transcripts],
-                           captions=[caption.text for caption in vao.data.captions])
+                           shots=shots,
+                           transcripts=transcripts,
+                           captions=captions,
+                           stories=stories)
     else:
+
         video = MainVideo(path=str(vao.path),
                           date=vao.date,
                           keyframes=[str(kf) for kf in vao.data.keyframes],

@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
 
 
 @dataclass
-class CaptionData:
+class BannerData:
     headline: str
     subline: str
     confidence: float
@@ -20,11 +19,6 @@ class TranscriptData:
     end: datetime.time
     text: str
     color: str = None
-
-
-class ShotType(Enum):
-    ANCHOR = 1
-    NEWS = 2
 
 
 @dataclass
@@ -44,14 +38,8 @@ class ShotData:
 
 @dataclass
 class StoryData:
-    title: str
+    headline: str
     first_frame_idx: int
     last_frame_idx: int
     first_shot_idx: int
     last_shot_idx: int
-
-
-@dataclass
-class ShotClassificationData:
-    clazz: str
-    prop: float

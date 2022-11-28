@@ -6,8 +6,8 @@ from typing import Union
 
 import pandas as pd
 
-from common.DataModel import CaptionData, TranscriptData, StoryData, ShotData
-from common.Schemas import SHOT_COLUMNS, CAPTION_COLUMNS, STORY_COLUMNS, TRANSCRIPT_COLUMNS
+from common.DataModel import BannerData, TranscriptData, StoryData, ShotData
+from common.Schemas import SHOT_COLUMNS, BANNER_COLUMNS, STORY_COLUMNS, TRANSCRIPT_COLUMNS
 from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT_AUDIO_FILENAME_RE, \
     STORY_TRANSCRIPT_FILENAME_RE, AUDIO_DIR, FRAME_DIR, KF_DIR, TRANSCRIPT_DIR, SM_DIR, TOPICS_FILENAME, \
     CAPTIONS_FILENAME, SHOT_CLASS_FILENAME, SHOT_FILENAME, TRANSCRIPT_FILENAME, STORY_FILENAME
@@ -57,7 +57,7 @@ class VAO:
         from_time, to_time = frame_idx_to_time(from_shot.first_frame_idx), frame_idx_to_time(to_shot.last_frame_idx)
 
         from_time = from_time.replace(microsecond=0)
-        to_time = add_sec_to_time(to_time, 1).replace(microsecond=0)
+        to_time = to_time
 
         return [trans for trans in self.data.transcripts if from_time <= trans.end and trans.start <= to_time]
 
@@ -97,7 +97,7 @@ class VAO:
             return read_shots_from_file(get_shot_file(self._path))
 
         @cached_property
-        def captions(self) -> [CaptionData]:
+        def banners(self) -> [BannerData]:
             return read_banner_captions_from_file(get_banner_caption_file(self._path))
 
         @cached_property
@@ -107,6 +107,9 @@ class VAO:
         @cached_property
         def transcripts(self) -> [TranscriptData]:
             return read_transcript_from_file(get_main_transcript_file(self._path))
+
+        def story_transcripts(self):
+            return read_story_transcript_from_file(get_story_transcripts(self._path))
 
 
 VideoPathType = Union[VAO, Path]
@@ -286,12 +289,12 @@ def get_xml_transcript_file(video: VideoPathType) -> Path:
 
 def read_stories_from_file(file: Path) -> [StoryData]:
     df = pd.read_csv(file, keep_default_na=False, usecols=STORY_COLUMNS[1:])
-    return [StoryData(val[0], val[1], val[2], val[4], val[5]) for val in df.values.tolist()]
+    return [StoryData(val[0], val[1], val[2], val[3], val[4]) for val in df.values.tolist()]
 
 
-def read_banner_captions_from_file(file: Path) -> [CaptionData]:
-    df = pd.read_csv(file, usecols=CAPTION_COLUMNS, keep_default_na=False)
-    return [CaptionData(val[0], val[1], val[2]) for val in df.values.tolist()]
+def read_banner_captions_from_file(file: Path) -> [BannerData]:
+    df = pd.read_csv(file, usecols=BANNER_COLUMNS, keep_default_na=False)
+    return [BannerData(val[0], val[1], val[2]) for val in df.values.tolist()]
 
 
 def read_shots_from_file(file: Path) -> [ShotData]:

@@ -13,6 +13,7 @@ from skimage.feature import match_template
 from skimage.filters.edges import sobel
 from skimage.filters.thresholding import try_all_threshold
 
+from common.Schemas import BANNER_COLUMNS
 from common.VAO import get_date_time, VAO, get_banner_caption_file, get_shot_file, is_summary, \
     get_frame_dir, get_frame_paths
 from common.constants import TV_FILENAME_RE, TS_LOGO
@@ -193,7 +194,7 @@ def main(args):
 
                 bar()
 
-            df = pd.DataFrame(data=captions, columns=['headline', 'subline', 'confidence'])
+            df = pd.DataFrame(data=captions, columns=BANNER_COLUMNS)
             df.to_csv(get_banner_caption_file(vao), index=False)
 
 
