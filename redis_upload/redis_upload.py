@@ -142,8 +142,8 @@ def upload_video_data(vao: VAO):
                              headline=story.headline,
                              first_shot=shots[story.first_shot_idx],
                              last_shot=shots[story.last_shot_idx],
-                             duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx).replace(
-                                 microsecond=0),
+                             duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx)
+                             .replace(microsecond=0),
                              transcript=vao.data.get_story_text(idx)) for idx, story in enumerate(vao.data.stories)]
 
         video = MainVideo(pk=str(vao.id),
