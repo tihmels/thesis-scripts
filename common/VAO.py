@@ -11,12 +11,12 @@ from common.Schemas import SHOT_COLUMNS, BANNER_COLUMNS, STORY_COLUMNS, TRANSCRI
 from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT_AUDIO_FILENAME_RE, \
     STORY_TRANSCRIPT_FILENAME_RE, AUDIO_DIR, FRAME_DIR, KF_DIR, TRANSCRIPT_DIR, SM_DIR, TOPICS_FILENAME, \
     CAPTIONS_FILENAME, SHOT_CLASS_FILENAME, SHOT_FILENAME, TRANSCRIPT_FILENAME, STORY_FILENAME
-from common.utils import frame_idx_to_time
+from common.utils import frame_idx_to_time, add_sec_to_time
 
 
 class VAO:
     def __init__(self, path: Path):
-        self.id: str = path.stem
+        self.id: str = path.name.split('.')[0]
         self.path: Path = path
         self.date: datetime = get_date_time(path)
         self.dirs = self.Dirs(path)
@@ -50,16 +50,9 @@ class VAO:
     def is_summary(self) -> bool:
         return is_summary(self)
 
-    def get_shot_transcripts(self, from_shot_idx, to_shot_idx=None) -> [TranscriptData]:
-        from_shot = self.data.shots[from_shot_idx]
-        to_shot = self.data.shots[to_shot_idx] if to_shot_idx else self.data.shots[from_shot_idx]
-
-        from_time, to_time = frame_idx_to_time(from_shot.first_frame_idx), frame_idx_to_time(to_shot.last_frame_idx)
-
-        from_time = from_time.replace(microsecond=0)
-        to_time = to_time
-
-        return [trans for trans in self.data.transcripts if from_time <= trans.end and trans.start <= to_time]
+    @property
+    def duration(self):
+        return frame_idx_to_time(self.n_frames).replace(microsecond=0)
 
     def __str__(self):
         return str(self.path.relative_to(self.path.parent.parent)).split('.')[0]
@@ -107,6 +100,24 @@ class VAO:
         @cached_property
         def transcripts(self) -> [TranscriptData]:
             return read_transcript_from_file(get_main_transcript_file(self._path))
+
+        def get_shot_transcripts(self, from_shot_idx, to_shot_idx=None) -> [TranscriptData]:
+            from_shot = self.shots[from_shot_idx]
+            to_shot = self.shots[to_shot_idx] if to_shot_idx else self.shots[from_shot_idx]
+
+            from_time, to_time = frame_idx_to_time(from_shot.first_frame_idx), frame_idx_to_time(to_shot.last_frame_idx)
+
+            from_time = from_time.replace(microsecond=0)
+            to_time = add_sec_to_time(to_time.replace(microsecond=0), 1)
+
+            return [trans for trans in self.transcripts if from_time <= trans.end <= to_time]
+
+        def get_story_text(self, story_idx) -> str:
+            story = self.stories[story_idx]
+
+            transcripts = self.get_shot_transcripts(story.first_shot_idx, story.last_shot_idx)
+
+            return ' '.join([transcript.text for transcript in transcripts])
 
 
 VideoPathType = Union[VAO, Path]
@@ -286,7 +297,7 @@ def get_xml_transcript_file(video: VideoPathType) -> Path:
 
 def read_stories_from_file(file: Path) -> [StoryData]:
     df = pd.read_csv(file, keep_default_na=False, usecols=STORY_COLUMNS[1:])
-    return [StoryData(val[0], val[1], val[2], val[3], val[4]) for val in df.values.tolist()]
+    return [StoryData(val[0], val[1], val[2], val[4], val[5]) for val in df.values.tolist()]
 
 
 def read_banner_captions_from_file(file: Path) -> [BannerData]:

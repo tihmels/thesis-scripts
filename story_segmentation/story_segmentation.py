@@ -143,10 +143,11 @@ def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts, anch
 
 def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=1):
     return {
-        idx: get_text(vao.get_shot_transcripts(idx,
-                                               min(next(
-                                                   (next_idx - 1 for next_idx in anchor_shots.keys() if next_idx > idx),
-                                                   idx), idx + max_shots, vao.n_shots)))
+        idx: get_text(vao.data.get_shot_transcripts(idx,
+                                                    min(next(
+                                                        (next_idx - 1 for next_idx in anchor_shots.keys() if
+                                                         next_idx > idx),
+                                                        idx), idx + max_shots, vao.n_shots)))
         for idx in anchor_shots}
 
 

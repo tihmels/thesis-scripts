@@ -1,3 +1,5 @@
+#!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
+
 import argparse
 import datetime
 from abc import ABC
@@ -32,8 +34,9 @@ class Shot(EmbeddedJsonModel):
 
 class Story(EmbeddedJsonModel):
     headline: str
-    first_shot_idx: int
-    last_shot_idx: int
+    first_shot: Shot
+    last_shot: Shot
+    text: str
 
 
 class Transcript(EmbeddedJsonModel):
@@ -43,9 +46,11 @@ class Transcript(EmbeddedJsonModel):
 
 
 class VideoBaseModel(JsonModel, ABC):
-    path: str = Field(index=True)
-    date: datetime.date = Field(index=True)
-    time: datetime.time = Field(index=True)
+    path: str
+    date: datetime.date
+    time: datetime.time
+    duration: datetime.time
+    timestamp: int = Field(index=True, sortable=True)
     keyframes: List[str]
     shots: List[Shot]
     stories: List[Story]
@@ -82,15 +87,19 @@ def upload_video_data(vao: VAO):
                               text=transcript.text) for transcript in vao.data.transcripts]
 
     stories = [Story(headline=story.headline,
-                     first_shot_idx=story.first_shot_idx,
-                     last_shot_idx=story.last_shot_idx) for story in vao.data.stories]
+                     first_shot=shots[story.first_shot_idx],
+                     last_shot=shots[story.first_shot_idx],
+                     text=vao.data.get_story_text(idx)) for idx, story in enumerate(vao.data.stories)]
 
     if vao.is_summary:
         banners = [Banner(text=banner.text, confidence=banner.confidence) for banner in vao.data.banners]
 
-        video = ShortVideo(path=str(vao.path),
+        video = ShortVideo(pk=str(vao.id),
+                           path=str(vao.path),
                            date=vao.date.date(),
                            time=vao.date.time(),
+                           duration=vao.duration,
+                           timestamp=vao.date.timestamp(),
                            keyframes=[str(kf) for kf in vao.data.keyframes],
                            shots=shots,
                            stories=stories,
@@ -99,9 +108,12 @@ def upload_video_data(vao: VAO):
     else:
         topics = [Topic(title=topic) for topic in vao.data.topics]
 
-        video = MainVideo(path=str(vao.path),
+        video = MainVideo(pk=str(vao.id),
+                          path=str(vao.path),
                           date=vao.date.date(),
                           time=vao.date.time(),
+                          duration=vao.duration,
+                          timestamp=vao.date.timestamp(),
                           keyframes=[str(kf) for kf in vao.data.keyframes],
                           shots=shots,
                           stories=stories,
@@ -113,7 +125,6 @@ def upload_video_data(vao: VAO):
 
 def main(args):
     r = get_redis_connection()
-    r.flushall()
 
     video_files = {file for file in args.files}
 
@@ -131,10 +142,6 @@ def main(args):
     Migrator().run()
 
     r.close()
-
-    print()
-
-    date = datetime.date(2022, 6, 10)
 
 
 if __name__ == "__main__":
