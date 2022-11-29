@@ -9,6 +9,7 @@ from typing import List, Optional
 from redis_om import JsonModel, Field, EmbeddedJsonModel, Migrator, get_redis_connection
 
 from common.VAO import get_date_time, VAO
+from common.utils import frame_idx_to_time
 
 parser = argparse.ArgumentParser('Uploads filesystem data to a Redis instance')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")
@@ -37,6 +38,7 @@ class Story(EmbeddedJsonModel):
     headline: str
     first_shot: Shot
     last_shot: Shot
+    duration: datetime.time
     transcript: str
 
 
@@ -90,6 +92,7 @@ def upload_video_data(vao: VAO):
     stories = [Story(headline=story.headline,
                      first_shot=shots[story.first_shot_idx],
                      last_shot=shots[story.last_shot_idx],
+                     duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx).replace(microsecond=0),
                      transcript=vao.data.get_story_text(idx)) for idx, story in enumerate(vao.data.stories)]
 
     if vao.is_summary:
