@@ -29,6 +29,7 @@ class Banner(EmbeddedJsonModel):
 class Shot(EmbeddedJsonModel):
     first_frame_idx: int
     last_frame_idx: int
+    keyframe: str
     type: Optional[str]
 
 
@@ -36,7 +37,7 @@ class Story(EmbeddedJsonModel):
     headline: str
     first_shot: Shot
     last_shot: Shot
-    text: str
+    transcript: str
 
 
 class Transcript(EmbeddedJsonModel):
@@ -51,7 +52,6 @@ class VideoBaseModel(JsonModel, ABC):
     time: datetime.time
     duration: datetime.time
     timestamp: int = Field(index=True, sortable=True)
-    keyframes: List[str]
     shots: List[Shot]
     stories: List[Story]
     transcripts: List[Transcript]
@@ -80,7 +80,8 @@ class ShortVideo(VideoBaseModel):
 def upload_video_data(vao: VAO):
     shots = [Shot(first_frame_idx=shot.first_frame_idx,
                   last_frame_idx=shot.last_frame_idx,
-                  type=shot.type) for shot in vao.data.shots]
+                  keyframe=str(vao.data.keyframes[idx]),
+                  type=shot.type) for idx, shot in enumerate(vao.data.shots)]
 
     transcripts = [Transcript(from_time=transcript.start,
                               to_time=transcript.end,
@@ -88,8 +89,8 @@ def upload_video_data(vao: VAO):
 
     stories = [Story(headline=story.headline,
                      first_shot=shots[story.first_shot_idx],
-                     last_shot=shots[story.first_shot_idx],
-                     text=vao.data.get_story_text(idx)) for idx, story in enumerate(vao.data.stories)]
+                     last_shot=shots[story.last_shot_idx],
+                     transcript=vao.data.get_story_text(idx)) for idx, story in enumerate(vao.data.stories)]
 
     if vao.is_summary:
         banners = [Banner(text=banner.text, confidence=banner.confidence) for banner in vao.data.banners]
@@ -100,7 +101,6 @@ def upload_video_data(vao: VAO):
                            time=vao.date.time(),
                            duration=vao.duration,
                            timestamp=vao.date.timestamp(),
-                           keyframes=[str(kf) for kf in vao.data.keyframes],
                            shots=shots,
                            stories=stories,
                            transcripts=transcripts,
@@ -114,7 +114,6 @@ def upload_video_data(vao: VAO):
                           time=vao.date.time(),
                           duration=vao.duration,
                           timestamp=vao.date.timestamp(),
-                          keyframes=[str(kf) for kf in vao.data.keyframes],
                           shots=shots,
                           stories=stories,
                           transcripts=transcripts,
