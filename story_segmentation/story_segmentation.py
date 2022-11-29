@@ -116,7 +116,7 @@ def get_vectorizer(text) -> CountVectorizer:
     return vectorizer
 
 
-def topic_to_anchor_by_transcript(topics, anchor_shots, anchor_transcripts, anchor_captions):
+def get_topic_to_shot(topics, anchor_shots, anchor_transcripts, anchor_captions):
     dt_matrix = np.zeros(shape=(len(topics), len(anchor_shots)))
 
     for idx, topic in topics.items():
@@ -218,10 +218,10 @@ def segment_ts15(vao: VAO):
     anchor_transcripts = get_anchor_transcripts(vao, anchor_shots)
     anchor_captions = get_anchor_captions(vao, anchor_shots)
 
-    topic_to_anchor = topic_to_anchor_by_transcript(news_topics, anchor_shots, anchor_transcripts, anchor_captions)
-    topic_to_anchor = post_processing(topic_to_anchor, news_topics, anchor_shots)
+    topic_to_shot = get_topic_to_shot(news_topics, anchor_shots, anchor_transcripts, anchor_captions)
+    topic_to_shot = post_processing(topic_to_shot, news_topics, anchor_shots)
 
-    missing_topics = [idx for idx in news_topics.keys() if idx not in topic_to_anchor.keys()]
+    missing_topics = [idx for idx in news_topics.keys() if idx not in topic_to_shot.keys()]
     if len(missing_topics) > 0:
         print(f'{missing_topics} could not be assigned')
     else:
@@ -229,12 +229,17 @@ def segment_ts15(vao: VAO):
 
     stories = []
 
-    for topic_idx, anchor_idx in topic_to_anchor.items():
+    for topic_idx, anchor_idx in topic_to_shot.items():
         story_title = news_topics[topic_idx]
 
         first_shot_idx = anchor_idx
-        last_shot_idx = next((next_idx for next_idx in list(topic_to_anchor.values()) if next_idx > anchor_idx),
-                             list(anchor_shots.keys())[-1]) - 1
+
+        if topic_idx + 1 in list(topic_to_shot.keys()):
+            last_shot_idx = next((idx for idx in list(topic_to_shot.values()) if idx > first_shot_idx)) - 1
+        else:
+            last_shot_idx = next(
+                (idx for idx, cd in anchor_shots.items() if idx > first_shot_idx and cd.type == 'anchor'),
+                len(anchor_shots)) - 1
 
         story_data = extract_story_data(vao.data.shots, first_shot_idx, last_shot_idx)
 

@@ -9,22 +9,19 @@ import skimage
 from PIL import Image, ImageEnhance
 from alive_progress import alive_bar
 from pytesseract import pytesseract, Output
-from skimage.feature import match_template
 from skimage.filters.edges import sobel
 from skimage.filters.thresholding import try_all_threshold
 
 from common.Schemas import BANNER_COLUMNS
 from common.VAO import get_date_time, VAO, get_banner_caption_file, get_shot_file, is_summary, \
     get_frame_dir, get_frame_paths
-from common.constants import TV_FILENAME_RE, TS_LOGO
+from common.constants import TV_FILENAME_RE
 
 parser = ArgumentParser(description='Banner Caption Extraction')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+',
                     help="Tagesschau video file(s)")
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
                     help='Re-extracts banner captions for all videos')
-
-TS_LOGO = np.array(Image.open(TS_LOGO).convert('L'))
 
 
 def resize_frame(frame, resize_factor):
@@ -56,18 +53,6 @@ def crop_frame(frame, area):
     return frame.crop(area)
 
 
-def is_nightly_version(vao: VAO):
-    ts_logo_area = (35, 225, 110, 250)
-
-    center_frame_cropped = Image.open(vao.data.frames[int(vao.n_frames / 2)]).convert('L').crop(ts_logo_area)
-    center_frame_cropped = np.array(center_frame_cropped)
-
-    corr_coeff = match_template(center_frame_cropped, TS_LOGO)
-    max_corr = np.max(corr_coeff)
-
-    return max_corr > 0.9
-
-
 def extract_caption_data_from_frame(frame: Path, resize_factor, is_nightly, custom_oem_psm_config='--psm 4 --oem 1'):
     frame = Image.open(frame).convert('L')
 
@@ -97,7 +82,7 @@ def extract_caption_data_from_frame(frame: Path, resize_factor, is_nightly, cust
 def extract_caption_data_from_shots(vao: VAO, resize_factor=3):
     shots = vao.data.shots
 
-    is_nightly = is_nightly_version(vao)
+    is_nightly = vao.is_nightly_version
 
     for shot in shots:
         center_frame = vao.data.frames[shot.center_frame_idx]
@@ -150,7 +135,7 @@ def main(args):
         vao = VAO(vf)
 
         with alive_bar(vao.n_shots, ctrl_c=False,
-                       title=f'[{vf_idx + 1}/{len(video_files)}] {vao} ' + ('☾' if is_nightly_version(vao) else '☼'),
+                       title=f'[{vf_idx + 1}/{len(video_files)}] {vao} ' + ('☾' if vao.is_nightly_version else '☼'),
                        length=20) as bar:
 
             captions = []

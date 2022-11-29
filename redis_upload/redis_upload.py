@@ -6,7 +6,8 @@ from abc import ABC
 from pathlib import Path
 from typing import List, Optional
 
-from redis_om import JsonModel, Field, EmbeddedJsonModel, Migrator, get_redis_connection
+import redis
+from redis_om import JsonModel, Field, EmbeddedJsonModel, Migrator
 
 from common.VAO import get_date_time, VAO
 from common.utils import frame_idx_to_time
@@ -16,15 +17,24 @@ parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs=
 parser.add_argument('--host', type=str, default="localhost")
 parser.add_argument('--port', type=int, default=6379)
 parser.add_argument('--db', type=int, default=0)
+args = parser.parse_args()
+
+redis = redis.Redis(host=args.host, port=args.port, db=args.db, decode_responses=True)
 
 
 class Topic(EmbeddedJsonModel):
     title: str
 
+    class Meta:
+        database = redis
+
 
 class Banner(EmbeddedJsonModel):
     text: str
     confidence: int
+
+    class Meta:
+        database = redis
 
 
 class Shot(EmbeddedJsonModel):
@@ -32,6 +42,9 @@ class Shot(EmbeddedJsonModel):
     last_frame_idx: int
     keyframe: str
     type: Optional[str]
+
+    class Meta:
+        database = redis
 
 
 class Story(EmbeddedJsonModel):
@@ -41,11 +54,21 @@ class Story(EmbeddedJsonModel):
     duration: datetime.time
     transcript: str
 
+    class Meta:
+        database = redis
+
+
+class MainStory(Story):
+    topic: Topic
+
 
 class Transcript(EmbeddedJsonModel):
     from_time: datetime.time
     to_time: datetime.time
     text: str
+
+    class Meta:
+        database = redis
 
 
 class VideoBaseModel(JsonModel, ABC):
@@ -59,6 +82,7 @@ class VideoBaseModel(JsonModel, ABC):
     transcripts: List[Transcript]
 
     class Meta:
+        database = redis
         orm_mode = True
         arbitrary_types_allowed = True
         extra = "allow"
@@ -74,6 +98,7 @@ class MainVideo(VideoBaseModel):
 
 class ShortVideo(VideoBaseModel):
     banners: List[Banner]
+    is_nightly: int
 
     class Meta:
         model_key_prefix = 'ts100'
@@ -89,14 +114,15 @@ def upload_video_data(vao: VAO):
                               to_time=transcript.end,
                               text=transcript.text) for transcript in vao.data.transcripts]
 
-    stories = [Story(headline=story.headline,
-                     first_shot=shots[story.first_shot_idx],
-                     last_shot=shots[story.last_shot_idx],
-                     duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx).replace(microsecond=0),
-                     transcript=vao.data.get_story_text(idx)) for idx, story in enumerate(vao.data.stories)]
-
     if vao.is_summary:
         banners = [Banner(text=banner.text, confidence=banner.confidence) for banner in vao.data.banners]
+
+        stories = [Story(headline=story.headline,
+                         first_shot=shots[story.first_shot_idx],
+                         last_shot=shots[story.last_shot_idx],
+                         duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx).replace(
+                             microsecond=0),
+                         transcript=vao.data.get_story_text(idx)) for idx, story in enumerate(vao.data.stories)]
 
         video = ShortVideo(pk=str(vao.id),
                            path=str(vao.path),
@@ -104,12 +130,21 @@ def upload_video_data(vao: VAO):
                            time=vao.date.time(),
                            duration=vao.duration,
                            timestamp=vao.date.timestamp(),
+                           is_nightly=vao.is_nightly_version,
                            shots=shots,
                            stories=stories,
                            transcripts=transcripts,
                            banners=banners)
     else:
         topics = [Topic(title=topic) for topic in vao.data.topics]
+
+        stories = [MainStory(topic=topics[story.ref_idx],
+                             headline=story.headline,
+                             first_shot=shots[story.first_shot_idx],
+                             last_shot=shots[story.last_shot_idx],
+                             duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx).replace(
+                                 microsecond=0),
+                             transcript=vao.data.get_story_text(idx)) for idx, story in enumerate(vao.data.stories)]
 
         video = MainVideo(pk=str(vao.id),
                           path=str(vao.path),
@@ -126,8 +161,6 @@ def upload_video_data(vao: VAO):
 
 
 def main(args):
-    r = get_redis_connection()
-
     video_files = {file for file in args.files}
 
     assert len(video_files) > 0, 'No suitable video files have been found.'
@@ -142,8 +175,6 @@ def main(args):
         upload_video_data(vao)
 
     Migrator().run()
-
-    r.close()
 
 
 if __name__ == "__main__":

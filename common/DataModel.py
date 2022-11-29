@@ -38,12 +38,9 @@ class ShotData:
 
 @dataclass
 class StoryData:
+    ref_idx: int
     headline: str
     first_frame_idx: int
     last_frame_idx: int
     first_shot_idx: int
     last_shot_idx: int
-
-    @property
-    def duration(self):
-        return

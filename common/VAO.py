@@ -4,13 +4,16 @@ from functools import cached_property
 from pathlib import Path
 from typing import Union
 
+import numpy as np
 import pandas as pd
+from PIL import Image
+from skimage.feature import match_template
 
 from common.DataModel import BannerData, TranscriptData, StoryData, ShotData
 from common.Schemas import SHOT_COLUMNS, BANNER_COLUMNS, STORY_COLUMNS, TRANSCRIPT_COLUMNS
 from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT_AUDIO_FILENAME_RE, \
     STORY_TRANSCRIPT_FILENAME_RE, AUDIO_DIR, FRAME_DIR, KF_DIR, TRANSCRIPT_DIR, SM_DIR, TOPICS_FILENAME, \
-    CAPTIONS_FILENAME, SHOT_CLASS_FILENAME, SHOT_FILENAME, TRANSCRIPT_FILENAME, STORY_FILENAME
+    CAPTIONS_FILENAME, SHOT_CLASS_FILENAME, SHOT_FILENAME, TRANSCRIPT_FILENAME, STORY_FILENAME, TS_LOGO
 from common.utils import frame_idx_to_time, add_sec_to_time
 
 
@@ -49,6 +52,20 @@ class VAO:
     @property
     def is_summary(self) -> bool:
         return is_summary(self)
+
+    @cached_property
+    def is_nightly_version(self) -> bool:
+        ts_logo_area = (35, 225, 110, 250)
+
+        center_frame_cropped = Image.open(self.data.frames[int(self.n_frames / 2)]).convert('L').crop(ts_logo_area)
+        center_frame_cropped = np.array(center_frame_cropped)
+
+        ts_logo = Image.open(TS_LOGO).convert('L')
+
+        corr_coeff = match_template(center_frame_cropped, np.array(ts_logo))
+        max_corr = np.max(corr_coeff)
+
+        return max_corr > 0.9
 
     @property
     def duration(self):
@@ -296,8 +313,8 @@ def get_xml_transcript_file(video: VideoPathType) -> Path:
 
 
 def read_stories_from_file(file: Path) -> [StoryData]:
-    df = pd.read_csv(file, keep_default_na=False, usecols=STORY_COLUMNS[1:])
-    return [StoryData(val[0], val[1], val[2], val[4], val[5]) for val in df.values.tolist()]
+    df = pd.read_csv(file, keep_default_na=False, usecols=STORY_COLUMNS)
+    return [StoryData(val[0], val[1], val[2], val[3], val[5], val[6]) for val in df.values.tolist()]
 
 
 def read_banner_captions_from_file(file: Path) -> [BannerData]:
