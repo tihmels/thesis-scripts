@@ -1,115 +1,18 @@
 #!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
 
 import argparse
-import datetime
-from abc import ABC
 from pathlib import Path
-from typing import List, Optional
 
-import redis
-from redis_om import Field, Migrator, JsonModel
+from redis_om import Migrator
 
 from common.VAO import get_date_time, VAO
 from common.utils import frame_idx_to_time
+from database.model import Shot, Transcript, Banner, Story, ShortVideo, Topic, MainStory, MainVideo, VideoRef, red
 
 parser = argparse.ArgumentParser('Uploads filesystem data to a Redis instance')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")
-parser.add_argument('--host', type=str, default="localhost")
-parser.add_argument('--port', type=int, default=6379)
-parser.add_argument('--db', type=int, default=0)
 parser.add_argument('--reset', action='store_true')
 args = parser.parse_args()
-
-redis = redis.Redis(host=args.host, port=args.port, db=args.db, decode_responses=True)
-
-
-# redis = redis.Redis(host=args.host, port=args.port, db=args.db, decode_responses=True, username='default', password = 'YX0Nx3ddpclPyewTGzvswBnZrPyT9Tit')
-
-class BaseModel(JsonModel, ABC):
-    class Meta:
-        database = redis
-        orm_mode = True
-        arbitrary_types_allowed = True
-        extra = "allow"
-        global_key_prefix = 'tsv'
-
-
-class EmbeddedBaseModel(BaseModel, ABC):
-    class Meta:
-        embedded = True
-
-
-class Topic(EmbeddedBaseModel):
-    title: str
-
-
-class Banner(EmbeddedBaseModel):
-    text: str
-    confidence: int
-
-
-class Transcript(EmbeddedBaseModel):
-    from_time: datetime.time
-    to_time: datetime.time
-    text: str
-
-
-class Shot(EmbeddedBaseModel):
-    first_frame_idx: int
-    last_frame_idx: int
-    keyframe: str
-    type: Optional[str]
-
-
-class Story(EmbeddedBaseModel):
-    headline: str
-    first_shot: Shot
-    last_shot: Shot
-    duration: datetime.time
-    transcript: str
-
-
-class MainStory(Story):
-    topic: Topic
-
-
-class NodeBaseModel(BaseModel, ABC):
-    pre_pk: str = Field(index=True, default="")
-    suc_pk: str = Field(index=True, default="")
-
-
-class VideoBaseModel(NodeBaseModel, ABC):
-    path: str
-    date: datetime.date
-    time: datetime.time
-    duration: datetime.time
-    timestamp: int = Field(index=True, sortable=True)
-    shots: List[Shot]
-    stories: List[Story]
-    transcripts: List[Transcript]
-
-
-class MainVideo(VideoBaseModel):
-    topics: List[Topic]
-
-    class Meta:
-        model_key_prefix = 'ts15'
-
-
-class VideoRef(EmbeddedBaseModel):
-    ref_pk: str = Field(index=True)
-    temp_dist: int = Field(index=True, sortable=True)
-
-
-class ShortVideo(VideoBaseModel):
-    banners: List[Banner]
-    is_nightly: int = Field(index=True)
-
-    pre_main: Optional[VideoRef]
-    suc_main: Optional[VideoRef]
-
-    class Meta:
-        model_key_prefix = 'ts100'
 
 
 def upload_video_data(vao: VAO):
@@ -176,8 +79,8 @@ def suppress(func):
         return None
 
 
-def link_nodes(video, model_key_prefix):
-    if model_key_prefix == 'ts100':
+def link_nodes(video):
+    if video.Meta.model_key_prefix == 'ts100':
         predecessor = suppress(ShortVideo.find(ShortVideo.timestamp < video.timestamp).sort_by('-timestamp').first)
         successor = suppress(ShortVideo.find(ShortVideo.timestamp > video.timestamp).sort_by('timestamp').first)
     else:
@@ -212,7 +115,7 @@ def set_refs(video):
 
 def main(args):
     if args.reset:
-        redis.flushall()
+        red.flushall()
 
     video_files = {file for file in args.files}
 
@@ -236,11 +139,11 @@ def main(args):
 
     for pk in main_pks:
         video = MainVideo.get(pk)
-        link_nodes(video, 'ts15')
+        link_nodes(video)
 
     for pk in short_pks:
         video = ShortVideo.get(pk)
-        link_nodes(video, 'ts100')
+        link_nodes(video)
         set_refs(video)
 
     Migrator().run()
