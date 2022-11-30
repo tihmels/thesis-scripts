@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import redis
-from redis_om import JsonModel, Field, EmbeddedJsonModel, Migrator
+from redis_om import Field, Migrator, JsonModel
 
 from common.VAO import get_date_time, VAO
 from common.utils import frame_idx_to_time
@@ -17,61 +17,68 @@ parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs=
 parser.add_argument('--host', type=str, default="localhost")
 parser.add_argument('--port', type=int, default=6379)
 parser.add_argument('--db', type=int, default=0)
+parser.add_argument('--reset', action='store_true')
 args = parser.parse_args()
 
 redis = redis.Redis(host=args.host, port=args.port, db=args.db, decode_responses=True)
 
 
-class Topic(EmbeddedJsonModel):
-    title: str
+# redis = redis.Redis(host=args.host, port=args.port, db=args.db, decode_responses=True, username='default', password = 'YX0Nx3ddpclPyewTGzvswBnZrPyT9Tit')
 
+class BaseModel(JsonModel, ABC):
     class Meta:
         database = redis
+        orm_mode = True
+        arbitrary_types_allowed = True
+        extra = "allow"
+        global_key_prefix = 'tsv'
 
 
-class Banner(EmbeddedJsonModel):
+class EmbeddedBaseModel(BaseModel, ABC):
+    class Meta:
+        embedded = True
+
+
+class Topic(EmbeddedBaseModel):
+    title: str
+
+
+class Banner(EmbeddedBaseModel):
     text: str
     confidence: int
 
-    class Meta:
-        database = redis
+
+class Transcript(EmbeddedBaseModel):
+    from_time: datetime.time
+    to_time: datetime.time
+    text: str
 
 
-class Shot(EmbeddedJsonModel):
+class Shot(EmbeddedBaseModel):
     first_frame_idx: int
     last_frame_idx: int
     keyframe: str
     type: Optional[str]
 
-    class Meta:
-        database = redis
 
-
-class Story(EmbeddedJsonModel):
+class Story(EmbeddedBaseModel):
     headline: str
     first_shot: Shot
     last_shot: Shot
     duration: datetime.time
     transcript: str
 
-    class Meta:
-        database = redis
-
 
 class MainStory(Story):
     topic: Topic
 
 
-class Transcript(EmbeddedJsonModel):
-    from_time: datetime.time
-    to_time: datetime.time
-    text: str
-
-    class Meta:
-        database = redis
+class NodeBaseModel(BaseModel, ABC):
+    pre_pk: str = Field(index=True, default="")
+    suc_pk: str = Field(index=True, default="")
 
 
-class VideoBaseModel(JsonModel, ABC):
+class VideoBaseModel(NodeBaseModel, ABC):
     path: str
     date: datetime.date
     time: datetime.time
@@ -81,13 +88,6 @@ class VideoBaseModel(JsonModel, ABC):
     stories: List[Story]
     transcripts: List[Transcript]
 
-    class Meta:
-        database = redis
-        orm_mode = True
-        arbitrary_types_allowed = True
-        extra = "allow"
-        global_key_prefix = 'tsv'
-
 
 class MainVideo(VideoBaseModel):
     topics: List[Topic]
@@ -96,9 +96,17 @@ class MainVideo(VideoBaseModel):
         model_key_prefix = 'ts15'
 
 
+class VideoRef(EmbeddedBaseModel):
+    ref_pk: str = Field(index=True)
+    temp_dist: int = Field(index=True, sortable=True)
+
+
 class ShortVideo(VideoBaseModel):
     banners: List[Banner]
-    is_nightly: int
+    is_nightly: int = Field(index=True)
+
+    pre_main: Optional[VideoRef]
+    suc_main: Optional[VideoRef]
 
     class Meta:
         model_key_prefix = 'ts100'
@@ -156,11 +164,56 @@ def upload_video_data(vao: VAO):
                           stories=stories,
                           transcripts=transcripts,
                           topics=topics)
+    video.save()
+
+    return video
+
+
+def suppress(func):
+    try:
+        return func()
+    except Exception:
+        return None
+
+
+def link_nodes(video, model_key_prefix):
+    if model_key_prefix == 'ts100':
+        predecessor = suppress(ShortVideo.find(ShortVideo.timestamp < video.timestamp).sort_by('-timestamp').first)
+        successor = suppress(ShortVideo.find(ShortVideo.timestamp > video.timestamp).sort_by('timestamp').first)
+    else:
+        predecessor = suppress(MainVideo.find(MainVideo.timestamp < video.timestamp).sort_by('-timestamp').first)
+        successor = suppress(MainVideo.find(MainVideo.timestamp > video.timestamp).sort_by('timestamp').first)
+
+    if predecessor:
+        video.pre_pk = predecessor.pk
+        predecessor.suc_pk = video.pk
+        predecessor.save()
+
+    if successor:
+        video.suc_pk = successor.pk
+        successor.pre_pk = video.pk
+        successor.save()
+
+    video.save()
+
+
+def set_refs(video):
+    predecessor = suppress(MainVideo.find(MainVideo.timestamp < video.timestamp).sort_by('-timestamp').first)
+    successor = suppress(MainVideo.find(MainVideo.timestamp > video.timestamp).sort_by('timestamp').first)
+
+    if predecessor:
+        video.pre_main = VideoRef(ref_pk=predecessor.pk, temp_dist=video.timestamp - predecessor.timestamp)
+
+    if successor:
+        video.suc_main = VideoRef(ref_pk=successor.pk, temp_dist=successor.timestamp - video.timestamp)
 
     video.save()
 
 
 def main(args):
+    if args.reset:
+        redis.flushall()
+
     video_files = {file for file in args.files}
 
     assert len(video_files) > 0, 'No suitable video files have been found.'
@@ -172,7 +225,23 @@ def main(args):
 
         print(f'[{idx + 1}/{len(video_files)}] {vao}')
 
-        upload_video_data(vao)
+        video = upload_video_data(vao)
+
+        video.save()
+
+    Migrator().run()
+
+    main_pks = MainVideo.all_pks()
+    short_pks = ShortVideo.all_pks()
+
+    for pk in main_pks:
+        video = MainVideo.get(pk)
+        link_nodes(video, 'ts15')
+
+    for pk in short_pks:
+        video = ShortVideo.get(pk)
+        link_nodes(video, 'ts100')
+        set_refs(video)
 
     Migrator().run()
 
