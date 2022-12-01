@@ -15,7 +15,7 @@ def estimate_similarity(ts100, ts15):
 
 
 def process_video(ts15: MainVideo):
-    pre_videos = ShortVideo.find(ShortVideo.suc_main.ref_pk == ts15.pk).all()
+    pre_videos = ShortVideo.find((ShortVideo.suc_main.ref_pk == ts15.pk) & (ShortVideo.suc_main.temp_dist < 20000)).all()
     suc_videos = ShortVideo.find(ShortVideo.pre_main.ref_pk == ts15.pk).all()
 
     for ts100 in pre_videos:

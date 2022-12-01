@@ -36,6 +36,10 @@ class Transcript(EmbeddedBaseModel):
     text: str
 
 
+class Sentence(EmbeddedBaseModel):
+    text: str
+
+
 class Shot(EmbeddedBaseModel):
     first_frame_idx: int
     last_frame_idx: int
@@ -43,12 +47,16 @@ class Shot(EmbeddedBaseModel):
     type: Optional[str]
 
 
+class ShortShot(Shot):
+    banner: Banner
+
+
 class Story(EmbeddedBaseModel):
     headline: str
     first_shot: Shot
     last_shot: Shot
     duration: datetime.time
-    transcript: str
+    sentences: List[Sentence]
 
 
 class MainStory(Story):
@@ -85,7 +93,6 @@ class VideoRef(EmbeddedBaseModel):
 
 
 class ShortVideo(VideoBaseModel):
-    banners: List[Banner]
     is_nightly: int = Field(index=True)
 
     pre_main: Optional[VideoRef]

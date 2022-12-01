@@ -303,6 +303,10 @@ def segment_ts100(vao: VAO):
     for topic_idx, story in enumerate(story_indices):
         story_captions = {idx: cd for idx, cd in captions.items() if idx in story}
 
+        if story[0] == story[-1] and (
+                list(story_captions.values())[0].text == "" or len(list(story_captions.values())[0].text.split()) < 3):
+            continue
+
         max_confidence = max([caption.confidence for caption in story_captions.values()])
         story_caption = next((caption for caption in story_captions.items() if caption[1].confidence == max_confidence))
 

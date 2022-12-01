@@ -7,7 +7,8 @@ from redis_om import Migrator
 
 from common.VAO import get_date_time, VAO
 from common.utils import frame_idx_to_time
-from database.model import Shot, Transcript, Banner, Story, ShortVideo, Topic, MainStory, MainVideo, VideoRef, red
+from database.model import Shot, Banner, Story, ShortVideo, Topic, MainStory, MainVideo, VideoRef, red, \
+    Sentence, Transcript
 
 parser = argparse.ArgumentParser('Uploads filesystem data to a Redis instance')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")
@@ -16,11 +17,6 @@ args = parser.parse_args()
 
 
 def upload_video_data(vao: VAO):
-    shots = [Shot(first_frame_idx=shot.first_frame_idx,
-                  last_frame_idx=shot.last_frame_idx,
-                  keyframe=str(vao.data.keyframes[idx]),
-                  type=shot.type) for idx, shot in enumerate(vao.data.shots)]
-
     transcripts = [Transcript(from_time=transcript.start,
                               to_time=transcript.end,
                               text=transcript.text) for transcript in vao.data.transcripts]
@@ -28,12 +24,19 @@ def upload_video_data(vao: VAO):
     if vao.is_summary:
         banners = [Banner(text=banner.text, confidence=banner.confidence) for banner in vao.data.banners]
 
+        shots = [Shot(first_frame_idx=shot.first_frame_idx,
+                      last_frame_idx=shot.last_frame_idx,
+                      keyframe=str(vao.data.keyframes[idx]),
+                      banner=banner) for idx, (shot, banner) in enumerate(zip(vao.data.shots, banners))]
+
         stories = [Story(headline=story.headline,
                          first_shot=shots[story.first_shot_idx],
                          last_shot=shots[story.last_shot_idx],
                          duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx).replace(
                              microsecond=0),
-                         transcript=vao.data.get_story_text(idx)) for idx, story in enumerate(vao.data.stories)]
+                         sentences=[Sentence(text=sent) for sent in vao.data.get_story_sentences(idx)]) for idx, story
+                   in
+                   enumerate(vao.data.stories)]
 
         video = ShortVideo(pk=str(vao.id),
                            path=str(vao.path),
@@ -44,10 +47,14 @@ def upload_video_data(vao: VAO):
                            is_nightly=vao.is_nightly_version,
                            shots=shots,
                            stories=stories,
-                           transcripts=transcripts,
-                           banners=banners)
+                           transcripts=transcripts)
     else:
         topics = [Topic(title=topic) for topic in vao.data.topics]
+
+        shots = [Shot(first_frame_idx=shot.first_frame_idx,
+                      last_frame_idx=shot.last_frame_idx,
+                      keyframe=str(vao.data.keyframes[idx]),
+                      type=shot.type) for idx, shot in enumerate(vao.data.shots)]
 
         stories = [MainStory(topic=topics[story.ref_idx],
                              headline=story.headline,
@@ -55,7 +62,8 @@ def upload_video_data(vao: VAO):
                              last_shot=shots[story.last_shot_idx],
                              duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx)
                              .replace(microsecond=0),
-                             transcript=vao.data.get_story_text(idx)) for idx, story in enumerate(vao.data.stories)]
+                             sentences=[Sentence(text=sent) for sent in vao.data.get_story_sentences(idx)])
+                   for idx, story in enumerate(vao.data.stories)]
 
         video = MainVideo(pk=str(vao.id),
                           path=str(vao.path),
