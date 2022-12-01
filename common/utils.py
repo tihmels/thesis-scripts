@@ -40,7 +40,7 @@ def add_sec_to_time(time, secs):
 
 def frame_idx_to_time(frame_idx):
     seconds = frame_idx_to_sec(frame_idx)
-    return sec_to_time(seconds)
+    return sec_to_time(seconds).replace(microsecond=0)
 
 
 def create_dir(path: Path, rm_if_exist=False):

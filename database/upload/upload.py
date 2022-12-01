@@ -26,17 +26,16 @@ def upload_video_data(vao: VAO):
 
         shots = [Shot(first_frame_idx=shot.first_frame_idx,
                       last_frame_idx=shot.last_frame_idx,
+                      duration=frame_idx_to_time(shot.last_frame_idx - shot.first_frame_idx),
                       keyframe=str(vao.data.keyframes[idx]),
                       banner=banner) for idx, (shot, banner) in enumerate(zip(vao.data.shots, banners))]
 
         stories = [Story(headline=story.headline,
-                         first_shot=shots[story.first_shot_idx],
-                         last_shot=shots[story.last_shot_idx],
+                         shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx)],
                          duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx).replace(
                              microsecond=0),
-                         sentences=[Sentence(text=sent) for sent in vao.data.get_story_sentences(idx)]) for idx, story
-                   in
-                   enumerate(vao.data.stories)]
+                         sentences=[Sentence(text=sent) for sent in vao.data.get_story_sentences(idx)])
+                   for idx, story in enumerate(vao.data.stories)]
 
         video = ShortVideo(pk=str(vao.id),
                            path=str(vao.path),
@@ -53,13 +52,13 @@ def upload_video_data(vao: VAO):
 
         shots = [Shot(first_frame_idx=shot.first_frame_idx,
                       last_frame_idx=shot.last_frame_idx,
+                      duration=frame_idx_to_time(shot.last_frame_idx - shot.first_frame_idx),
                       keyframe=str(vao.data.keyframes[idx]),
                       type=shot.type) for idx, shot in enumerate(vao.data.shots)]
 
         stories = [MainStory(topic=topics[story.ref_idx],
                              headline=story.headline,
-                             first_shot=shots[story.first_shot_idx],
-                             last_shot=shots[story.last_shot_idx],
+                             shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx)],
                              duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx)
                              .replace(microsecond=0),
                              sentences=[Sentence(text=sent) for sent in vao.data.get_story_sentences(idx)])
