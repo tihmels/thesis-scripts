@@ -3,7 +3,7 @@
 from argparse import ArgumentParser
 from pathlib import Path
 
-import numpy as np
+from scipy.spatial import distance
 from sentence_transformers import util
 from smartredis import Client
 
@@ -28,12 +28,13 @@ def visual_similarity(ts15_stories, ts100_stories):
                                                                               ts100_ai_tensors[0].shape:
                 return
 
-            cosine_scores = util.cos_sim(np.array(ts15_ai_tensors), np.array(ts100_ai_tensors))
+            cosine_scores = distance.cdist(ts15_ai_tensors, ts100_ai_tensors, metric='cosine')
 
             pairs = []
             for i in range(cosine_scores.shape[0]):
                 for j in range(i + 1, cosine_scores.shape[1]):
-                    pairs.append({'index': [i, j], 'score': cosine_scores[i][j]})
+                    if cosine_scores[i][j] < 0.5:
+                        pairs.append({'index': [i, j], 'score': cosine_scores[i][j]})
 
             # Sort scores in decreasing order
             pairs = sorted(pairs, key=lambda x: x['score'], reverse=True)
@@ -55,7 +56,7 @@ def sent_similarity(ts15_stories, ts100_stories):
                                 client.tensor_exists(sentence.pk)]
 
             if len(ts15_ai_tensors) == 0 or len(ts100_ai_tensors) == 0:
-                return
+                continue
 
             cosine_scores = util.cos_sim(ts15_ai_tensors, ts100_ai_tensors)
 
@@ -76,10 +77,8 @@ def sent_similarity(ts15_stories, ts100_stories):
 
 
 def process_video(ts15: MainVideo):
-    pre_videos = ShortVideo.find(
-        (ShortVideo.suc_main.ref_pk == ts15.pk) and (ShortVideo.suc_main.temp_dist < 1500)).all()
-    suc_videos = ShortVideo.find(
-        (ShortVideo.pre_main.ref_pk == ts15.pk) and (ShortVideo.pre_main.temp_dist < 1500)).all()
+    pre_videos = ShortVideo.find(ShortVideo.suc_main.ref_pk == ts15.pk).all()
+    suc_videos = ShortVideo.find(ShortVideo.pre_main.ref_pk == ts15.pk).all()
 
     for ts100 in pre_videos + suc_videos:
         visual_similarity(ts15.stories, ts100.stories)
@@ -92,7 +91,6 @@ def main():
     assert len(videos) > 0, 'No suitable video files have been found.'
 
     for idx, video in enumerate(videos):
-
         print(f'[{idx + 1}/{len(videos)}] {video.pk}')
 
         process_video(video)
