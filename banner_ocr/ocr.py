@@ -1,4 +1,5 @@
-#!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
+#!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
+
 import re
 from argparse import ArgumentParser
 from pathlib import Path

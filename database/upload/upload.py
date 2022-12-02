@@ -31,7 +31,7 @@ def upload_video_data(vao: VAO):
                       banner=banner) for idx, (shot, banner) in enumerate(zip(vao.data.shots, banners))]
 
         stories = [Story(headline=story.headline,
-                         shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx)],
+                         shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx + 1)],
                          duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx).replace(
                              microsecond=0),
                          sentences=[Sentence(text=sent) for sent in vao.data.get_story_sentences(idx)])
@@ -58,7 +58,7 @@ def upload_video_data(vao: VAO):
 
         stories = [MainStory(topic=topics[story.ref_idx],
                              headline=story.headline,
-                             shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx)],
+                             shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx + 1)],
                              duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx)
                              .replace(microsecond=0),
                              sentences=[Sentence(text=sent) for sent in vao.data.get_story_sentences(idx)])

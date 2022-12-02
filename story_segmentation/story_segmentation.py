@@ -1,4 +1,4 @@
-#!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
+#!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
 
 import itertools
 import operator
@@ -16,7 +16,7 @@ from nltk.corpus import stopwords
 from pytesseract import pytesseract, Output
 from sklearn.feature_extraction.text import CountVectorizer
 
-from banner_ocr.ocr import sharpen_frame, resize_frame, crop_frame
+from banner_ocr import crop_frame, sharpen_frame, resize_frame
 from charsplit.splitter import Splitter
 from common.DataModel import TranscriptData
 from common.Schemas import STORY_COLUMNS
