@@ -50,7 +50,7 @@ def extract_sentence_features(story, skip_existing):
     features = nlp_model.encode([sentence.text for sentence in story.sentences])
 
     for sentence, feature in zip(story.sentences, features):
-        rai.put_tensor(sentence.pk, feature)
+        rai.put_tensor('tensor:text:' + sentence.pk, feature)
 
 
 def extract_image_features(story, skip_existing):
@@ -65,7 +65,7 @@ def extract_image_features(story, skip_existing):
     embeddings = [embedding_pipeline(shot.keyframe) for shot in story.shots]
 
     for shot, vector in zip(story.shots, embeddings):
-        rai.put_tensor(shot.pk, vector)
+        rai.put_tensor('tensor:shot:' + shot.pk, vector)
 
 
 def action_dispatcher(action, video, skip_existing):
