@@ -1,14 +1,16 @@
 #!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
+
 import logging
+import os
 
 from common.utils import set_tf_loglevel
 
 set_tf_loglevel(logging.FATAL)
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
 from argparse import ArgumentParser
 
-import numpy as np
-import tensorflow as tf
+from towhee import pipeline
 from alive_progress import alive_bar
 from keras.applications import EfficientNetV2S
 from sentence_transformers import SentenceTransformer
@@ -58,14 +60,12 @@ def extract_image_features(story, skip_existing):
     if skip_existing and all((rai.tensor_exists(shot.pk) for shot in story.shots)):
         return
 
-    frames = [tf.keras.utils.load_img(shot.keyframe, target_size=IMAGE_SHAPE) for shot in story.shots]
-    frames = [tf.keras.utils.img_to_array(frame) for frame in frames]
-    frames = np.expand_dims(frames, axis=0)
+    embedding_pipeline = pipeline('towhee/image-embedding-swinbase')
 
-    features = img_model.predict(np.vstack(frames), verbose=0)
+    embeddings = [embedding_pipeline(shot.keyframe) for shot in story.shots]
 
-    for shot, feature in zip(story.shots, features):
-        rai.put_tensor(shot.pk, feature.flatten())
+    for shot, vector in zip(story.shots, embeddings):
+        rai.put_tensor(shot.pk, vector)
 
 
 def action_dispatcher(action, video, skip_existing):
@@ -94,7 +94,7 @@ def main(args):
     actions = args.actions
 
     if args.pks:
-        videos = [ShortVideo.get(pk) for pk in args.pks]
+        videos = [MainVideo.get(pk) for pk in args.pks]
         alive_action(videos, actions, args.skip_existing)
 
     if args.ts15:

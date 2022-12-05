@@ -58,6 +58,7 @@ class Story(EmbeddedBaseModel):
     start: datetime.time
     end: datetime.time
     duration: datetime.time
+    keywords: List[str]
     shots: List[Shot]
     sentences: List[Sentence]
 

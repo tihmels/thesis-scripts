@@ -3,6 +3,7 @@
 from argparse import ArgumentParser
 from pathlib import Path
 
+import numpy as np
 from scipy.spatial import distance
 from sentence_transformers import util
 from smartredis import Client
@@ -28,22 +29,19 @@ def visual_similarity(ts15_stories, ts100_stories):
                                                                               ts100_ai_tensors[0].shape:
                 return
 
-            cosine_scores = distance.cdist(ts15_ai_tensors, ts100_ai_tensors, metric='cosine')
+            cosine_scores = distance.cdist(ts15_ai_tensors, ts100_ai_tensors, metric='correlation')
 
-            pairs = []
-            for i in range(cosine_scores.shape[0]):
-                for j in range(i + 1, cosine_scores.shape[1]):
-                        pairs.append({'index': [i, j], 'score': cosine_scores[i][j]})
+            argmax, argmin = np.argmax(cosine_scores), np.argmin(cosine_scores)
+            argmax_idx, argmin_idx = np.unravel_index(argmax, cosine_scores.shape), np.unravel_index(argmin,
+                                                                                                     cosine_scores.shape)
 
-            # Sort scores in decreasing order
-            pairs = sorted(pairs, key=lambda x: x['score'], reverse=True)
-
-            for pair in pairs[0:10]:
-                i, j = pair['index']
-                print(
-                    "{} \t {} \t Score: {:.4f}".format(ts15_story.shots[i].keyframe, ts100_story.shots[j].keyframe,
-                                                       pair['score']))
-                print()
+            print(f'{ts15_story.headline} - {ts100_story.headline}')
+            print(
+                f'MAX[ {ts15_story.shots[argmax_idx[0]].keyframe} : {ts100_story.shots[argmax_idx[1]].keyframe} ] {np.max(cosine_scores)}')
+            print(
+                f'MIN[ {ts15_story.shots[argmin_idx[0]].keyframe} : {ts100_story.shots[argmin_idx[1]].keyframe} ] {np.min(cosine_scores)}')
+            print(f'Mean: {np.mean(cosine_scores)}')
+            print()
 
 
 def sent_similarity(ts15_stories, ts100_stories):
@@ -77,8 +75,7 @@ def sent_similarity(ts15_stories, ts100_stories):
 
 def process_video(ts15: MainVideo):
     videos = ShortVideo.find(
-        (ShortVideo.suc_main.ref_pk == ts15.pk) or (ShortVideo.suc_main.ref_pk == ts15.pk)).sort_by('timestamp').all()
-    # suc_videos = ShortVideo.find(ShortVideo.pre_main.ref_pk == ts15.pk).all()
+        (ShortVideo.pre_main.ref_pk == ts15.pk) or (ShortVideo.suc_main.ref_pk == ts15.pk)).sort_by('timestamp').all()
 
     for ts100 in videos:
         visual_similarity(ts15.stories, ts100.stories)

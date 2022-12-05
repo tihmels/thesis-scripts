@@ -1,13 +1,15 @@
-#!/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
+#!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
 
 import argparse
 from pathlib import Path
 
+from keybert import KeyBERT
+from nltk.corpus import stopwords
 from redis_om import Migrator
 
 from common.DataModel import get_text
 from common.VAO import get_date_time, VAO
-from common.utils import frame_idx_to_time, sec_to_time
+from common.utils import frame_idx_to_time
 from database.model import Shot, Banner, Story, ShortVideo, Topic, MainStory, MainVideo, VideoRef, red, \
     Sentence, Transcript
 
@@ -15,6 +17,9 @@ parser = argparse.ArgumentParser('Uploads filesystem data to a Redis instance')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")
 parser.add_argument('--reset', action='store_true')
 args = parser.parse_args()
+
+kw_model = KeyBERT(model='paraphrase-multilingual-MiniLM-L12-v2')
+german_stop_words = stopwords.words('german')
 
 
 def upload_video_data(vao: VAO):
@@ -38,6 +43,9 @@ def upload_video_data(vao: VAO):
                          shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx + 1)],
                          duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx).replace(
                              microsecond=0),
+                         keywords=[kw[0] for kw in kw_model.extract_keywords(
+                             get_text(vao.data.get_shot_transcripts(story.first_shot_idx, story.last_shot_idx)),
+                             keyphrase_ngram_range=(1, 1), stop_words=german_stop_words)],
                          sentences=[Sentence(text=sent) for sent in vao.data.get_story_sentences(idx)])
                    for idx, story in enumerate(vao.data.stories)]
 
@@ -65,6 +73,9 @@ def upload_video_data(vao: VAO):
                              start=frame_idx_to_time(story.first_frame_idx),
                              end=frame_idx_to_time(story.last_frame_idx),
                              headline=story.headline,
+                             keywords=[kw[0] for kw in kw_model.extract_keywords(
+                                 get_text(vao.data.get_shot_transcripts(story.first_shot_idx, story.last_shot_idx)),
+                                 keyphrase_ngram_range=(1, 1), stop_words=german_stop_words)],
                              shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx + 1)],
                              duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx)
                              .replace(microsecond=0),
@@ -119,10 +130,10 @@ def set_refs(video):
     successor = suppress(MainVideo.find(MainVideo.timestamp > video.timestamp).sort_by('timestamp').first)
 
     if predecessor:
-        video.pre_main = VideoRef(ref_pk=predecessor.pk, temp_dist=video.timestamp - predecessor.timestamp).save()
+        video.pre_main = VideoRef(ref_pk=predecessor.pk, temp_dist=video.timestamp - predecessor.timestamp)
 
     if successor:
-        video.suc_main = VideoRef(ref_pk=successor.pk, temp_dist=successor.timestamp - video.timestamp).save()
+        video.suc_main = VideoRef(ref_pk=successor.pk, temp_dist=successor.timestamp - video.timestamp)
 
     video.save()
 
