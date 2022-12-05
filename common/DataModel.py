@@ -21,6 +21,10 @@ class TranscriptData:
     color: str = None
 
 
+def get_text(tds: [TranscriptData]):
+    return ' '.join([td.text for td in tds])
+
+
 @dataclass
 class ShotData:
     first_frame_idx: int

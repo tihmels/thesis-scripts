@@ -5,8 +5,9 @@ from pathlib import Path
 
 from redis_om import Migrator
 
+from common.DataModel import get_text
 from common.VAO import get_date_time, VAO
-from common.utils import frame_idx_to_time
+from common.utils import frame_idx_to_time, sec_to_time
 from database.model import Shot, Banner, Story, ShortVideo, Topic, MainStory, MainVideo, VideoRef, red, \
     Sentence, Transcript
 
@@ -28,9 +29,12 @@ def upload_video_data(vao: VAO):
                       last_frame_idx=shot.last_frame_idx,
                       duration=frame_idx_to_time(shot.last_frame_idx - shot.first_frame_idx),
                       keyframe=str(vao.data.keyframes[idx]),
+                      text=get_text(vao.data.get_shot_transcripts(idx)),
                       banner=banner) for idx, (shot, banner) in enumerate(zip(vao.data.shots, banners))]
 
         stories = [Story(headline=story.headline,
+                         start=frame_idx_to_time(story.first_frame_idx),
+                         end=frame_idx_to_time(story.last_frame_idx),
                          shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx + 1)],
                          duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx).replace(
                              microsecond=0),
@@ -54,9 +58,12 @@ def upload_video_data(vao: VAO):
                       last_frame_idx=shot.last_frame_idx,
                       duration=frame_idx_to_time(shot.last_frame_idx - shot.first_frame_idx),
                       keyframe=str(vao.data.keyframes[idx]),
+                      text=get_text(vao.data.get_shot_transcripts(idx)),
                       type=shot.type) for idx, shot in enumerate(vao.data.shots)]
 
         stories = [MainStory(topic=topics[story.ref_idx],
+                             start=frame_idx_to_time(story.first_frame_idx),
+                             end=frame_idx_to_time(story.last_frame_idx),
                              headline=story.headline,
                              shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx + 1)],
                              duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx)

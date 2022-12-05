@@ -33,7 +33,6 @@ def visual_similarity(ts15_stories, ts100_stories):
             pairs = []
             for i in range(cosine_scores.shape[0]):
                 for j in range(i + 1, cosine_scores.shape[1]):
-                    if cosine_scores[i][j] < 0.5:
                         pairs.append({'index': [i, j], 'score': cosine_scores[i][j]})
 
             # Sort scores in decreasing order
@@ -77,10 +76,11 @@ def sent_similarity(ts15_stories, ts100_stories):
 
 
 def process_video(ts15: MainVideo):
-    pre_videos = ShortVideo.find(ShortVideo.suc_main.ref_pk == ts15.pk).all()
-    suc_videos = ShortVideo.find(ShortVideo.pre_main.ref_pk == ts15.pk).all()
+    videos = ShortVideo.find(
+        (ShortVideo.suc_main.ref_pk == ts15.pk) or (ShortVideo.suc_main.ref_pk == ts15.pk)).sort_by('timestamp').all()
+    # suc_videos = ShortVideo.find(ShortVideo.pre_main.ref_pk == ts15.pk).all()
 
-    for ts100 in pre_videos + suc_videos:
+    for ts100 in videos:
         visual_similarity(ts15.stories, ts100.stories)
         # sent_similarity(ts15.stories, ts100.stories)
 

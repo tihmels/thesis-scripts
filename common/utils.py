@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+from collections import namedtuple
 from datetime import datetime, timedelta
 from pathlib import Path
 from shutil import rmtree
@@ -8,6 +9,8 @@ from shutil import rmtree
 import cv2
 
 from common.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE
+
+Range = namedtuple('Range', ['start', 'end'])
 
 
 def sec_to_frame_idx(second, fps=25):
@@ -18,7 +21,16 @@ def frame_idx_to_sec(idx, fps=25):
     return idx / fps
 
 
-def sec_to_time(seconds):
+def range_intersect(r1: Range, r2: Range):
+    latest_start = max(r1.start, r2.start)
+    earliest_end = min(r1.end, r2.end)
+    delta = (earliest_end - latest_start).total_seconds()
+    overlap = max(0, delta)
+
+    return overlap
+
+
+def sec_to_time(seconds: int):
     return (datetime.min + timedelta(seconds=seconds)).time()
 
 

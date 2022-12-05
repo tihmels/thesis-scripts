@@ -15,7 +15,7 @@ from common.Schemas import SHOT_COLUMNS, BANNER_COLUMNS, STORY_COLUMNS, TRANSCRI
 from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT_AUDIO_FILENAME_RE, \
     STORY_TRANSCRIPT_FILENAME_RE, AUDIO_DIR, FRAME_DIR, KF_DIR, TRANSCRIPT_DIR, SM_DIR, TOPICS_FILENAME, \
     CAPTIONS_FILENAME, SHOT_CLASS_FILENAME, SHOT_FILENAME, TRANSCRIPT_FILENAME, STORY_FILENAME, TS_LOGO
-from common.utils import frame_idx_to_time, add_sec_to_time
+from common.utils import frame_idx_to_time, time_to_datetime, Range, range_intersect
 
 nltk.download('punkt')
 
@@ -127,10 +127,13 @@ class VAO:
 
             from_time, to_time = frame_idx_to_time(from_shot.first_frame_idx), frame_idx_to_time(to_shot.last_frame_idx)
 
-            from_time = from_time.replace(microsecond=0)
-            to_time = add_sec_to_time(to_time.replace(microsecond=0), 1)
+            from_time = time_to_datetime(from_time)
+            to_time = time_to_datetime(to_time)
 
-            return [trans for trans in self.transcripts if from_time <= trans.end <= to_time]
+            return [trans for trans in self.transcripts if
+                    range_intersect(Range(start=from_time, end=to_time),
+                                    Range(time_to_datetime(trans.start), time_to_datetime(trans.end))) >= 0.8 * (
+                            time_to_datetime(trans.end) - time_to_datetime(trans.start)).total_seconds()]
 
         def get_story_sentences(self, story_idx) -> [str]:
             story = self.stories[story_idx]

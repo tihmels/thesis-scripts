@@ -16,9 +16,9 @@ from nltk.corpus import stopwords
 from pytesseract import pytesseract, Output
 from sklearn.feature_extraction.text import CountVectorizer
 
-from banner_ocr import crop_frame, sharpen_frame, resize_frame
+from banner_ocr.ocr import crop_frame, sharpen_frame, resize_frame
 from charsplit.splitter import Splitter
-from common.DataModel import TranscriptData
+from common.DataModel import get_text
 from common.Schemas import STORY_COLUMNS
 from common.VAO import VAO, get_shot_file, get_date_time, get_banner_caption_file, get_story_file, \
     get_topic_file, is_summary, read_shots_from_file
@@ -44,10 +44,6 @@ abbrvs = {'AKW': 'Atomkraftwerk',
 
 def lemmatizer(text):
     return [tag for word in text for tag in tagger.analyze(word)[:1]]
-
-
-def get_text(tds: [TranscriptData]):
-    return ' '.join([td.text for td in tds])
 
 
 def extract_story_data(shots, first_shot_idx: int, last_shot_idx: int):

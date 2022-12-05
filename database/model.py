@@ -44,6 +44,7 @@ class Shot(EmbeddedBaseModel):
     first_frame_idx: int
     last_frame_idx: int
     duration: datetime.time
+    text: str
     keyframe: str
     type: Optional[str]
 
@@ -54,6 +55,8 @@ class ShortShot(Shot):
 
 class Story(EmbeddedBaseModel):
     headline: str
+    start: datetime.time
+    end: datetime.time
     duration: datetime.time
     shots: List[Shot]
     sentences: List[Sentence]
