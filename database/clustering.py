@@ -4,9 +4,11 @@ from collections import defaultdict
 import hdbscan
 import numpy as np
 import pandas as pd
+import random
 import umap
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import CountVectorizer
+from tqdm import trange
 
 from common.utils import flatten
 from database import rai
@@ -52,6 +54,49 @@ def c_tf_idf(documents, m, ngram_range=(1, 1)):
     return tf_idf, count
 
 
+def score_clusters(clusters, prob_threshold=0.05):
+    """
+    Returns the label count and cost of a given cluster supplied from running hdbscan
+    """
+
+    cluster_labels = clusters.labels_
+    label_count = len(np.unique(cluster_labels))
+    total_num = len(clusters.labels_)
+    cost = (np.count_nonzero(clusters.probabilities_ < prob_threshold) / total_num)
+
+    return label_count, cost
+
+
+def random_search(embeddings, space, num_evals):
+    """
+    Randomly search hyperparameter space and limited number of times
+    and return a summary of the results
+    """
+
+    results = []
+
+    for i in trange(num_evals):
+        n_neighbors = random.choice(space['n_neighbors'])
+        n_components = random.choice(space['n_components'])
+        min_cluster_size = random.choice(space['min_cluster_size'])
+
+        clusters = generate_clusters(embeddings,
+                                     n_neighbors=n_neighbors,
+                                     n_components=n_components,
+                                     min_cluster_size=min_cluster_size,
+                                     random_state=space['random_state'])
+
+        label_count, cost = score_clusters(clusters, prob_threshold=0.05)
+
+        results.append([i, n_neighbors, n_components, min_cluster_size,
+                        label_count, cost])
+
+    result_df = pd.DataFrame(results, columns=['run_id', 'n_neighbors', 'n_components',
+                                               'min_cluster_size', 'label_count', 'cost'])
+
+    return result_df.sort_values(by='cost')
+
+
 def generate_clusters(embeddings,
                       n_neighbors=15,
                       n_components=5,
@@ -70,11 +115,21 @@ def generate_clusters(embeddings,
     return clusters
 
 
+space = {
+    "n_neighbors": range(12, 16),
+    "n_components": range(3, 7),
+    "min_cluster_size": range(2, 16),
+    "random_state": 42
+}
+
+
 def process_stories(stories):
     headlines = [story.headline for story in stories]
     tensors = [rai.get_tensor(RAI_STORY_PREFIX + story.pk) for story in stories]
 
     cluster = generate_clusters(tensors, 14, 4, 8, 42)
+
+    random_use = random_search(tensors, space, 100)
 
     story_cluster = defaultdict(list)
     for story, label in zip(stories, cluster.labels_):
