@@ -21,8 +21,16 @@ class EmbeddedBaseModel(BaseModel, ABC):
         embedded = True
 
 
-class Topic(EmbeddedBaseModel):
-    title: str
+class TopicCluster(BaseModel):
+    topics: List[str]
+    stories: List[str]
+
+    class Meta:
+        model_key_prefix = 'cluster'
+
+
+class Headline(EmbeddedBaseModel):
+    text: str
 
 
 class Banner(EmbeddedBaseModel):
@@ -36,35 +44,45 @@ class Transcript(EmbeddedBaseModel):
     text: str
 
 
-class Sentence(EmbeddedBaseModel):
-    text: str
-
-
-class Shot(EmbeddedBaseModel):
+class Shot(EmbeddedBaseModel, ABC):
     first_frame_idx: int
     last_frame_idx: int
     duration: datetime.time
-    text: str
+    transcript: str
     keyframe: str
-    type: Optional[str]
+
+    class Meta:
+        model_key_prefix = 'shot'
+
+
+class MainShot(Shot):
+    type: str
+
+    class Meta:
+        model_key_prefix = 'shot'
 
 
 class ShortShot(Shot):
     banner: Banner
 
+    class Meta:
+        model_key_prefix = 'shot'
+
 
 class Story(EmbeddedBaseModel):
     headline: str
+    first_frame_idx: int
+    last_frame_idx: int
     start: datetime.time
     end: datetime.time
     duration: datetime.time
-    keywords: List[str]
+    frames: List[str]
     shots: List[Shot]
-    sentences: List[Sentence]
+    sentences: List[str]
+    keywords: List[str]
 
-
-class MainStory(Story):
-    topic: Topic
+    class Meta:
+        model_key_prefix = 'story'
 
 
 class NodeBaseModel(BaseModel, ABC):
@@ -84,7 +102,7 @@ class VideoBaseModel(NodeBaseModel, ABC):
 
 
 class MainVideo(VideoBaseModel):
-    topics: List[Topic]
+    topics: List[str]
 
     class Meta:
         model_key_prefix = 'ts15'

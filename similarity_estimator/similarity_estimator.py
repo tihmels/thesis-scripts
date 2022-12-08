@@ -21,6 +21,8 @@ def visual_similarity(ts15_stories, ts100_stories):
     for ts15_story in ts15_stories:
         ts15_ai_tensors = [client.get_tensor(shot.pk) for shot in ts15_story.shots]
 
+
+
         for ts100_story in ts100_stories:
             ts100_ai_tensors = [client.get_tensor(shot.pk) for shot in ts100_story.shots if
                                 client.tensor_exists(shot.pk)]
@@ -29,7 +31,7 @@ def visual_similarity(ts15_stories, ts100_stories):
                                                                               ts100_ai_tensors[0].shape:
                 return
 
-            cosine_scores = distance.cdist(ts15_ai_tensors, ts100_ai_tensors, metric='correlation')
+            cosine_scores = distance.cdist(ts15_ai_tensors, ts100_ai_tensors, metric='cosine')
 
             argmax, argmin = np.argmax(cosine_scores), np.argmin(cosine_scores)
             argmax_idx, argmin_idx = np.unravel_index(argmax, cosine_scores.shape), np.unravel_index(argmin,
@@ -76,6 +78,8 @@ def sent_similarity(ts15_stories, ts100_stories):
 def process_video(ts15: MainVideo):
     videos = ShortVideo.find(
         (ShortVideo.pre_main.ref_pk == ts15.pk) or (ShortVideo.suc_main.ref_pk == ts15.pk)).sort_by('timestamp').all()
+
+    ts100_stories = [story for video in videos for story in video.stories]
 
     for ts100 in videos:
         visual_similarity(ts15.stories, ts100.stories)

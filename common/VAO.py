@@ -130,10 +130,12 @@ class VAO:
             from_time = time_to_datetime(from_time)
             to_time = time_to_datetime(to_time)
 
-            return [trans for trans in self.transcripts if
-                    range_intersect(Range(start=from_time, end=to_time),
-                                    Range(time_to_datetime(trans.start), time_to_datetime(trans.end))) >= 0.8 * (
-                            time_to_datetime(trans.end) - time_to_datetime(trans.start)).total_seconds()]
+            transcripts = [trans for trans in self.transcripts if
+                           range_intersect(Range(start=from_time, end=to_time),
+                                           Range(time_to_datetime(trans.start), time_to_datetime(trans.end))) >= 0.6 * (
+                                   time_to_datetime(trans.end) - time_to_datetime(trans.start)).total_seconds()]
+
+            return transcripts
 
         def get_story_sentences(self, story_idx) -> [str]:
             story = self.stories[story_idx]

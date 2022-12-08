@@ -1,6 +1,5 @@
 #!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
 
-import itertools
 import operator
 import re
 from argparse import ArgumentParser
@@ -17,13 +16,13 @@ from pytesseract import pytesseract, Output
 from sklearn.feature_extraction.text import CountVectorizer
 
 from banner_ocr.ocr import crop_frame, sharpen_frame, resize_frame
-from charsplit.splitter import Splitter
 from common.DataModel import get_text
 from common.Schemas import STORY_COLUMNS
 from common.VAO import VAO, get_shot_file, get_date_time, get_banner_caption_file, get_story_file, \
     get_topic_file, is_summary, read_shots_from_file
 from common.constants import TV_FILENAME_RE
-from common.utils import frame_idx_to_sec, sec_to_time, time_to_datetime
+from common.utils import frame_idx_to_sec, sec_to_time, time_to_datetime, flatten
+from story_segmentation.charsplit.splitter import Splitter
 
 parser = ArgumentParser('Story Segmentation')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
@@ -98,8 +97,7 @@ def custom_preprocessor(text):
 
 
 def custom_tokenizer(text):
-    splits = [split[1:] for word in text for split in splitter.split_compound(word) if split[0] > 0.9]
-    splits = list(itertools.chain.from_iterable(splits))
+    splits = flatten([split[1:] for word in text for split in splitter.split_compound(word) if split[0] > 0.9])
 
     return lemmatizer(text + splits)
 

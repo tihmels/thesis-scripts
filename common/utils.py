@@ -1,3 +1,4 @@
+import itertools
 import logging
 import os
 import re
@@ -12,6 +13,8 @@ from common.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE
 
 Range = namedtuple('Range', ['start', 'end'])
 
+def flatten(nested):
+    return list(itertools.chain.from_iterable(nested))
 
 def sec_to_frame_idx(second, fps=25):
     return second * fps

@@ -3,23 +3,26 @@
 import argparse
 from pathlib import Path
 
+from flair.embeddings import TransformerDocumentEmbeddings
 from keybert import KeyBERT
-from nltk.corpus import stopwords
+from keyphrase_vectorizers import KeyphraseCountVectorizer
 from redis_om import Migrator
 
 from common.DataModel import get_text
 from common.VAO import get_date_time, VAO
 from common.utils import frame_idx_to_time
-from database.model import Shot, Banner, Story, ShortVideo, Topic, MainStory, MainVideo, VideoRef, red, \
-    Sentence, Transcript
+from database import red
+from database.model import Banner, Story, ShortVideo, ShortShot, Headline, MainShot, Transcript, MainVideo, VideoRef
 
 parser = argparse.ArgumentParser('Uploads filesystem data to a Redis instance')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")
 parser.add_argument('--reset', action='store_true')
 args = parser.parse_args()
 
-kw_model = KeyBERT(model='paraphrase-multilingual-MiniLM-L12-v2')
-german_stop_words = stopwords.words('german')
+kw_model = KeyBERT(
+    model=TransformerDocumentEmbeddings('dbmdz/bert-base-german-uncased'))  # https://github.com/MaartenGr/KeyBERT
+vectorizer = KeyphraseCountVectorizer(spacy_pipeline='de_core_news_sm', pos_pattern='<ADJ.*>*<N.*>+',
+                                      stop_words='german')
 
 
 def upload_video_data(vao: VAO):
@@ -30,24 +33,27 @@ def upload_video_data(vao: VAO):
     if vao.is_summary:
         banners = [Banner(text=banner.text, confidence=banner.confidence) for banner in vao.data.banners]
 
-        shots = [Shot(first_frame_idx=shot.first_frame_idx,
-                      last_frame_idx=shot.last_frame_idx,
-                      duration=frame_idx_to_time(shot.last_frame_idx - shot.first_frame_idx),
-                      keyframe=str(vao.data.keyframes[idx]),
-                      text=get_text(vao.data.get_shot_transcripts(idx)),
-                      banner=banner) for idx, (shot, banner) in enumerate(zip(vao.data.shots, banners))]
+        shots = [ShortShot(first_frame_idx=shot.first_frame_idx,
+                           last_frame_idx=shot.last_frame_idx,
+                           duration=frame_idx_to_time(shot.last_frame_idx - shot.first_frame_idx),
+                           keyframe=str(vao.data.keyframes[idx]),
+                           transcript=get_text(vao.data.get_shot_transcripts(idx)),
+                           banner=banner) for idx, (shot, banner) in enumerate(zip(vao.data.shots, banners))]
 
-        stories = [Story(headline=story.headline,
+        stories = [Story(headline=Headline(text=story.headline),
+                         first_frame_idx=story.first_frame_idx,
+                         last_frame_idx=story.last_frame_idx,
                          start=frame_idx_to_time(story.first_frame_idx),
                          end=frame_idx_to_time(story.last_frame_idx),
-                         shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx + 1)],
                          duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx).replace(
                              microsecond=0),
+                         frames=[str(frame) for frame in vao.data.frames[story.first_frame_idx:story.last_frame_idx]],
+                         shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx + 1)],
+                         sentences=vao.data.get_story_sentences(idx),
                          keywords=[kw[0] for kw in kw_model.extract_keywords(
                              get_text(vao.data.get_shot_transcripts(story.first_shot_idx, story.last_shot_idx)),
-                             keyphrase_ngram_range=(1, 1), stop_words=german_stop_words)],
-                         sentences=[Sentence(text=sent) for sent in vao.data.get_story_sentences(idx)])
-                   for idx, story in enumerate(vao.data.stories)]
+                             vectorizer=vectorizer, use_maxsum=True, nr_candidates=20, top_n=5)]) for idx, story in
+                   enumerate(vao.data.stories)]
 
         video = ShortVideo(pk=str(vao.id),
                            path=str(vao.path),
@@ -60,26 +66,24 @@ def upload_video_data(vao: VAO):
                            stories=stories,
                            transcripts=transcripts)
     else:
-        topics = [Topic(title=topic) for topic in vao.data.topics]
+        shots = [MainShot(first_frame_idx=shot.first_frame_idx,
+                          last_frame_idx=shot.last_frame_idx,
+                          duration=frame_idx_to_time(shot.last_frame_idx - shot.first_frame_idx),
+                          keyframe=str(vao.data.keyframes[idx]),
+                          transcript=get_text(vao.data.get_shot_transcripts(idx)),
+                          type=shot.type) for idx, shot in enumerate(vao.data.shots)]
 
-        shots = [Shot(first_frame_idx=shot.first_frame_idx,
-                      last_frame_idx=shot.last_frame_idx,
-                      duration=frame_idx_to_time(shot.last_frame_idx - shot.first_frame_idx),
-                      keyframe=str(vao.data.keyframes[idx]),
-                      text=get_text(vao.data.get_shot_transcripts(idx)),
-                      type=shot.type) for idx, shot in enumerate(vao.data.shots)]
-
-        stories = [MainStory(topic=topics[story.ref_idx],
-                             start=frame_idx_to_time(story.first_frame_idx),
-                             end=frame_idx_to_time(story.last_frame_idx),
-                             headline=story.headline,
-                             keywords=[kw[0] for kw in kw_model.extract_keywords(
-                                 get_text(vao.data.get_shot_transcripts(story.first_shot_idx, story.last_shot_idx)),
-                                 keyphrase_ngram_range=(1, 1), stop_words=german_stop_words)],
-                             shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx + 1)],
-                             duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx)
-                             .replace(microsecond=0),
-                             sentences=[Sentence(text=sent) for sent in vao.data.get_story_sentences(idx)])
+        stories = [Story(headline=vao.data.topics[story.ref_idx],
+                         first_frame_idx=story.first_frame_idx,
+                         last_frame_idx=story.last_frame_idx,
+                         start=frame_idx_to_time(story.first_frame_idx),
+                         end=frame_idx_to_time(story.last_frame_idx),
+                         duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx)
+                         .replace(microsecond=0),
+                         frames=[],
+                         shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx + 1)],
+                         sentences=vao.data.get_story_sentences(idx),
+                         keywords=[]).save()
                    for idx, story in enumerate(vao.data.stories)]
 
         video = MainVideo(pk=str(vao.id),
@@ -91,7 +95,7 @@ def upload_video_data(vao: VAO):
                           shots=shots,
                           stories=stories,
                           transcripts=transcripts,
-                          topics=topics)
+                          topics=vao.data.topics)
     video.save()
 
     return video
