@@ -1,4 +1,5 @@
 # !/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
+from collections import defaultdict
 
 import hdbscan
 import numpy as np
@@ -10,7 +11,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from common.utils import flatten
 from database import rai
 from database.config import RAI_STORY_PREFIX
-from database.model import MainVideo, ShortVideo
+from database.model import MainVideo, StoryCluster
 
 german_stop_words = stopwords.words('german')
 
@@ -75,23 +76,29 @@ def process_stories(stories):
 
     cluster = generate_clusters(tensors, 14, 4, 8, 42)
 
+    story_cluster = defaultdict(list)
+    for story, label in zip(stories, cluster.labels_):
+        if label != -1:
+            story_cluster[label].append(story)
+
     docs_df = pd.DataFrame(headlines, columns=["Doc"])
     docs_df['Topic'] = cluster.labels_
     docs_df['Doc_ID'] = range(len(docs_df))
-    docs_per_topic = docs_df.groupby(['Topic'], as_index=False).agg({'Doc': ' '.join})
+    docs_per_topic = docs_df.groupby(['Topic'], as_index=False)
+    docs_per_topic_agg = docs_per_topic.agg({'Doc': ' '.join})
 
-    tf_idf, count = c_tf_idf(docs_per_topic.Doc.values, m=len(stories))
+    tf_idf, count = c_tf_idf(docs_per_topic_agg.Doc.values, m=len(stories))
 
-    top_n_words = extract_top_n_words_per_topic(tf_idf, count, docs_per_topic, n=20)
+    top_n_words = extract_top_n_words_per_topic(tf_idf, count, docs_per_topic_agg, n=20)
     topic_sizes = extract_topic_sizes(docs_df)
     topic_sizes.head(10)
 
-    print()
+    for cluster, stories in story_cluster.items():
+        StoryCluster(keywords=[w[0] for w in top_n_words[cluster]], stories=stories).save()
 
 
 def main():
     videos = MainVideo.find().sort_by('timestamp').all()
-    ts100 = ShortVideo.find().sort_by('timestamp').all()
 
     assert len(videos) > 0, 'No suitable video files have been found.'
 

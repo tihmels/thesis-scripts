@@ -21,14 +21,6 @@ class EmbeddedBaseModel(BaseModel, ABC):
         embedded = True
 
 
-class TopicCluster(BaseModel):
-    topics: List[str]
-    stories: List[str]
-
-    class Meta:
-        model_key_prefix = 'cluster'
-
-
 class Headline(EmbeddedBaseModel):
     text: str
 
@@ -83,6 +75,14 @@ class Story(EmbeddedBaseModel):
 
     class Meta:
         model_key_prefix = 'story'
+
+
+class StoryCluster(BaseModel):
+    keywords: List[str]
+    stories: List[Story]
+
+    class Meta:
+        model_key_prefix = 'cluster'
 
 
 class NodeBaseModel(BaseModel, ABC):
