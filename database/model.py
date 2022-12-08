@@ -43,9 +43,6 @@ class Shot(EmbeddedBaseModel, ABC):
     transcript: str
     keyframe: str
 
-    class Meta:
-        model_key_prefix = 'shot'
-
 
 class MainShot(Shot):
     type: str
@@ -71,7 +68,6 @@ class Story(EmbeddedBaseModel):
     frames: List[str]
     shots: List[Shot]
     sentences: List[str]
-    keywords: List[str]
 
     class Meta:
         model_key_prefix = 'story'
@@ -115,7 +111,6 @@ class VideoRef(EmbeddedBaseModel):
 
 
 class ShortVideo(VideoBaseModel):
-    is_nightly: int = Field(index=True)
 
     pre_main: Optional[VideoRef]
     suc_main: Optional[VideoRef]

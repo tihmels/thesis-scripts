@@ -11,7 +11,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from common.utils import flatten
 from database import rai
 from database.config import RAI_STORY_PREFIX
-from database.model import MainVideo, StoryCluster
+from database.model import MainVideo, StoryCluster, ShortVideo
 
 german_stop_words = stopwords.words('german')
 
@@ -98,7 +98,10 @@ def process_stories(stories):
 
 
 def main():
-    videos = MainVideo.find().sort_by('timestamp').all()
+    ts100_videos = ShortVideo.find().sort_by('timestamp').all()
+    ts15_videos = MainVideo.find().sort_by('timestamp').all()
+
+    videos = ts15_videos + ts100_videos
 
     assert len(videos) > 0, 'No suitable video files have been found.'
 

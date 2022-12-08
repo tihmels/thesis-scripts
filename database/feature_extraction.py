@@ -97,7 +97,7 @@ def alive_action(videos, actions, skip_existing):
     with alive_bar(len(videos),
                    ctrl_c=False,
                    title=videos[0].Meta.model_key_prefix,
-                   length=50, force_tty=True) as bar:
+                   length=25, force_tty=True) as bar:
 
         for video in videos:
             bar.text = video.pk
