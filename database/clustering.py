@@ -13,7 +13,7 @@ from tqdm import trange
 
 from common.utils import flatten
 from database import rai
-from database.config import RAI_STORY_PREFIX
+from database.config import RAI_TOPIC_PREFIX
 from database.model import MainVideo, StoryCluster, ShortVideo
 
 german_stop_words = stopwords.words('german')
@@ -189,12 +189,13 @@ max_evals = 100
 
 def process_stories(stories):
     headlines = [story.headline for story in stories]
-    tensors = [rai.get_tensor(RAI_STORY_PREFIX + story.pk) for story in stories]
+    tensors = [rai.get_tensor(RAI_TOPIC_PREFIX + story.pk) for story in stories]
 
-    best_params_use, best_clusters_use, trials_use = bayesian_search(tensors, space=hspace, label_lower=label_lower,
-                                                                     label_upper=label_upper, max_evals=max_evals)
+    # best_params_use, best_clusters_use, trials_use = bayesian_search(tensors, space=hspace, label_lower=label_lower,
+    #                                                                label_upper=label_upper, max_evals=max_evals)
 
     cluster = generate_clusters(tensors, 14, 4, 8, 42)
+    # cluster = generate_clusters(tensors, 11, 3, 16, 42)
 
     story_cluster = defaultdict(list)
     for story, label in zip(stories, cluster.labels_):
@@ -213,6 +214,8 @@ def process_stories(stories):
     topic_sizes = extract_topic_sizes(docs_df)
     topic_sizes.head(10)
 
+    StoryCluster.find().delete()
+
     for cluster, stories in story_cluster.items():
         StoryCluster(keywords=[w[0] for w in top_n_words[cluster]], stories=stories).save()
 
@@ -221,13 +224,13 @@ def main():
     ts100_videos = ShortVideo.find().sort_by('timestamp').all()
     ts15_videos = MainVideo.find().sort_by('timestamp').all()
 
-    videos = ts15_videos + ts100_videos
+    videos = ts15_videos
 
     assert len(videos) > 0, 'No suitable video files have been found.'
 
     stories = flatten([video.stories for video in videos])
 
-    process_stories([story for story in stories if rai.tensor_exists(RAI_STORY_PREFIX + story.pk)])
+    process_stories([story for story in stories if rai.tensor_exists(RAI_TOPIC_PREFIX + story.pk)])
 
 
 if __name__ == "__main__":

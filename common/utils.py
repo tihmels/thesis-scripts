@@ -1,20 +1,30 @@
+from collections import namedtuple
+
+import cv2
 import itertools
 import logging
 import os
 import re
-from collections import namedtuple
 from datetime import datetime, timedelta
 from pathlib import Path
 from shutil import rmtree
-
-import cv2
 
 from common.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE
 
 Range = namedtuple('Range', ['start', 'end'])
 
+
+def crop_center_square(frame):
+    y, x = frame.shape[0:2]
+    min_dim = min(y, x)
+    start_x = (x // 2) - (min_dim // 2)
+    start_y = (y // 2) - (min_dim // 2)
+    return frame[start_y:start_y + min_dim, start_x:start_x + min_dim]
+
+
 def flatten(nested):
     return list(itertools.chain.from_iterable(nested))
+
 
 def sec_to_frame_idx(second, fps=25):
     return second * fps
