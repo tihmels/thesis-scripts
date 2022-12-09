@@ -73,7 +73,7 @@ class Story(EmbeddedBaseModel):
         model_key_prefix = 'story'
 
 
-class StoryCluster(BaseModel):
+class TopicCluster(BaseModel):
     keywords: List[str]
     stories: List[Story]
 

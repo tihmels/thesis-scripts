@@ -14,7 +14,7 @@ from tqdm import trange
 from common.utils import flatten
 from database import rai
 from database.config import RAI_TOPIC_PREFIX
-from database.model import MainVideo, StoryCluster, ShortVideo
+from database.model import MainVideo, TopicCluster, ShortVideo
 
 german_stop_words = stopwords.words('german')
 
@@ -214,10 +214,10 @@ def process_stories(stories):
     topic_sizes = extract_topic_sizes(docs_df)
     topic_sizes.head(10)
 
-    StoryCluster.find().delete()
+    TopicCluster.find().delete()
 
     for cluster, stories in story_cluster.items():
-        StoryCluster(keywords=[w[0] for w in top_n_words[cluster]], stories=stories).save()
+        TopicCluster(keywords=[w[0] for w in top_n_words[cluster]], stories=stories).save()
 
 
 def main():
