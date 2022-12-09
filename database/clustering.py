@@ -11,7 +11,6 @@ from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import CountVectorizer
 from tqdm import trange
 
-from common.utils import flatten
 from database import rai
 from database.config import RAI_TOPIC_PREFIX
 from database.model import MainVideo, TopicCluster, ShortVideo
@@ -155,17 +154,18 @@ def generate_clusters(embeddings,
                       n_components=5,
                       min_cluster_size=15,
                       random_state=None):
-    umap_embeddings = (umap.UMAP(n_neighbors=n_neighbors,
-                                 n_components=n_components,
-                                 metric='cosine',
-                                 random_state=random_state)
-                       .fit_transform(embeddings))
+    umap_ = umap.UMAP(n_neighbors=n_neighbors,
+                      n_components=n_components,
+                      metric='cosine',
+                      random_state=random_state)
+
+    umap_embeddings = umap_.fit_transform(embeddings)
 
     clusters = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size,
                                metric='euclidean',
-                               cluster_selection_method='eom').fit(umap_embeddings)
+                               cluster_selection_method='eom', prediction_data=True).fit(umap_embeddings)
 
-    return clusters
+    return umap_, clusters
 
 
 space = {
@@ -187,28 +187,45 @@ label_upper = 100
 max_evals = 100
 
 
-def process_stories(stories):
-    headlines = [story.headline for story in stories]
-    tensors = [rai.get_tensor(RAI_TOPIC_PREFIX + story.pk) for story in stories]
+def process_stories(ts15_stories, ts100_stories):
+    ts15_headlines = [story.headline for story in ts15_stories]
+    ts15_tensors = [rai.get_tensor(RAI_TOPIC_PREFIX + story.pk) for story in ts15_stories]
+    ts100_headlines = [story.headline for story in ts100_stories]
+    ts100_tensors = [rai.get_tensor(RAI_TOPIC_PREFIX + story.pk) for story in ts100_stories]
 
     # best_params_use, best_clusters_use, trials_use = bayesian_search(tensors, space=hspace, label_lower=label_lower,
     #                                                                label_upper=label_upper, max_evals=max_evals)
 
-    cluster = generate_clusters(tensors, 14, 4, 8, 42)
+    uma, cluster = generate_clusters(ts15_tensors, 14, 4, 8, 42)
     # cluster = generate_clusters(tensors, 11, 3, 16, 42)
 
+    ts100_embeddings = uma.transform(ts100_tensors[:100])
+
+    test_labels, strengths = hdbscan.approximate_predict(cluster, ts100_embeddings)
+
+    ts100s = [(story, label) for idx, (story, label) in enumerate(zip(ts100_stories, test_labels))
+              if strengths[idx] > 0.8]
+
     story_cluster = defaultdict(list)
-    for story, label in zip(stories, cluster.labels_):
+    for story, label in zip(ts15_stories, cluster.labels_):
         if label != -1:
             story_cluster[label].append(story)
 
-    docs_df = pd.DataFrame(headlines, columns=["Doc"])
+    print(f'Cluster before: {[len(stories) for stories in list(story_cluster.values())]}')
+
+    for story, label in ts100s:
+        if label != -1:
+            story_cluster[label].append(story)
+
+    print(f'Cluster after: {[len(stories) for stories in list(story_cluster.values())]}')
+
+    docs_df = pd.DataFrame(ts15_headlines, columns=["Doc"])
     docs_df['Topic'] = cluster.labels_
     docs_df['Doc_ID'] = range(len(docs_df))
     docs_per_topic = docs_df.groupby(['Topic'], as_index=False)
     docs_per_topic_agg = docs_per_topic.agg({'Doc': ' '.join})
 
-    tf_idf, count = c_tf_idf(docs_per_topic_agg.Doc.values, m=len(stories))
+    tf_idf, count = c_tf_idf(docs_per_topic_agg.Doc.values, m=len(ts15_stories), ngram_range=(1, 2))
 
     top_n_words = extract_top_n_words_per_topic(tf_idf, count, docs_per_topic_agg, n=20)
     topic_sizes = extract_topic_sizes(docs_df)
@@ -224,13 +241,14 @@ def main():
     ts100_videos = ShortVideo.find().sort_by('timestamp').all()
     ts15_videos = MainVideo.find().sort_by('timestamp').all()
 
-    videos = ts15_videos
+    assert len(ts15_videos) > 0 or len(ts100_videos) > 0, 'No suitable video files have been found.'
 
-    assert len(videos) > 0, 'No suitable video files have been found.'
+    ts15_stories = [story for video in ts15_videos for story in video.stories if
+                    rai.tensor_exists(RAI_TOPIC_PREFIX + story.pk)]
+    ts100_stories = [story for video in ts100_videos for story in video.stories if
+                     rai.tensor_exists(RAI_TOPIC_PREFIX + story.pk)]
 
-    stories = flatten([video.stories for video in videos])
-
-    process_stories([story for story in stories if rai.tensor_exists(RAI_TOPIC_PREFIX + story.pk)])
+    process_stories(ts15_stories, ts100_stories)
 
 
 if __name__ == "__main__":
