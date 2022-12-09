@@ -4,12 +4,12 @@ from typing import List, Optional
 
 from redis_om import Field, JsonModel
 
-from database import red
+from database import db
 
 
 class BaseModel(JsonModel, ABC):
     class Meta:
-        database = red
+        database = db
         orm_mode = True
         arbitrary_types_allowed = True
         extra = "allow"

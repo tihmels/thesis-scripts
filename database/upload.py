@@ -7,7 +7,7 @@ from redis_om import Migrator
 from common.DataModel import get_text
 from common.VAO import get_date_time, VAO
 from common.utils import frame_idx_to_time
-from database import red
+from database import db
 from database.model import Banner, Story, ShortVideo, ShortShot, MainShot, Transcript, MainVideo, VideoRef
 
 parser = argparse.ArgumentParser('Uploads filesystem data to a Redis instance')
@@ -137,7 +137,7 @@ def set_refs(video):
 
 def main(args):
     if args.reset:
-        red.flushall()
+        db.flushall()
 
     video_files = {file for file in args.files}
 

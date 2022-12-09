@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import random
 import umap
+from hyperopt import Trials, partial, fmin, tpe, space_eval, STATUS_OK, hp
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import CountVectorizer
 from tqdm import trange
@@ -97,6 +98,58 @@ def random_search(embeddings, space, num_evals):
     return result_df.sort_values(by='cost')
 
 
+def bayesian_search(embeddings, space, label_lower, label_upper, max_evals=100):
+    """
+    Perform bayseian search on hyperopt hyperparameter space to minimize objective function
+    """
+
+    trials = Trials()
+    fmin_objective = partial(objective, embeddings=embeddings, label_lower=label_lower, label_upper=label_upper)
+    best = fmin(fmin_objective,
+                space=space,
+                algo=tpe.suggest,
+                max_evals=max_evals,
+                trials=trials)
+
+    best_params = space_eval(space, best)
+    print('best:')
+    print(best_params)
+    print(f"label count: {trials.best_trial['result']['label_count']}")
+
+    best_clusters = generate_clusters(embeddings,
+                                      n_neighbors=best_params['n_neighbors'],
+                                      n_components=best_params['n_components'],
+                                      min_cluster_size=best_params['min_cluster_size'],
+                                      random_state=best_params['random_state'])
+
+    return best_params, best_clusters, trials
+
+
+def objective(params, embeddings, label_lower, label_upper):
+    """
+    Objective function for hyperopt to minimize, which incorporates constraints
+    on the number of clusters we want to identify
+    """
+
+    clusters = generate_clusters(embeddings,
+                                 n_neighbors=params['n_neighbors'],
+                                 n_components=params['n_components'],
+                                 min_cluster_size=params['min_cluster_size'],
+                                 random_state=params['random_state'])
+
+    label_count, cost = score_clusters(clusters, prob_threshold=0.05)
+
+    # 15% penalty on the cost function if outside the desired range of groups
+    if (label_count < label_lower) | (label_count > label_upper):
+        penalty = 0.15
+    else:
+        penalty = 0
+
+    loss = cost + penalty
+
+    return {'loss': loss, 'label_count': label_count, 'status': STATUS_OK}
+
+
 def generate_clusters(embeddings,
                       n_neighbors=15,
                       n_components=5,
@@ -117,19 +170,31 @@ def generate_clusters(embeddings,
 
 space = {
     "n_neighbors": range(12, 16),
-    "n_components": range(3, 7),
-    "min_cluster_size": range(2, 16),
+    "n_components": range(3, 8),
+    "min_cluster_size": range(12, 20),
     "random_state": 42
 }
+
+hspace = {
+    "n_neighbors": hp.choice('n_neighbors', range(3, 16)),
+    "n_components": hp.choice('n_components', range(3, 16)),
+    "min_cluster_size": hp.choice('min_cluster_size', range(12, 20)),
+    "random_state": 42
+}
+
+label_lower = 30
+label_upper = 100
+max_evals = 100
 
 
 def process_stories(stories):
     headlines = [story.headline for story in stories]
     tensors = [rai.get_tensor(RAI_STORY_PREFIX + story.pk) for story in stories]
 
-    cluster = generate_clusters(tensors, 14, 4, 8, 42)
+    best_params_use, best_clusters_use, trials_use = bayesian_search(tensors, space=hspace, label_lower=label_lower,
+                                                                     label_upper=label_upper, max_evals=max_evals)
 
-    random_use = random_search(tensors, space, 100)
+    cluster = generate_clusters(tensors, 14, 4, 8, 42)
 
     story_cluster = defaultdict(list)
     for story, label in zip(stories, cluster.labels_):
