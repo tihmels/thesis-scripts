@@ -22,7 +22,7 @@ from alive_progress import alive_bar
 from keras.applications import EfficientNetV2S
 from sentence_transformers import SentenceTransformer
 
-from database.model import MainVideo, ShortVideo, Story, StoryCluster
+from database.model import MainVideo, ShortVideo, Story, TopicCluster
 
 IMG_ACTION = 'img'
 NLP_ACTION = 'nlp'
@@ -160,7 +160,7 @@ def main(args):
     actions = args.actions
 
     if VIDEO_ACTION in actions:
-        clusters = StoryCluster.find().all()
+        clusters = TopicCluster.find().all()
 
         for cluster in clusters:
             stories = cluster.stories
