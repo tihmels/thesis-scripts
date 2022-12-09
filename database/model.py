@@ -1,8 +1,7 @@
 import datetime
 from abc import ABC
-from typing import List, Optional
-
 from redis_om import Field, JsonModel
+from typing import List, Optional
 
 from database import db
 
@@ -74,6 +73,10 @@ class Story(EmbeddedBaseModel):
 
 
 class TopicCluster(BaseModel):
+    index: int = Field(index=True, sortable=True)
+    n_ts15: int
+    n_ts100: int
+
     keywords: List[str]
     stories: List[Story]
 
@@ -111,7 +114,6 @@ class VideoRef(EmbeddedBaseModel):
 
 
 class ShortVideo(VideoBaseModel):
-
     pre_main: Optional[VideoRef]
     suc_main: Optional[VideoRef]
 

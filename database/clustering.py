@@ -8,6 +8,7 @@ import random
 import umap
 from hyperopt import Trials, partial, fmin, tpe, space_eval, STATUS_OK, hp
 from nltk.corpus import stopwords
+from redis_om import Migrator
 from sklearn.feature_extraction.text import CountVectorizer
 from tqdm import trange
 
@@ -190,8 +191,6 @@ max_evals = 100
 def process_stories(ts15_stories, ts100_stories):
     ts15_headlines = [story.headline for story in ts15_stories]
     ts15_tensors = [rai.get_tensor(RAI_TOPIC_PREFIX + story.pk) for story in ts15_stories]
-    ts100_headlines = [story.headline for story in ts100_stories]
-    ts100_tensors = [rai.get_tensor(RAI_TOPIC_PREFIX + story.pk) for story in ts100_stories]
 
     # best_params_use, best_clusters_use, trials_use = bayesian_search(tensors, space=hspace, label_lower=label_lower,
     #                                                                label_upper=label_upper, max_evals=max_evals)
@@ -199,23 +198,27 @@ def process_stories(ts15_stories, ts100_stories):
     uma, cluster = generate_clusters(ts15_tensors, 14, 4, 8, 42)
     # cluster = generate_clusters(tensors, 11, 3, 16, 42)
 
-    ts100_embeddings = uma.transform(ts100_tensors[:100])
+    story_cluster = defaultdict(list)
+    for story, label in zip(ts15_stories, cluster.labels_):
+        if label != -1:
+            story_cluster[label].append(story)
+
+    ts100_tensors = [rai.get_tensor(RAI_TOPIC_PREFIX + story.pk) for story in ts100_stories]
+
+    ts100_embeddings = uma.transform(ts100_tensors)
 
     test_labels, strengths = hdbscan.approximate_predict(cluster, ts100_embeddings)
 
     ts100s = [(story, label) for idx, (story, label) in enumerate(zip(ts100_stories, test_labels))
               if strengths[idx] > 0.8]
 
-    story_cluster = defaultdict(list)
-    for story, label in zip(ts15_stories, cluster.labels_):
-        if label != -1:
-            story_cluster[label].append(story)
-
-    print(f'Cluster before: {[len(stories) for stories in list(story_cluster.values())]}')
+    cluster_sizes_before = np.array([len(stories) for stories in list(story_cluster.values())])
 
     for story, label in ts100s:
         if label != -1:
             story_cluster[label].append(story)
+
+    cluster_sizes_after = np.array([len(stories) for stories in list(story_cluster.values())])
 
     print(f'Cluster after: {[len(stories) for stories in list(story_cluster.values())]}')
 
@@ -233,15 +236,17 @@ def process_stories(ts15_stories, ts100_stories):
 
     TopicCluster.find().delete()
 
-    for cluster, stories in story_cluster.items():
-        TopicCluster(keywords=[w[0] for w in top_n_words[cluster]], stories=stories).save()
+    for idx, (cluster, stories) in enumerate(story_cluster.items()):
+        TopicCluster(index=cluster, n_ts15=cluster_sizes_before[idx],
+                     n_ts100=cluster_sizes_after[idx] - cluster_sizes_before[idx],
+                     keywords=[w[0] for w in top_n_words[cluster]], stories=stories).save()
 
 
 def main():
-    ts100_videos = ShortVideo.find().sort_by('timestamp').all()
     ts15_videos = MainVideo.find().sort_by('timestamp').all()
+    ts100_videos = ShortVideo.find().sort_by('timestamp').all()
 
-    assert len(ts15_videos) > 0 or len(ts100_videos) > 0, 'No suitable video files have been found.'
+    assert len(ts15_videos) > 0, 'No suitable video files have been found.'
 
     ts15_stories = [story for video in ts15_videos for story in video.stories if
                     rai.tensor_exists(RAI_TOPIC_PREFIX + story.pk)]
@@ -249,6 +254,8 @@ def main():
                      rai.tensor_exists(RAI_TOPIC_PREFIX + story.pk)]
 
     process_stories(ts15_stories, ts100_stories)
+
+    Migrator().run()
 
 
 if __name__ == "__main__":
