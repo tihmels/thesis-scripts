@@ -189,13 +189,12 @@ max_evals = 100
 
 
 def process_stories(ts15_stories, ts100_stories):
-    ts15_headlines = [story.headline for story in ts15_stories]
     ts15_tensors = [rai.get_tensor(RAI_TOPIC_PREFIX + story.pk) for story in ts15_stories]
 
     # best_params_use, best_clusters_use, trials_use = bayesian_search(tensors, space=hspace, label_lower=label_lower,
     #                                                                label_upper=label_upper, max_evals=max_evals)
 
-    uma, cluster = generate_clusters(ts15_tensors, 14, 4, 8, 42)
+    umap_, cluster = generate_clusters(ts15_tensors, 14, 4, 8, 42)
     # cluster = generate_clusters(tensors, 11, 3, 16, 42)
 
     story_cluster = defaultdict(list)
@@ -205,7 +204,7 @@ def process_stories(ts15_stories, ts100_stories):
 
     ts100_tensors = [rai.get_tensor(RAI_TOPIC_PREFIX + story.pk) for story in ts100_stories]
 
-    ts100_embeddings = uma.transform(ts100_tensors)
+    ts100_embeddings = umap_.transform(ts100_tensors)
 
     test_labels, strengths = hdbscan.approximate_predict(cluster, ts100_embeddings)
 
@@ -220,7 +219,7 @@ def process_stories(ts15_stories, ts100_stories):
 
     cluster_sizes_after = np.array([len(stories) for stories in list(story_cluster.values())])
 
-    print(f'Cluster after: {[len(stories) for stories in list(story_cluster.values())]}')
+    ts15_headlines = [story.headline for story in ts15_stories]
 
     docs_df = pd.DataFrame(ts15_headlines, columns=["Doc"])
     docs_df['Topic'] = cluster.labels_
