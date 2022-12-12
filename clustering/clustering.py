@@ -207,7 +207,7 @@ def process_stories(ts15_stories, ts100_stories):
 
     test_labels, strengths = hdbscan.approximate_predict(cluster, ts100_embeddings)
     data = [(story, label) for idx, (story, label) in enumerate(zip(ts100_stories, test_labels)) if
-            strengths[idx] > 0.8]
+            strengths[idx] > 0.9]
 
     ts100_cluster = defaultdict(list)
     for story, label in data:
@@ -233,8 +233,9 @@ def process_stories(ts15_stories, ts100_stories):
     for idx, (cluster, stories) in enumerate(ts15_cluster.items()):
         TopicCluster(index=cluster, n_ts15=len(stories),
                      n_ts100=len(ts100_cluster[idx]),
-                     keywords=[w[0] for w in top_n_words[cluster]], ts15_stories=ts15_stories,
-                     ts100_stories=ts100_cluster[idx]).save()
+                     keywords=[w[0] for w in top_n_words[cluster]],
+                     ts15s=stories,
+                     ts100s=ts100_cluster[idx]).save()
 
 
 def main():

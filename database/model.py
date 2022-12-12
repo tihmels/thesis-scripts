@@ -76,8 +76,8 @@ class TopicCluster(BaseModel):
     index: int = Field(index=True, sortable=True)
     keywords: List[str]
 
-    ts15_stories: List[Story]
-    ts100_stories: List[Story]
+    ts15s: List[Story]
+    ts100s: List[Story]
 
     class Meta:
         model_key_prefix = 'cluster'
