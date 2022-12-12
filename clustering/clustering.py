@@ -197,27 +197,22 @@ def process_stories(ts15_stories, ts100_stories):
     umap_, cluster = generate_clusters(ts15_tensors, 14, 4, 8, 42)
     # cluster = generate_clusters(tensors, 11, 3, 16, 42)
 
-    story_cluster = defaultdict(list)
+    ts15_cluster = defaultdict(list)
     for story, label in zip(ts15_stories, cluster.labels_):
         if label != -1:
-            story_cluster[label].append(story)
+            ts15_cluster[label].append(story)
 
     ts100_tensors = [rai.get_tensor(RAI_TOPIC_PREFIX + story.pk) for story in ts100_stories]
-
     ts100_embeddings = umap_.transform(ts100_tensors)
 
     test_labels, strengths = hdbscan.approximate_predict(cluster, ts100_embeddings)
+    data = [(story, label) for idx, (story, label) in enumerate(zip(ts100_stories, test_labels)) if
+            strengths[idx] > 0.8]
 
-    ts100s = [(story, label) for idx, (story, label) in enumerate(zip(ts100_stories, test_labels))
-              if strengths[idx] > 0.8]
-
-    cluster_sizes_before = np.array([len(stories) for stories in list(story_cluster.values())])
-
-    for story, label in ts100s:
+    ts100_cluster = defaultdict(list)
+    for story, label in data:
         if label != -1:
-            story_cluster[label].append(story)
-
-    cluster_sizes_after = np.array([len(stories) for stories in list(story_cluster.values())])
+            ts100_cluster[label].append(story)
 
     ts15_headlines = [story.headline for story in ts15_stories]
 
@@ -235,10 +230,11 @@ def process_stories(ts15_stories, ts100_stories):
 
     TopicCluster.find().delete()
 
-    for idx, (cluster, stories) in enumerate(story_cluster.items()):
-        TopicCluster(index=cluster, n_ts15=cluster_sizes_before[idx],
-                     n_ts100=cluster_sizes_after[idx] - cluster_sizes_before[idx],
-                     keywords=[w[0] for w in top_n_words[cluster]], stories=stories).save()
+    for idx, (cluster, stories) in enumerate(ts15_cluster.items()):
+        TopicCluster(index=cluster, n_ts15=len(stories),
+                     n_ts100=len(ts100_cluster[idx]),
+                     keywords=[w[0] for w in top_n_words[cluster]], ts15_stories=ts15_stories,
+                     ts100_stories=ts100_cluster[idx]).save()
 
 
 def main():

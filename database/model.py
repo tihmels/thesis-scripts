@@ -74,11 +74,10 @@ class Story(EmbeddedBaseModel):
 
 class TopicCluster(BaseModel):
     index: int = Field(index=True, sortable=True)
-    n_ts15: int
-    n_ts100: int
-
     keywords: List[str]
-    stories: List[Story]
+
+    ts15_stories: List[Story]
+    ts100_stories: List[Story]
 
     class Meta:
         model_key_prefix = 'cluster'
