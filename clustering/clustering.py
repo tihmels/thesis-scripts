@@ -2,11 +2,14 @@
 from collections import defaultdict
 
 import hdbscan
+import matplotlib
 import numpy as np
 import pandas as pd
 import random
 import umap
 from hyperopt import Trials, partial, fmin, tpe, space_eval, STATUS_OK, hp
+from matplotlib import pyplot as plt
+matplotlib.use('TkAgg')
 from nltk.corpus import stopwords
 from redis_om import Migrator
 from sklearn.feature_extraction.text import CountVectorizer
@@ -154,6 +157,7 @@ def generate_clusters(embeddings,
                       n_neighbors=15,
                       n_components=5,
                       min_cluster_size=15,
+                      min_samples=None,
                       random_state=None):
     umap_ = umap.UMAP(n_neighbors=n_neighbors,
                       n_components=n_components,
@@ -163,8 +167,8 @@ def generate_clusters(embeddings,
     umap_embeddings = umap_.fit_transform(embeddings)
 
     clusters = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size,
-                               metric='euclidean',
-                               cluster_selection_method='eom', prediction_data=True).fit(umap_embeddings)
+                               metric='euclidean', min_samples=min_samples,
+                               cluster_selection_method='leaf', prediction_data=True).fit(umap_embeddings)
 
     return umap_, clusters
 
@@ -194,8 +198,12 @@ def process_stories(ts15_stories, ts100_stories):
     # best_params_use, best_clusters_use, trials_use = bayesian_search(tensors, space=hspace, label_lower=label_lower,
     #                                                                label_upper=label_upper, max_evals=max_evals)
 
-    umap_, cluster = generate_clusters(ts15_tensors, 14, 4, 8, 42)
+    umap_, cluster = generate_clusters(ts15_tensors, 15, 5, 15, random_state=42)
     # cluster = generate_clusters(tensors, 11, 3, 16, 42)
+
+    umap_data = umap.UMAP(n_neighbors=14, n_components=2, min_dist=0.0, metric='cosine').fit_transform(ts15_tensors)
+    result = pd.DataFrame(umap_data, columns=['x', 'y'])
+    result['labels'] = cluster.labels_
 
     ts15_cluster = defaultdict(list)
     for story, label in zip(ts15_stories, cluster.labels_):
@@ -205,8 +213,8 @@ def process_stories(ts15_stories, ts100_stories):
     ts100_tensors = [rai.get_tensor(RAI_TOPIC_PREFIX + story.pk) for story in ts100_stories]
     ts100_embeddings = umap_.transform(ts100_tensors)
 
-    test_labels, strengths = hdbscan.approximate_predict(cluster, ts100_embeddings)
-    data = [(story, label) for idx, (story, label) in enumerate(zip(ts100_stories, test_labels)) if
+    labels, strengths = hdbscan.approximate_predict(cluster, ts100_embeddings)
+    data = [(story, label) for idx, (story, label) in enumerate(zip(ts100_stories, labels)) if
             strengths[idx] > 0.9]
 
     ts100_cluster = defaultdict(list)
@@ -230,12 +238,11 @@ def process_stories(ts15_stories, ts100_stories):
 
     TopicCluster.find().delete()
 
-    for idx, (cluster, stories) in enumerate(ts15_cluster.items()):
-        TopicCluster(index=cluster, n_ts15=len(stories),
-                     n_ts100=len(ts100_cluster[idx]),
-                     keywords=[w[0] for w in top_n_words[cluster]],
+    for label, stories in ts15_cluster.items():
+        TopicCluster(index=label,
+                     keywords=[w[0] for w in top_n_words[label]],
                      ts15s=stories,
-                     ts100s=ts100_cluster[idx]).save()
+                     ts100s=ts100_cluster[label]).save()
 
 
 def main():

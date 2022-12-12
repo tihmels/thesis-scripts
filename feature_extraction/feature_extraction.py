@@ -46,7 +46,7 @@ parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 IMAGE_SHAPE = (224, 224)
 
 nlp_model = SentenceTransformer('distiluse-base-multilingual-cased-v1')
-topic_model = SentenceTransformer('all-mpnet-base-v2')
+topic_model = SentenceTransformer('T-Systems-onsite/cross-en-de-roberta-sentence-transformer')
 
 img_model = EfficientNetV2S(weights="imagenet", include_top=False)
 img_model.trainable = False
