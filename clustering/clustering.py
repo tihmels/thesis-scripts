@@ -1,15 +1,14 @@
 # !/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
+import sys
 from collections import defaultdict
 
 import hdbscan
-import matplotlib
 import numpy as np
 import pandas as pd
 import random
 import umap
 from hyperopt import Trials, partial, fmin, tpe, space_eval, STATUS_OK, hp
-from matplotlib import pyplot as plt
-matplotlib.use('TkAgg')
+# matplotlib.use('TkAgg')
 from nltk.corpus import stopwords
 from redis_om import Migrator
 from sklearn.feature_extraction.text import CountVectorizer
@@ -156,11 +155,22 @@ def objective(params, embeddings, label_lower, label_upper):
 def generate_clusters(embeddings,
                       n_neighbors=15,
                       n_components=5,
+                      min_dist=0.1,
                       min_cluster_size=15,
                       min_samples=None,
                       random_state=None):
+    # n_neighbors: the number of approximate nearest neighbors used to construct the initial high-dimensional graph.
+    # It effectively controls how UMAP balances local versus global structure -
+    # low values will push UMAP to focus more on local structure by constraining the number of neighboring points considered when analyzing the data in high dimensions,
+    # while high values will push UMAP towards representing the big-picture structure while losing fine detail.
+
+    # min_dist, the minimum distance between points in low-dimensional space.
+    # This parameter controls how tightly UMAP clumps points together, with low values leading to more tightly packed embeddings.
+    # Larger values of min_dist will make UMAP pack points together more loosely, focusing instead on the preservation of the broad topological structure.
+
     umap_ = umap.UMAP(n_neighbors=n_neighbors,
                       n_components=n_components,
+                      min_dist=min_dist,
                       metric='cosine',
                       random_state=random_state)
 
@@ -174,9 +184,9 @@ def generate_clusters(embeddings,
 
 
 space = {
-    "n_neighbors": range(12, 16),
-    "n_components": range(3, 8),
-    "min_cluster_size": range(12, 20),
+    "n_neighbors": range(2, 15),
+    "n_components": range(2, 5),
+    "min_cluster_size": range(10, 25),
     "random_state": 42
 }
 
@@ -193,15 +203,16 @@ max_evals = 100
 
 
 def process_stories(ts15_stories, ts100_stories):
+    ts15_headlines = [story.headline for story in ts15_stories]
     ts15_tensors = [rai.get_tensor(RAI_TOPIC_PREFIX + story.pk) for story in ts15_stories]
 
     # best_params_use, best_clusters_use, trials_use = bayesian_search(tensors, space=hspace, label_lower=label_lower,
     #                                                                label_upper=label_upper, max_evals=max_evals)
 
-    umap_, cluster = generate_clusters(ts15_tensors, 15, 5, 15, random_state=42)
+    umap_, cluster = generate_clusters(ts15_tensors, 5, 4, 0.1, 15)
     # cluster = generate_clusters(tensors, 11, 3, 16, 42)
 
-    umap_data = umap.UMAP(n_neighbors=14, n_components=2, min_dist=0.0, metric='cosine').fit_transform(ts15_tensors)
+    umap_data = umap.UMAP(n_neighbors=4, n_components=2, min_dist=0.0, metric='cosine').fit_transform(ts15_tensors)
     result = pd.DataFrame(umap_data, columns=['x', 'y'])
     result['labels'] = cluster.labels_
 
@@ -222,8 +233,6 @@ def process_stories(ts15_stories, ts100_stories):
         if label != -1:
             ts100_cluster[label].append(story)
 
-    ts15_headlines = [story.headline for story in ts15_stories]
-
     docs_df = pd.DataFrame(ts15_headlines, columns=["Doc"])
     docs_df['Topic'] = cluster.labels_
     docs_df['Doc_ID'] = range(len(docs_df))
@@ -243,6 +252,7 @@ def process_stories(ts15_stories, ts100_stories):
                      keywords=[w[0] for w in top_n_words[label]],
                      ts15s=stories,
                      ts100s=ts100_cluster[label]).save()
+    return
 
 
 def main():
@@ -259,6 +269,8 @@ def main():
     process_stories(ts15_stories, ts100_stories)
 
     Migrator().run()
+
+    sys.exit()
 
 
 if __name__ == "__main__":
