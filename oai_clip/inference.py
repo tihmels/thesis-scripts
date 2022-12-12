@@ -11,20 +11,16 @@
 
 # BATCH_SIZE must larger than 1
 import clip
-import numpy as np
 import torch
 from PIL import Image
 from redis_om import Migrator
-
-from numpy.linalg import norm
 
 from database.model import MainVideo
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"  # If using GPU then use mixed precision training.
 
 # model, preprocess = clip.load("ViT-B/32", device=device, jit=False)
-#checkpoint = torch.load("./model_checkpoint/model_10.pt")
-
+# checkpoint = torch.load("./model_checkpoint/model_10.pt")
 
 # Use these 3 lines if you use default model setting(not training setting) of the clip. For example, if you set context_length to 100 since your string is very long during training, then assign 100 to checkpoint['model_state_dict']["context_length"]
 # checkpoint['model_state_dict']["input_resolution"] = 224  # default is 224
@@ -33,10 +29,8 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"  # If using GPU then u
 
 # model.load_state_dict(checkpoint['model_state_dict'])
 
-# model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-# processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-
 from sentence_transformers import SentenceTransformer, util
+
 image_model = SentenceTransformer('clip-ViT-B-32')
 text_model = SentenceTransformer('sentence-transformers/clip-ViT-B-32-multilingual-v1')
 
@@ -69,13 +63,11 @@ def create_summary(video: MainVideo, query):
 
             print()
 
-    pass
-
 
 def main():
-    video = MainVideo.find().sort_by('timestamp').all()[1]
+    video = MainVideo.find().sort_by('timestamp').first()
 
-    create_summary(video, query='')
+    create_summary(video, query='news ')
 
     Migrator().run()
 

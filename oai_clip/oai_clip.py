@@ -28,7 +28,7 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"  # If using GPU then u
 model, preprocess = clip.load("ViT-B/32", device=device, jit=False)  # Must set jit=False for training
 
 EPOCHS = 10
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 
 
 class ImageTextDataset(Dataset):
@@ -86,7 +86,7 @@ def create_data_loader(ts15_stories, ts100_stories, dataset):
 def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
     dataset = ImageTextDataset()
 
-    dataloader = create_data_loader(random.sample(ts15_stories, 500), random.sample(ts100_stories, 250), dataset)
+    dataloader = create_data_loader(random.sample(ts15_stories, 100), random.sample(ts100_stories, 200), dataset)
 
     if device == "cpu":
         model.float()
@@ -95,8 +95,8 @@ def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
     loss_txt = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=5e-5, betas=(0.9, 0.98), eps=1e-6, weight_decay=0.2)
 
-    for epoch in range(EPOCHS):
-        with alive_bar(EPOCHS, title=f'[Epoch {epoch}/{EPOCHS}]', length=25) as bar:
+    with alive_bar(EPOCHS, title=f'Training', length=25, dual_line=True) as bar:
+        for epoch in range(EPOCHS):
             for idx, batch in enumerate(dataloader):
 
                 optimizer.zero_grad()
@@ -115,10 +115,8 @@ def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
 
                 if device == "cpu":
                     optimizer.step()
-                else:
-                    convert_models_to_fp32(model)
-                    optimizer.step()
-                    model.convert_weights(model)
+
+                bar.text = f'Batch {idx + 1}/{int(len(dataloader.dataset)/BATCH_SIZE)} - Total Loss: {total_loss}'
 
                 torch.save({
                     'epoch': epoch,
