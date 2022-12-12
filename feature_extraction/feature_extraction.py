@@ -1,17 +1,16 @@
-##!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
+#!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
+
 import cv2
-import logging
 import math
 import numpy as np
 import os
 import tensorflow as tf
 import tensorflow_hub as hub
 
-from common.utils import set_tf_loglevel, read_images, crop_center_square
+from common.utils import read_images, crop_center_square
 from database import rai, db
 from database.config import RAI_TOPIC_PREFIX, RAI_TEXT_PREFIX, RAI_SHOT_PREFIX, RAI_STORY_PREFIX
 
-set_tf_loglevel(logging.FATAL)
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
 from argparse import ArgumentParser

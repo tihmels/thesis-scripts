@@ -28,7 +28,7 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"  # If using GPU then u
 model, preprocess = clip.load("ViT-B/32", device=device, jit=False)  # Must set jit=False for training
 
 EPOCHS = 10
-BATCH_SIZE = 64
+BATCH_SIZE = 512
 
 
 class ImageTextDataset(Dataset):
@@ -67,6 +67,8 @@ def create_data_loader(ts15_stories, ts100_stories, dataset):
 
         shots = story.shots[1:] if story.shots[0].type == 'anchor' else story.shots
 
+        shots = [shot for shot in shots if len(shot.transcript) < 50]
+
         for shot in shots:
             data.append((shot.keyframe, shot.transcript))
 
@@ -75,18 +77,16 @@ def create_data_loader(ts15_stories, ts100_stories, dataset):
         for shot in story.shots:
             data.append((shot.keyframe, shot.transcript))
 
-    random.shuffle(data)
-
     for keyframe, transcript in data:
         dataset.add(keyframe, transcript)
 
-    return DataLoader(dataset, batch_size=BATCH_SIZE)  # Define your own dataloader
+    return DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)  # Define your own dataloader
 
 
 def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
     dataset = ImageTextDataset()
 
-    dataloader = create_data_loader(random.sample(ts15_stories, 100), random.sample(ts100_stories, 200), dataset)
+    dataloader = create_data_loader(random.sample(ts15_stories, 300), random.sample(ts100_stories, 500), dataset)
 
     if device == "cpu":
         model.float()
@@ -116,7 +116,7 @@ def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
                 if device == "cpu":
                     optimizer.step()
 
-                bar.text = f'Batch {idx + 1}/{int(len(dataloader.dataset)/BATCH_SIZE)} - Total Loss: {total_loss}'
+                bar.text = f'Batch {idx + 1}/{int(len(dataloader.dataset) / BATCH_SIZE)} - Total Loss: {total_loss}'
 
                 torch.save({
                     'epoch': epoch,
