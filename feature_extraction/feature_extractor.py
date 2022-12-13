@@ -49,13 +49,15 @@ mil_nce_module = 'https://tfhub.dev/deepmind/mil-nce/s3d/1'
 mil_nce = hub.load(mil_nce_module)
 
 
-def extract_milnce_features(stories: [Story], skip_existing):
+def extract_milnce_features(stories: [Story], dataset, skip_existing):
     extractor = StoryDataExtractor(stories)
 
     with torch.no_grad():
-        with alive_bar(len(extractor), title=f'[MIL-NCE]', length=25, dual_line=True) as bar:
+        with alive_bar(len(extractor), title=f'MIL-NCE [{dataset}]', length=25, dual_line=True) as bar:
             for i in range(len(extractor)):
                 story_pk, segments, sentences = extractor[i]
+
+                bar.text = f'Story: {story_pk}'
 
                 if skip_existing and \
                         rai.tensor_exists(RAI_SEG_PREFIX + story_pk) and \
@@ -63,8 +65,6 @@ def extract_milnce_features(stories: [Story], skip_existing):
                         rai.tensor_exists(RAI_TEXT_PREFIX + story_pk):
                     bar()
                     continue
-
-                bar.text = f'Story: {story_pk}'
 
                 if len(segments) > 0:
                     vision_output = mil_nce.signatures['video'](tf.constant(tf.cast(segments, dtype=tf.float32)))
@@ -155,8 +155,8 @@ def main(args):
 
         for idx, cluster in enumerate(clusters):
             print(f'[{idx + 1}/{len(clusters)}] Cluster: {cluster.index}')
-            extract_milnce_features(cluster.ts15s, args.skip_existing)
-            extract_milnce_features(cluster.ts100s, args.skip_existing)
+            extract_milnce_features(cluster.ts15s, dataset='ts15', skip_existing=args.skip_existing)
+            extract_milnce_features(cluster.ts100s, dataset='ts100', skip_existing=args.skip_existing)
 
             cluster.features = 1
             cluster.save()
