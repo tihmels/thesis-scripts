@@ -1,11 +1,31 @@
-import os
+import cv2
+import numpy as np
 import torch
-import torchvision.io as io
 import torchvision.transforms as transforms
+from PIL import Image
 from torch.utils.data import Dataset
 
 from common.utils import read_images
 from database.model import Story
+
+IMAGE_SHAPE = (224, 224)
+
+
+def crop_center_square(frame):
+    y, x = frame.shape[0:2]
+    min_dim = min(y, x)
+    start_x = (x // 2) - (min_dim // 2)
+    start_y = (y // 2) - (min_dim // 2)
+    return frame[start_y:start_y + min_dim, start_x:start_x + min_dim]
+
+
+def load_frames(frame_paths, resize=IMAGE_SHAPE):
+    frames = [crop_center_square(frame) for frame in read_images(frame_paths)]
+    frames = [cv2.resize(frame, resize) for frame in frames]
+
+    frames = np.array(frames)
+
+    return frames / 255.0
 
 
 class MilNceFeatureExtractor(Dataset):
@@ -13,7 +33,6 @@ class MilNceFeatureExtractor(Dataset):
         self.stories = stories
         self.window = window
         self.dataset = dataset
-
         self.transform = transforms.Resize((224, 224))
 
     def __len__(self):
@@ -21,28 +40,15 @@ class MilNceFeatureExtractor(Dataset):
 
     def __getitem__(self, idx):
         story = self.stories[idx]
-        frames = read_images(story.frames[::5])
-        frames = torch.tensor(frames)
+        frames = load_frames(story.frames[::5])
 
-        window_len = int(self.window * 25)
+        window_len = 32
 
-        # Pad video with extra frames to ensure its divisible by window_len
         extra_frames = window_len - (len(frames) % window_len)
-        video = torch.cat((frames, frames[-extra_frames:]), dim=0)
+        frames = np.concatenate((frames, frames[-extra_frames:]))
 
-        n_segs = int(video.shape[0] / window_len)
+        n_segments = int(frames.shape[0] / window_len)
 
-        print("Number of video segments: ", n_segs)
+        frames = frames.reshape(n_segments, window_len, frames.shape[1], frames.shape[2], 3)
 
-        video = video.view(n_segs, 32, video.shape[1], video.shape[2], 3)
-        video = video.permute(0, 1, 4, 2, 3)
-
-        # Transform video segments
-        video_segs = []
-        for seg in video:
-            # Resize and normalize to [0,1]
-            video_segs.append(self.transform(seg) / 255.0)
-        video_segs = torch.stack(video_segs)
-        video_segs = video_segs.view(n_segs, 32, 3, 224, 224)
-
-        return video_segs, self.vid_files[idx].split(".")[0]
+        return story.pk, frames, story.sentences
