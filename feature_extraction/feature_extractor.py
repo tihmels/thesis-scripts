@@ -8,7 +8,7 @@ import torch
 
 from common.utils import read_images, crop_center_square
 from database import rai
-from database.config import RAI_TOPIC_PREFIX, RAI_TEXT_PREFIX, RAI_SHOT_PREFIX
+from database.config import RAI_TOPIC_PREFIX, RAI_TEXT_PREFIX, RAI_SHOT_PREFIX, RAI_SEG_PREFIX, RAI_M5C_PREFIX
 from feature_extraction.StoryDataExtractor import StoryDataExtractor
 
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
@@ -68,23 +68,21 @@ def load_video(frame_paths, max_frames=32, resize=IMAGE_SHAPE):
 
 
 def extract_milnce_features(stories: [Story], skip_existing):
-    dataset = StoryDataExtractor(stories)
+    extractor = StoryDataExtractor(stories)
 
     with torch.no_grad():
-        for i in range(len(dataset)):
-            (story_pk, segments, sentences) = dataset[i]
+        for i in range(len(extractor)):
+            story_pk, segments, sentences = extractor[i]
 
             vision_output = mil_nce.signatures['video'](tf.constant(tf.cast(segments, dtype=tf.float32)))
-
-            video_features = vision_output['video_embedding'].numpy()
-            mixed_5c = vision_output['mixed_5c'].numpy()
-
-            rai.put_tensor('tensor:segments:' + story_pk, video_features)
-            rai.put_tensor('tensor:m5c:' + story_pk, mixed_5c)
-
             text_output = mil_nce.signatures['text'](tf.constant(sentences))
+
+            segment_features = vision_output['video_embedding'].numpy()
+            mixed_5c = vision_output['mixed_5c'].numpy()
             text_features = text_output['text_embedding'].numpy()
 
+            rai.put_tensor(RAI_SEG_PREFIX + story_pk, segment_features)
+            rai.put_tensor(RAI_M5C_PREFIX + story_pk, mixed_5c)
             rai.put_tensor(RAI_TEXT_PREFIX + story_pk, text_features)
 
 
