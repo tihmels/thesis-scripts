@@ -153,8 +153,8 @@ def main(args):
         condition = TopicCluster.features == 0 if args.skip_existing else TopicCluster.features <= 0
         clusters = TopicCluster.find(condition).all()
 
-        for cluster in clusters:
-            print(f'Cluster: {cluster.index}')
+        for idx, cluster in enumerate(clusters):
+            print(f'[{idx + 1}/{len(clusters)}] Cluster: {cluster.index}')
             extract_milnce_features(cluster.ts15s, args.skip_existing)
             extract_milnce_features(cluster.ts100s, args.skip_existing)
 
