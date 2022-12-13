@@ -6,10 +6,13 @@ import numpy as np
 import os
 import tensorflow as tf
 import tensorflow_hub as hub
+from torch.utils.data import DataLoader
 
 from common.utils import read_images, crop_center_square
 from database import rai, db
 from database.config import RAI_TOPIC_PREFIX, RAI_TEXT_PREFIX, RAI_SHOT_PREFIX, RAI_STORY_PREFIX
+from feature_extraction.MILNCE_FeatureExtract import MilNceFeatureExtractor
+from feature_extraction.s3dg import S3D
 
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
@@ -73,8 +76,18 @@ def load_video(frame_paths, max_frames=32, resize=(224, 224)):
 def extract_video_text_features(stories: [Story], skip_existing):
     """Generate embeddings from the model from video frames and input words."""
 
-    if skip_existing and all([db.get_key(RAI_STORY_PREFIX + story.pk) for story in stories]):
-        return
+    dataset = MilNceFeatureExtractor(stories)
+
+    # create training loader
+    dataloader = DataLoader(
+        dataset,
+        batch_size=1,
+        shuffle=False,
+        num_workers=args.workers,
+        drop_last=False,
+    )
+
+    net = S3D("../pretrained_weights/s3d_dict.npy", 512)
 
     for story in stories:
         frames = load_video(story.frames)
@@ -159,11 +172,10 @@ def main(args):
     actions = args.actions
 
     if VIDEO_ACTION in actions:
-        clusters = TopicCluster.find().all()
+        pks = TopicCluster.all_pks()
 
-        for cluster in clusters:
-            stories = cluster.stories
-            extract_video_text_features(stories, args.skip_existing)
+        for cluster in (TopicCluster.get(pk) for pk in pks):
+            extract_video_text_features(cluster.ts15s, args.skip_existing)
 
     if args.pks:
         videos = [MainVideo.get(pk) for pk in args.pks]
