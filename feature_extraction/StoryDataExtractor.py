@@ -42,10 +42,12 @@ class StoryDataExtractor:
         window_len = 32
 
         extra_frames = window_len - (len(frames) % window_len)
-        frames = np.concatenate((frames, frames[-extra_frames:]))
 
-        n_segments = int(frames.shape[0] / window_len)
+        appendix = np.array([np.take(np.flip(frames), i, axis=0, mode='wrap') for i in range(extra_frames)])
+        frames_c = np.concatenate((frames, appendix))
 
-        frames = frames.reshape((n_segments, window_len, frames.shape[1], frames.shape[2], 3))
+        n_segments = int(frames_c.shape[0] / window_len)
 
-        return story.pk, frames, story.sentences
+        segments = np.reshape(frames_c, (n_segments, window_len, frames_c.shape[1], frames_c.shape[2], 3))
+
+        return story.pk, segments, story.sentences
