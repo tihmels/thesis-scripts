@@ -5,12 +5,11 @@ import math
 import numpy as np
 import os
 import torch
-from torch.utils.data import DataLoader
 
 from common.utils import read_images, crop_center_square
 from database import rai
 from database.config import RAI_TOPIC_PREFIX, RAI_TEXT_PREFIX, RAI_SHOT_PREFIX
-from feature_extraction.MILNCE_FeatureExtract import MilNceFeatureExtractor
+from feature_extraction.StoryDataExtractor import StoryDataExtractor
 
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
@@ -69,23 +68,13 @@ def load_video(frame_paths, max_frames=32, resize=IMAGE_SHAPE):
 
 
 def extract_milnce_features(stories: [Story], skip_existing):
-    dataset = MilNceFeatureExtractor(stories)
-
-    dataloader = DataLoader(
-        dataset,
-        batch_size=1,
-        shuffle=False,
-        drop_last=False
-    )
+    dataset = StoryDataExtractor(stories)
 
     with torch.no_grad():
-        for batch_data in dataloader:
-            (story_pk, segments, sentences) = batch_data
+        for i in range(len(dataset)):
+            (story_pk, segments, sentences) = dataset[i]
 
-            story_pk = story_pk[0]
-            sentences = [s[0] for s in sentences]
-
-            vision_output = mil_nce.signatures['video'](tf.constant(tf.cast(segments.squeeze(0), dtype=tf.float32)))
+            vision_output = mil_nce.signatures['video'](tf.constant(tf.cast(segments, dtype=tf.float32)))
 
             video_features = vision_output['video_embedding'].numpy()
             mixed_5c = vision_output['mixed_5c'].numpy()
@@ -97,8 +86,6 @@ def extract_milnce_features(stories: [Story], skip_existing):
             text_features = text_output['text_embedding'].numpy()
 
             rai.put_tensor(RAI_TEXT_PREFIX + story_pk, text_features)
-
-            print()
 
 
 def extract_topic_features(story: Story, skip_existing):

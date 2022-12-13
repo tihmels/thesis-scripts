@@ -1,9 +1,6 @@
 import cv2
 import numpy as np
-import torch
 import torchvision.transforms as transforms
-from PIL import Image
-from torch.utils.data import Dataset
 
 from common.utils import read_images
 from database.model import Story
@@ -28,7 +25,7 @@ def load_frames(frame_paths, resize=IMAGE_SHAPE):
     return frames / 255.0
 
 
-class MilNceFeatureExtractor(Dataset):
+class StoryDataExtractor:
     def __init__(self, stories: [Story], window=1, dataset='ts15'):
         self.stories = stories
         self.window = window
@@ -49,6 +46,6 @@ class MilNceFeatureExtractor(Dataset):
 
         n_segments = int(frames.shape[0] / window_len)
 
-        frames = frames.reshape(n_segments, window_len, frames.shape[1], frames.shape[2], 3)
+        frames = frames.reshape((n_segments, window_len, frames.shape[1], frames.shape[2], 3))
 
         return story.pk, frames, story.sentences
