@@ -5,6 +5,7 @@ import math
 import numpy as np
 import os
 import torch
+from redis_om import Migrator
 
 from common.utils import read_images, crop_center_square
 from database import rai
@@ -71,19 +72,31 @@ def extract_milnce_features(stories: [Story], skip_existing):
     extractor = StoryDataExtractor(stories)
 
     with torch.no_grad():
-        for i in range(len(extractor)):
-            story_pk, segments, sentences = extractor[i]
+        with alive_bar(len(extractor), title=f'[MIL-NCE]', length=25, dual_line=True) as bar:
+            for i in range(len(extractor)):
+                story_pk, segments, sentences = extractor[i]
 
-            vision_output = mil_nce.signatures['video'](tf.constant(tf.cast(segments, dtype=tf.float32)))
-            text_output = mil_nce.signatures['text'](tf.constant(sentences))
+                if skip_existing and \
+                        rai.tensor_exists(RAI_SEG_PREFIX + story_pk) and \
+                        rai.tensor_exists(RAI_M5C_PREFIX + story_pk) and \
+                        rai.tensor_exists(RAI_TEXT_PREFIX + story_pk):
+                    bar()
+                    continue
 
-            segment_features = vision_output['video_embedding'].numpy()
-            mixed_5c = vision_output['mixed_5c'].numpy()
-            text_features = text_output['text_embedding'].numpy()
+                bar.text = f'Story: {story_pk}'
 
-            rai.put_tensor(RAI_SEG_PREFIX + story_pk, segment_features)
-            rai.put_tensor(RAI_M5C_PREFIX + story_pk, mixed_5c)
-            rai.put_tensor(RAI_TEXT_PREFIX + story_pk, text_features)
+                vision_output = mil_nce.signatures['video'](tf.constant(tf.cast(segments, dtype=tf.float32)))
+                text_output = mil_nce.signatures['text'](tf.constant(sentences))
+
+                segment_features = vision_output['video_embedding'].numpy()
+                mixed_5c = vision_output['mixed_5c'].numpy()
+                text_features = text_output['text_embedding'].numpy()
+
+                rai.put_tensor(RAI_SEG_PREFIX + story_pk, segment_features)
+                rai.put_tensor(RAI_M5C_PREFIX + story_pk, mixed_5c)
+                rai.put_tensor(RAI_TEXT_PREFIX + story_pk, text_features)
+
+                bar()
 
 
 def extract_topic_features(story: Story, skip_existing):
@@ -154,8 +167,17 @@ def main(args):
     actions = args.actions
 
     if VIDEO_ACTION in actions:
-        cluster = TopicCluster.find().first()
-        extract_milnce_features(cluster.ts15s, args.skip_existing)
+        clusters = TopicCluster.find().all()
+
+        for cluster in clusters:
+            print(f'Cluster: {cluster.index}')
+            extract_milnce_features(cluster.ts15s, args.skip_existing)
+            extract_milnce_features(cluster.ts100s, args.skip_existing)
+
+            cluster.features = 1
+            cluster.save()
+
+            Migrator().run()
 
     if args.pks:
         videos = [MainVideo.get(pk) for pk in args.pks]

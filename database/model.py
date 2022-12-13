@@ -74,6 +74,7 @@ class Story(EmbeddedBaseModel):
 
 class TopicCluster(BaseModel):
     index: int = Field(index=True, sortable=True)
+    features: int = Field(index=True, default=0)
     keywords: List[str]
 
     ts15s: List[Story]

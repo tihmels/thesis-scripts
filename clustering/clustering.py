@@ -209,7 +209,7 @@ def process_stories(ts15_stories, ts100_stories):
     # best_params_use, best_clusters_use, trials_use = bayesian_search(tensors, space=hspace, label_lower=label_lower,
     #                                                                label_upper=label_upper, max_evals=max_evals)
 
-    umap_, cluster = generate_clusters(ts15_tensors, 5, 4, 0.1, 15)
+    umap_, cluster = generate_clusters(ts15_tensors, 4, 4, 0.05, 15)
     # cluster = generate_clusters(tensors, 11, 3, 16, 42)
 
     umap_data = umap.UMAP(n_neighbors=4, n_components=2, min_dist=0.0, metric='cosine').fit_transform(ts15_tensors)
