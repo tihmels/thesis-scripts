@@ -53,16 +53,13 @@ def extract_milnce_features(stories: [Story], dataset, skip_existing):
     extractor = StoryDataExtractor(stories)
 
     with torch.no_grad():
-        with alive_bar(len(extractor), title=f'MIL-NCE [{dataset}]', length=25, dual_line=True) as bar:
+        with alive_bar(len(extractor), ctrl_c=False, title=f'MIL-NCE [{dataset}]', length=25, dual_line=True) as bar:
             for i in range(len(extractor)):
                 story_pk, segments, sentences = extractor[i]
 
                 bar.text = f'Story: {story_pk}'
 
-                if skip_existing and \
-                        rai.tensor_exists(RAI_SEG_PREFIX + story_pk) and \
-                        rai.tensor_exists(RAI_M5C_PREFIX + story_pk) and \
-                        rai.tensor_exists(RAI_TEXT_PREFIX + story_pk):
+                if skip_existing and rai.tensor_exists(RAI_SEG_PREFIX + story_pk):
                     bar()
                     continue
 
@@ -150,7 +147,7 @@ def main(args):
     actions = args.actions
 
     if VIDEO_ACTION in actions:
-        condition = TopicCluster.features == 0 if args.skip_existing else TopicCluster.features <= 0
+        condition = TopicCluster.features == 0 if args.skip_existing else TopicCluster.features >= 0
         clusters = TopicCluster.find(condition).all()
 
         for idx, cluster in enumerate(clusters):
