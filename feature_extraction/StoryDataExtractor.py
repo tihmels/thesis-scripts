@@ -37,6 +37,7 @@ class StoryDataExtractor:
 
     def __getitem__(self, idx):
         story = self.stories[idx]
+
         frames = load_frames(story.frames[::5])
 
         window_len = 32
