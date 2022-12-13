@@ -66,7 +66,7 @@ def extract_milnce_features(stories: [Story], skip_existing):
 
                 bar.text = f'Story: {story_pk}'
 
-                if len(vision_output) > 0:
+                if len(segments) > 0:
                     vision_output = mil_nce.signatures['video'](tf.constant(tf.cast(segments, dtype=tf.float32)))
                     segment_features = vision_output['video_embedding'].numpy()
                     mixed_5c = vision_output['mixed_5c'].numpy()
