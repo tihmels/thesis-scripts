@@ -36,6 +36,8 @@ def create_video_data(vao: VAO):
                            banner=banner) for idx, (shot, banner) in enumerate(zip(vao.data.shots, banners))]
 
         stories = [Story(headline=story.headline,
+                         video=str(vao.path),
+                         type='ts100',
                          first_frame_idx=story.first_frame_idx,
                          last_frame_idx=story.last_frame_idx,
                          start=frame_idx_to_time(story.first_frame_idx),
@@ -44,7 +46,7 @@ def create_video_data(vao: VAO):
                              microsecond=0),
                          frames=[str(frame) for frame in vao.data.frames[story.first_frame_idx:story.last_frame_idx]],
                          shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx + 1)],
-                         sentences=vao.data.get_story_sentences(idx)) for idx, story in
+                         sentences=vao.data.get_story_sentences(idx)).save() for idx, story in
                    enumerate(vao.data.stories)]
 
         video = ShortVideo(pk=str(vao.id),
@@ -69,6 +71,8 @@ def create_video_data(vao: VAO):
         #                              vectorizer=vectorizer, use_maxsum=True, nr_candidates=20, top_n=5)]
 
         stories = [Story(headline=vao.data.topics[story.ref_idx],
+                         video=str(vao.path),
+                         type='ts15',
                          first_frame_idx=story.first_frame_idx,
                          last_frame_idx=story.last_frame_idx,
                          start=frame_idx_to_time(story.first_frame_idx),

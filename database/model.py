@@ -59,6 +59,8 @@ class ShortShot(Shot):
 
 class Story(EmbeddedBaseModel):
     headline: str
+    video: str = Field(index=True)
+    type: str = Field(index=True)
     first_frame_idx: int
     last_frame_idx: int
     start: datetime.time

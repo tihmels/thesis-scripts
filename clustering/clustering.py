@@ -168,19 +168,19 @@ def generate_clusters(embeddings,
     # This parameter controls how tightly UMAP clumps points together, with low values leading to more tightly packed embeddings.
     # Larger values of min_dist will make UMAP pack points together more loosely, focusing instead on the preservation of the broad topological structure.
 
-    umap_ = umap.UMAP(n_neighbors=n_neighbors,
+    mapper = umap.UMAP(n_neighbors=n_neighbors,
                       n_components=n_components,
                       min_dist=min_dist,
                       metric='cosine',
                       random_state=random_state)
 
-    umap_embeddings = umap_.fit_transform(embeddings)
+    umap_embeddings = mapper.fit_transform(embeddings)
 
     clusters = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size,
                                metric='euclidean', min_samples=min_samples,
                                cluster_selection_method='leaf', prediction_data=True).fit(umap_embeddings)
 
-    return umap_, clusters
+    return mapper, clusters
 
 
 space = {
@@ -209,10 +209,10 @@ def process_stories(ts15_stories, ts100_stories):
     # best_params_use, best_clusters_use, trials_use = bayesian_search(tensors, space=hspace, label_lower=label_lower,
     #                                                                label_upper=label_upper, max_evals=max_evals)
 
-    umap_, cluster = generate_clusters(ts15_tensors, 4, 4, 0.05, 15)
+    mapper, cluster = generate_clusters(ts15_tensors, 15, 30, 0.05, 20, min_samples=10, random_state=42)
     # cluster = generate_clusters(tensors, 11, 3, 16, 42)
 
-    umap_data = umap.UMAP(n_neighbors=4, n_components=2, min_dist=0.0, metric='cosine').fit_transform(ts15_tensors)
+    umap_data = umap.UMAP(n_neighbors=15, n_components=2, min_dist=0.0, metric='cosine').fit_transform(ts15_tensors)
     result = pd.DataFrame(umap_data, columns=['x', 'y'])
     result['labels'] = cluster.labels_
 
@@ -222,7 +222,7 @@ def process_stories(ts15_stories, ts100_stories):
             ts15_cluster[label].append(story)
 
     ts100_tensors = [rai.get_tensor(RAI_TOPIC_PREFIX + story.pk) for story in ts100_stories]
-    ts100_embeddings = umap_.transform(ts100_tensors)
+    ts100_embeddings = mapper.transform(ts100_tensors)
 
     labels, strengths = hdbscan.approximate_predict(cluster, ts100_embeddings)
     data = [(story, label) for idx, (story, label) in enumerate(zip(ts100_stories, labels)) if

@@ -3,6 +3,7 @@
 import os
 import torch
 from redis_om import Migrator
+from sentence_transformers import SentenceTransformer
 
 from database import rai
 from database.config import RAI_TOPIC_PREFIX, RAI_TEXT_PREFIX, RAI_SHOT_PREFIX, RAI_SEG_PREFIX, RAI_M5C_PREFIX
@@ -43,7 +44,7 @@ parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 IMAGE_SHAPE = (224, 224)
 
 # nlp_model = SentenceTransformer('distiluse-base-multilingual-cased-v1')
-# topic_model = SentenceTransformer('T-Systems-onsite/cross-en-de-roberta-sentence-transformer')
+topic_model = SentenceTransformer('all-mpnet-base-v2')
 
 mil_nce_module = 'https://tfhub.dev/deepmind/mil-nce/s3d/1'
 mil_nce = hub.load(mil_nce_module)
@@ -148,7 +149,12 @@ def main(args):
 
     if VIDEO_ACTION in actions:
         condition = TopicCluster.features == 0 if args.skip_existing else TopicCluster.features >= 0
-        clusters = TopicCluster.find(condition).all()
+        clusters = TopicCluster.find(condition).sort_by('-index').all()
+
+        if not args.skip_existing:
+            for cluster in clusters:
+                cluster.features = 0
+                cluster.save()
 
         for idx, cluster in enumerate(clusters):
             print(f'[{idx + 1}/{len(clusters)}] Cluster: {cluster.index}')
