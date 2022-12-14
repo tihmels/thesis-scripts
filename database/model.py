@@ -73,6 +73,8 @@ class Story(EmbeddedBaseModel):
     class Meta:
         model_key_prefix = 'story'
 
+class MachineSummary(BaseModel):
+    story_pk: str = Field(index=True)
 
 class TopicCluster(BaseModel):
     index: int = Field(index=True, sortable=True)

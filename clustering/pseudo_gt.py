@@ -1,9 +1,12 @@
 import math
+import matplotlib
 import numpy as np
 import os
 import torch
 import torch.nn.functional as F
 import torchvision.io as io
+
+matplotlib.use('TkAgg')
 
 from common.utils import read_images, frame_idx_to_time
 from database import rai
@@ -11,18 +14,19 @@ from database.config import RAI_SEG_PREFIX, RAI_TEXT_PREFIX
 from database.model import TopicCluster
 
 
-def convert_segment_to_frame_idx(story_start_idx, segment_idx):
+def segment_idx_to_frame_idx(story_start_idx, segment_idx):
     return story_start_idx + (segment_idx * 3 * 16)
 
 
-def convert_range_to_frame_idx(story_start_idx, segment):
+def segment_to_frame_range(story_start_idx, segment):
     start, end = segment
-    return (convert_segment_to_frame_idx(story_start_idx, start), convert_segment_to_frame_idx(story_start_idx, end))
+    return (segment_idx_to_frame_idx(story_start_idx, start),
+            segment_idx_to_frame_idx(story_start_idx, end))
 
 
 def process_cluster(cluster: TopicCluster):
     ts15_stories = cluster.ts15s
-    all_summaries = {}
+    ts15_summaries = {}
 
     ts15_features = []  # segment features per video
     all_features = []  # all segment features
@@ -51,9 +55,9 @@ def process_cluster(cluster: TopicCluster):
 
         for i in range(1, len(features)):
             sim = torch.matmul(features[i], start_feature.t())
-            start, end = convert_range_to_frame_idx(story.first_frame_idx, (i, i + 1))
+            start, end = segment_to_frame_range(story.first_frame_idx, (i, i + 1))
             start_time, end_time = frame_idx_to_time(start), frame_idx_to_time(end)
-            if sim > max_sim:
+            if sim > 0.9 * max_sim:
                 avg_feature += features[i]
                 start_feature = features[i]
                 moving_avg_count += 1
@@ -82,7 +86,7 @@ def process_cluster(cluster: TopicCluster):
         ts15_features.append(torch.stack(segment_features))
         video_segments.append(segments)
 
-        frame_segments = [convert_segment_to_frame_idx(seg) for seg in segments]
+        frame_segments = [segment_to_frame_range(story.first_frame_idx, seg) for seg in segments]
 
         print()
 
@@ -158,11 +162,11 @@ def process_cluster(cluster: TopicCluster):
                 25,
             )
 
-        all_summaries[story.pk] = {}
-        all_summaries[story.pk][
+        ts15_summaries[story.pk] = {}
+        ts15_summaries[story.pk][
             "machine_summary"
         ] = machine_summary.tolist()
-        all_summaries[story.pk][
+        ts15_summaries[story.pk][
             "machine_summary_scores"
         ] = machine_summary_scores.tolist()
 
