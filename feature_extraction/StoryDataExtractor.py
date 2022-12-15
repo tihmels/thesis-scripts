@@ -44,12 +44,15 @@ class StoryDataExtractor:
 
         while len(frames) % window_len != 0:
             extra_frames = window_len - (len(frames) % window_len)
-            frames = np.concatenate((frames, frames[-extra_frames:]), axis=0)
+            if extra_frames / window_len > 0.5:
+                frames = frames[:-(window_len - extra_frames)]
+            else:
+                frames = np.concatenate((frames, frames[-extra_frames:]), axis=0)
 
         n_segments = int(frames.shape[0] / window_len)
 
         segments = np.reshape(frames, (n_segments, window_len, frames.shape[1], frames.shape[2], 3))
 
-        sentences = [self.lt.translate(sentence, 'de', 'en') for sentence in story.sentences]
+        sentences = [sentence for sentence in story.sentences]
 
         return story.pk, segments, sentences
