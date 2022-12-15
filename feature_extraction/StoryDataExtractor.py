@@ -30,7 +30,7 @@ class StoryDataExtractor:
         self.stories = stories
         self.window = window
         self.dataset = dataset
-        self.lt = LibreTranslateAPI("http://localhost:5000")
+        self.lt = LibreTranslateAPI("http://127.0.0.1:5005")
 
     def __len__(self):
         return len(self.stories)
@@ -53,6 +53,6 @@ class StoryDataExtractor:
 
         segments = np.reshape(frames, (n_segments, window_len, frames.shape[1], frames.shape[2], 3))
 
-        sentences = [sentence for sentence in story.sentences]
+        sentences = [self.lt.translate(sentence, 'de', 'en') for sentence in story.sentences]
 
         return story.pk, segments, sentences

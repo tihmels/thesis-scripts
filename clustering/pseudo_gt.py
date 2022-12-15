@@ -1,8 +1,7 @@
-import random
-
 import matplotlib
 import numpy as np
 import os
+import random
 import torch
 import torch.nn.functional as F
 import torchvision.io as io
@@ -187,10 +186,7 @@ def process_cluster(cluster: TopicCluster):
             summary_video = torch.cat(summary_video, dim=0)
 
             io.write_video(
-                os.path.join(
-                    "/Users/tihmels/Desktop/summaries/",
-                    "{}_summary.mp4".format(story.headline),
-                ),
+                os.path.join("/Users/tihmels/Desktop/summaries/", "{}_summary.mp4".format(story.headline)),
                 summary_video,
                 25,
             )
