@@ -37,14 +37,6 @@ def process_cluster(cluster: TopicCluster):
         story_segment_count = 1
         story_segments = [(0, 0)]
 
-        ### DEBUGGING
-
-        total_frames = story.last_frame_idx - story.first_frame_idx
-        total_frames_subsampled = int(total_frames / 3)
-        n_segments = math.ceil(total_frames_subsampled / 16)
-
-        ###
-
         features = torch.tensor(rai.get_tensor(RAI_SEG_PREFIX + story.pk))
         features = F.normalize(features, dim=1)
 
@@ -52,14 +44,6 @@ def process_cluster(cluster: TopicCluster):
         similarity_matrix = torch.matmul(features, features.t())
         similarity_means = similarity_matrix.mean(axis=1)
         max_similarity = similarity_means.max()
-
-        ### DEBUGGING
-
-        max_similarity_idx = similarity_means.argmax()
-        max_similarity_segment = segment_to_frame_range(story.first_frame_idx,
-                                                        (max_similarity_idx.item(), max_similarity_idx.item() + 1))
-
-        ###
 
         segment_feature = features[0]
         reference_feature = features[0]
