@@ -20,10 +20,6 @@ class EmbeddedBaseModel(BaseModel, ABC):
         embedded = True
 
 
-class Headline(EmbeddedBaseModel):
-    text: str
-
-
 class Banner(EmbeddedBaseModel):
     text: str
     confidence: int
@@ -72,10 +68,6 @@ class Story(EmbeddedBaseModel):
 
     class Meta:
         model_key_prefix = 'story'
-
-
-class MachineSummary(BaseModel):
-    story_pk: str = Field(index=True)
 
 
 class TopicCluster(BaseModel):

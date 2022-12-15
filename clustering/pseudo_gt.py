@@ -1,7 +1,6 @@
 import matplotlib
 import numpy as np
 import os
-import random
 import torch
 import torch.nn.functional as F
 import torchvision.io as io
@@ -26,7 +25,7 @@ def segment_to_frame_range(story_start_idx, first_segment_idx: int, last_segment
 
 def process_cluster(cluster: TopicCluster):
     ts15_stories = cluster.ts15s
-    ts100_stories = random.sample(cluster.ts100s, min(len(ts15_stories) * 2, len(cluster.ts100s)))
+    ts100_stories = cluster.ts100s
 
     ts15_summaries = {}
 
