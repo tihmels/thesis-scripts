@@ -28,72 +28,84 @@ def process_cluster(cluster: TopicCluster):
     ts15_stories = cluster.ts15s
     ts15_summaries = {}
 
-    ts15_features = []  # segment features per video
-    all_features = []  # all segment features
-    video_segments = []  # segments for all videos
+    segment_features_per_story = []
+    all_segment_features = []
+    all_segments = []
 
-    for story in ts15_stories:
-        segment_features = []
-        segment_count = 1
-        segments = [(0, 0)]
+    for story in ts15_stories[2:]:
+        story_segment_features = []
+        story_segment_count = 1
+        story_segments = [(0, 0)]
+
+        ### DEBUGGING
 
         total_frames = story.last_frame_idx - story.first_frame_idx
         total_frames_subsampled = int(total_frames / 3)
         n_segments = math.ceil(total_frames_subsampled / 16)
 
+        ###
+
         features = torch.tensor(rai.get_tensor(RAI_SEG_PREFIX + story.pk))
         features = F.normalize(features, dim=1)
 
         # Find max vid feature similarity
-        vid_feat_mat = torch.matmul(features, features.t())
-        vid_feat_sim_mean = vid_feat_mat.mean(dim=1)
-        max_sim = vid_feat_sim_mean.max()
+        similarity_matrix = torch.matmul(features, features.t())
+        similarity_means = similarity_matrix.mean(axis=1)
+        max_similarity = similarity_means.max()
 
-        avg_feature = features[0]
-        start_feature = features[0]
+        ### DEBUGGING
+
+        max_similarity_idx = similarity_means.argmax()
+        max_similarity_segment = segment_to_frame_range(story.first_frame_idx,
+                                                        (max_similarity_idx.item(), max_similarity_idx.item() + 1))
+
+        ###
+
+        segment_feature = features[0]
+        reference_feature = features[0]
         moving_avg_count = 1
 
         for i in range(1, len(features)):
-            sim = torch.matmul(features[i], start_feature.t())
+            similarity = torch.matmul(features[i], reference_feature.t())
+
             start, end = segment_to_frame_range(story.first_frame_idx, (i, i + 1))
-            start_time, end_time = frame_idx_to_time(start), frame_idx_to_time(end)
-            if sim > 0.9 * max_sim:
-                avg_feature += features[i]
-                start_feature = features[i]
+            start_time = frame_idx_to_time(start)
+            end_time = frame_idx_to_time(end)
+
+            if similarity > max_similarity:
+                segment_feature += features[i]
                 moving_avg_count += 1
+                reference_feature = segment_feature / moving_avg_count
             else:
-                segment_count += 1
-                segments[len(segments) - 1] = (
-                    segments[len(segments) - 1][0],
-                    i - 1,
-                )
-                segments.append((i, i))
-                segment_features.append(avg_feature / moving_avg_count)
-                all_features.append(avg_feature)
-                avg_feature = features[i]
-                start_feature = features[i]
+                story_segment_count += 1
+
+                story_segments[-1] = (story_segments[-1][0], i - 1)
+                story_segments.append((i, i))
+
+                story_segment_features.append(segment_feature / moving_avg_count)
+                all_segment_features.append(segment_feature / moving_avg_count)
+
+                segment_feature = features[i]
+                reference_feature = features[i]
                 moving_avg_count = 1
 
         if moving_avg_count > 1:
-            segments[len(segments) - 1] = (
-                segments[len(segments) - 1][0],
-                i,
-            )
-            segment_features.append(avg_feature / moving_avg_count)
-            all_features.append(avg_feature)
+            story_segments[-1] = (story_segments[-1][0], len(features))
+            story_segment_features.append(segment_feature / moving_avg_count)
+            all_segment_features.append(segment_feature / moving_avg_count)
 
-        assert segment_count == len(segments)
-        ts15_features.append(torch.stack(segment_features))
-        video_segments.append(segments)
+        assert story_segment_count == len(story_segments)
+        segment_features_per_story.append(torch.stack(story_segment_features))
+        all_segments.append(story_segments)
 
-        frame_segments = [segment_to_frame_range(story.first_frame_idx, seg) for seg in segments]
+        frame_segments = [segment_to_frame_range(story.first_frame_idx, seg) for seg in story_segments]
 
         print()
 
-    all_features = torch.stack(all_features)
-    all_features = F.normalize(all_features, dim=1)
+    all_segment_features = torch.stack(all_segment_features)
+    # all_segment_features = F.normalize(all_segment_features, dim=1)
 
-    for idx, (segments, segment_features) in enumerate(zip(video_segments, ts15_features)):
+    for idx, (segments, segment_features) in enumerate(zip(video_segments, segment_features_per_story)):
 
         story = ts15_stories[idx]
 
@@ -118,7 +130,7 @@ def process_cluster(cluster: TopicCluster):
             asr_similarity_matrix = asr_similarity_matrix.mean(axis=1)
 
         v_similarity_matrix = (
-            torch.matmul(segment_features, all_features.t()).detach().cpu()
+            torch.matmul(segment_features, all_segment_features.t()).detach().cpu()
         )
         v_similarity_matrix = v_similarity_matrix.mean(axis=1)
 

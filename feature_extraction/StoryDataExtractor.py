@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import torchvision.transforms as transforms
+from libretranslatepy import LibreTranslateAPI
 
 from common.utils import read_images
 from database.model import Story
@@ -30,7 +30,7 @@ class StoryDataExtractor:
         self.stories = stories
         self.window = window
         self.dataset = dataset
-        self.transform = transforms.Resize((224, 224))
+        self.lt = LibreTranslateAPI("http://localhost:5000")
 
     def __len__(self):
         return len(self.stories)
@@ -50,4 +50,6 @@ class StoryDataExtractor:
 
         segments = np.reshape(frames, (n_segments, window_len, frames.shape[1], frames.shape[2], 3))
 
-        return story.pk, segments, story.sentences
+        sentences = [self.lt.translate(sentence, 'de', 'en') for sentence in story.sentences]
+
+        return story.pk, segments, sentences
