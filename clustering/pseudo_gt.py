@@ -1,21 +1,23 @@
 import argparse
-
 import matplotlib
 import numpy as np
 import os
+import random
 import torch
 import torch.nn.functional as F
 import torchvision.io as io
+from pathlib import Path
 
 matplotlib.use('TkAgg')
 
-from common.utils import read_images, frame_idx_to_time
+from common.utils import read_images, create_dir
 from database import rai, db
 from database.config import RAI_SEG_PREFIX, RAI_TEXT_PREFIX
 from database.model import TopicCluster, Story
 
 parser = argparse.ArgumentParser('Pseudo Summary Generation')
 parser.add_argument('--index', type=int, nargs='*', help="Generate pseudo summary for cluster index")
+parser.add_argument('--pseudo_video_dir', type=str, default='')
 
 
 def segment_idx_to_frame_idx(story_start_idx, segment_idx):
@@ -81,11 +83,13 @@ def extract_segment_features(story: Story):
     return story_segments, story_segment_features
 
 
-def process_cluster(cluster: TopicCluster):
+def process_cluster(cluster: TopicCluster, args):
     ts15_stories = cluster.ts15s
     ts100_stories = cluster.ts100s
 
-    ts15_summaries = {}
+    print(f'Keywords: {cluster.keywords[:5]}')
+    print(f'{len(ts15_stories)} ts15')
+    print(f'{len(ts100_stories)} ts100', end='\n\n')
 
     segment_features_per_story = []
     segments_per_story = []
@@ -117,8 +121,7 @@ def process_cluster(cluster: TopicCluster):
 
         story = ts15_stories[idx]
 
-        print(f"[{story.pk}] Story: ", story.headline)
-        print(f"[{story.pk}] Number of segments: ", len(segments))
+        print(f"[{idx + 1}/{len(cluster.ts15s)}] Story: {story.headline} ({story.pk})")
 
         if len(segment_features) == 0:
             print('No features available ...')
@@ -130,14 +133,14 @@ def process_cluster(cluster: TopicCluster):
         text_similarity_mean = text_similarity_matrix.mean(axis=1)
 
         ts15_similarity_matrix = torch.matmul(segment_features, all_segment_features.t())
-        ts15_similarity_mean = 1 / ts15_similarity_matrix.mean(axis=1)
+        ts15_similarity_mean = ts15_similarity_matrix.mean(axis=1)
+        ts15_similarity_mean_inv = F.normalize(1 / ts15_similarity_mean, dim=0)
 
         ts100_similarity_matrix = torch.matmul(segment_features, ts100_segment_features.t())
         ts100_similarity_mean = ts100_similarity_matrix.mean(axis=1)
 
-        # Combine both the similarity matrices
         if text_similarity_mean is not None:
-            segment_scores = (ts15_similarity_mean + ts100_similarity_mean + text_similarity_mean) / 3
+            segment_scores = (ts15_similarity_mean_inv + ts100_similarity_mean + text_similarity_mean) / 3
         else:
             segment_scores = (ts15_similarity_mean + ts100_similarity_mean) / 2
 
@@ -153,23 +156,23 @@ def process_cluster(cluster: TopicCluster):
         for itr, score in enumerate(segment_scores):
             start, end = segments[itr]
 
-            start_, end_ = segment_to_frame_range(story.first_frame_idx, start, end)
-            start_time = frame_idx_to_time(start_)
-            end_time = frame_idx_to_time(end_)
-
             if end >= start:
                 machine_summary_scores[start: end + 1] = score
                 if score >= threshold:
                     machine_summary[start: end + 1] = 1
-                    if idx % 10 == 0 and story is not None:
+                    if idx % 5 == 0 and args.pseudo_video_dir:
                         frames = story.frames[segment_idx_to_frame_idx(0, start): segment_idx_to_frame_idx(0, end)]
                         summary_video.append(torch.tensor(np.array(read_images(frames))))
 
-        if idx % 10 == 0 and story is not None:
+        if idx % 5 == 0 and len(summary_video) > 25 and args.pseudo_video_dir:
             summary_video = torch.cat(summary_video, dim=0)
 
+            pseudo_video_dir = Path(args.pseudo_video_dir, str(cluster.index))
+
+            create_dir(pseudo_video_dir)
+
             io.write_video(
-                os.path.join("/Users/tihmels/Desktop/summaries/", "{}_summary.mp4".format(story.headline)),
+                os.path.join(str(pseudo_video_dir), "{}.mp4".format(story.headline)),
                 summary_video,
                 25,
             )
@@ -188,9 +191,12 @@ def main(args):
 
     else:
         clusters = TopicCluster.find(TopicCluster.features == 1).sort_by('-index').all()
+        random.shuffle(clusters)
 
     for cluster in clusters:
-        process_cluster(cluster)
+        print(f'----- Cluster {cluster.index} -----')
+        process_cluster(cluster, args)
+        print()
 
 
 if __name__ == "__main__":
