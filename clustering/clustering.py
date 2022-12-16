@@ -1,11 +1,11 @@
 # !/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
-import sys
 from collections import defaultdict
 
 import hdbscan
 import numpy as np
 import pandas as pd
 import random
+import sys
 import umap
 from hyperopt import Trials, partial, fmin, tpe, space_eval, STATUS_OK, hp
 # matplotlib.use('TkAgg')
@@ -15,7 +15,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from tqdm import trange
 
 from database import rai
-from database.config import RAI_TOPIC_PREFIX
+from database.config import get_topic_key
 from database.model import MainVideo, TopicCluster, ShortVideo
 
 german_stop_words = stopwords.words('german')
@@ -169,10 +169,10 @@ def generate_clusters(embeddings,
     # Larger values of min_dist will make UMAP pack points together more loosely, focusing instead on the preservation of the broad topological structure.
 
     mapper = umap.UMAP(n_neighbors=n_neighbors,
-                      n_components=n_components,
-                      min_dist=min_dist,
-                      metric='cosine',
-                      random_state=random_state)
+                       n_components=n_components,
+                       min_dist=min_dist,
+                       metric='cosine',
+                       random_state=random_state)
 
     umap_embeddings = mapper.fit_transform(embeddings)
 
@@ -203,55 +203,56 @@ max_evals = 100
 
 
 def process_stories(ts15_stories, ts100_stories):
-    ts15_headlines = [story.headline for story in ts15_stories]
-    ts15_tensors = [rai.get_tensor(RAI_TOPIC_PREFIX + story.pk) for story in ts15_stories]
+    ts15_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts15_stories]
 
     # best_params_use, best_clusters_use, trials_use = bayesian_search(tensors, space=hspace, label_lower=label_lower,
     #                                                                label_upper=label_upper, max_evals=max_evals)
 
-    mapper, cluster = generate_clusters(ts15_tensors, 15, 30, 0.05, 20, min_samples=10, random_state=42)
-    # cluster = generate_clusters(tensors, 11, 3, 16, 42)
+    mapper, cluster = generate_clusters(ts15_tensors, 20, 30, 0.05, 25, random_state=42)
 
-    umap_data = umap.UMAP(n_neighbors=15, n_components=2, min_dist=0.0, metric='cosine').fit_transform(ts15_tensors)
-    result = pd.DataFrame(umap_data, columns=['x', 'y'])
-    result['labels'] = cluster.labels_
+    # umap_data = umap.UMAP(n_neighbors=30, n_components=2, min_dist=0.0, metric='cosine').fit_transform(ts15_tensors)
+    # result = pd.DataFrame(umap_data, columns=['x', 'y'])
+    # result['labels'] = cluster.labels_
 
     ts15_cluster = defaultdict(list)
     for story, label in zip(ts15_stories, cluster.labels_):
         if label != -1:
             ts15_cluster[label].append(story)
 
-    ts100_tensors = [rai.get_tensor(RAI_TOPIC_PREFIX + story.pk) for story in ts100_stories]
+    ts100_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts100_stories]
     ts100_embeddings = mapper.transform(ts100_tensors)
 
     labels, strengths = hdbscan.approximate_predict(cluster, ts100_embeddings)
-    data = [(story, label) for idx, (story, label) in enumerate(zip(ts100_stories, labels)) if
-            strengths[idx] > 0.9]
+    data = [(story, label) for idx, (story, label) in enumerate(zip(ts100_stories, labels)) if strengths[idx] > 0.8]
 
     ts100_cluster = defaultdict(list)
     for story, label in data:
         if label != -1:
             ts100_cluster[label].append(story)
 
-    docs_df = pd.DataFrame(ts15_headlines, columns=["Doc"])
+    headlines = [story.headline for story in ts15_stories]
+
+    docs_df = pd.DataFrame(headlines, columns=["Doc"])
     docs_df['Topic'] = cluster.labels_
     docs_df['Doc_ID'] = range(len(docs_df))
     docs_per_topic = docs_df.groupby(['Topic'], as_index=False)
     docs_per_topic_agg = docs_per_topic.agg({'Doc': ' '.join})
 
     tf_idf, count = c_tf_idf(docs_per_topic_agg.Doc.values, m=len(ts15_stories), ngram_range=(1, 2))
-
     top_n_words = extract_top_n_words_per_topic(tf_idf, count, docs_per_topic_agg, n=20)
-    topic_sizes = extract_topic_sizes(docs_df)
-    topic_sizes.head(10)
 
     TopicCluster.find().delete()
 
     for label, stories in ts15_cluster.items():
+        ts100s = ts100_cluster[label]
+
         TopicCluster(index=label,
                      keywords=[w[0] for w in top_n_words[label]],
+                     n_ts15=len(stories),
+                     n_ts100=len(ts100s),
                      ts15s=stories,
-                     ts100s=ts100_cluster[label]).save()
+                     ts100s=ts100s).save()
+
     return
 
 
@@ -262,9 +263,9 @@ def main():
     assert len(ts15_videos) > 0, 'No suitable video files have been found.'
 
     ts15_stories = [story for video in ts15_videos for story in video.stories if
-                    rai.tensor_exists(RAI_TOPIC_PREFIX + story.pk)]
+                    rai.tensor_exists(get_topic_key(story.pk))]
     ts100_stories = [story for video in ts100_videos for story in video.stories if
-                     rai.tensor_exists(RAI_TOPIC_PREFIX + story.pk)]
+                     rai.tensor_exists(get_topic_key(story.pk))]
 
     process_stories(ts15_stories, ts100_stories)
 

@@ -12,7 +12,7 @@ matplotlib.use('TkAgg')
 
 from common.utils import read_images, create_dir
 from database import rai, db
-from database.config import RAI_SEG_PREFIX, RAI_TEXT_PREFIX
+from database.config import RAI_VIS_PREFIX, RAI_TEXT_PREFIX
 from database.model import TopicCluster, Story
 
 parser = argparse.ArgumentParser('Pseudo Summary Generation')
@@ -46,7 +46,7 @@ def extract_segment_features(story: Story):
     story_segment_count = 1
     story_segments = [(0, 0)]
 
-    segment_features = torch.tensor(rai.get_tensor(RAI_SEG_PREFIX + story.pk))
+    segment_features = torch.tensor(rai.get_tensor(RAI_VIS_PREFIX + story.pk))
     segment_features = F.normalize(segment_features, dim=1)
 
     similarity_matrix = torch.matmul(segment_features, segment_features.t())

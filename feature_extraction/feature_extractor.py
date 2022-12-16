@@ -6,7 +6,8 @@ from redis_om import Migrator
 from sentence_transformers import SentenceTransformer
 
 from database import rai
-from database.config import RAI_TOPIC_PREFIX, RAI_TEXT_PREFIX, RAI_SHOT_PREFIX, RAI_SEG_PREFIX, RAI_M5C_PREFIX
+from database.config import RAI_TOPIC_PREFIX, get_vis_key, \
+    get_m5c_key, get_text_key, get_topic_key
 from feature_extraction.StoryDataExtractor import StoryDataExtractor
 
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
@@ -16,24 +17,17 @@ from argparse import ArgumentParser
 import tensorflow as tf
 import tensorflow_hub as hub
 
-from towhee import pipeline
 from alive_progress import alive_bar
 
 from database.model import MainVideo, ShortVideo, Story, TopicCluster
 
-IMG_ACTION = 'img'
-NLP_ACTION = 'nlp'
 TOPIC_ACTION = 'top'
-VIDEO_ACTION = 'vid'
+MIL_NCE_ACTION = 'mil'
 
 parser = ArgumentParser('Setup RedisAI DB')
-parser.add_argument('--img', dest='actions', action='append_const', const=IMG_ACTION,
-                    help='Generate image embeddings for each story shot and save them to RedisAI')
-parser.add_argument('--nlp', dest='actions', action='append_const', const=NLP_ACTION,
-                    help='Generate sentence embeddings for each story sentence and save them to RedisAI')
 parser.add_argument('--top', dest='actions', action='append_const', const=TOPIC_ACTION,
-                    help='Generate sentence embeddings for each story sentence and save them to RedisAI')
-parser.add_argument('--vid', dest='actions', action='append_const', const=VIDEO_ACTION,
+                    help='Generate sentence embeddings for each story headline and save them to RedisAI')
+parser.add_argument('--mil', dest='actions', action='append_const', const=MIL_NCE_ACTION,
                     help='Generate sentence embeddings for each story sentence and save them to RedisAI')
 parser.add_argument('--pks', action='append', type=str,
                     help='Generate sentence embeddings for each story sentence and save them to RedisAI')
@@ -41,9 +35,6 @@ parser.add_argument('--ts15', action='store_true')
 parser.add_argument('--ts100', action='store_true')
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
-IMAGE_SHAPE = (224, 224)
-
-# nlp_model = SentenceTransformer('distiluse-base-multilingual-cased-v1')
 topic_model = SentenceTransformer('all-mpnet-base-v2')
 
 mil_nce_module = 'https://tfhub.dev/deepmind/mil-nce/s3d/1'
@@ -60,7 +51,7 @@ def extract_milnce_features(stories: [Story], dataset, skip_existing):
 
                 bar.text = f'Story: {story_pk}'
 
-                if skip_existing and rai.tensor_exists(RAI_SEG_PREFIX + story_pk):
+                if skip_existing and rai.tensor_exists(get_vis_key(story_pk)):
                     bar()
                     continue
 
@@ -69,19 +60,20 @@ def extract_milnce_features(stories: [Story], dataset, skip_existing):
                     segment_features = vision_output['video_embedding'].numpy()
                     mixed_5c = vision_output['mixed_5c'].numpy()
 
-                    rai.put_tensor(RAI_SEG_PREFIX + story_pk, segment_features)
-                    rai.put_tensor(RAI_M5C_PREFIX + story_pk, mixed_5c)
+                    rai.put_tensor(get_vis_key(story_pk), segment_features)
+                    rai.put_tensor(get_m5c_key(story_pk), mixed_5c)
 
                 if len(sentences) > 0:
                     text_output = mil_nce.signatures['text'](tf.constant(sentences))
                     text_features = text_output['text_embedding'].numpy()
-                    rai.put_tensor(RAI_TEXT_PREFIX + story_pk, text_features)
+
+                    rai.put_tensor(get_text_key(story_pk), text_features)
 
                 bar()
 
 
 def extract_topic_features(story: Story, skip_existing):
-    if skip_existing and rai.tensor_exists(RAI_TOPIC_PREFIX + story.pk):
+    if skip_existing and rai.tensor_exists(get_topic_key(story.pk)):
         return
 
     feature = topic_model.encode(story.headline)
@@ -89,36 +81,9 @@ def extract_topic_features(story: Story, skip_existing):
     rai.put_tensor(RAI_TOPIC_PREFIX + story.pk, feature)
 
 
-def extract_sentence_features(story: Story, skip_existing):
-    if skip_existing and all((rai.tensor_exists(RAI_TEXT_PREFIX + sentence.pk) for sentence in story.sentences)):
-        return
-
-    features = nlp_model.encode([sentence.text for sentence in story.sentences])
-
-    for sentence, feature in zip(story.sentences, features):
-        rai.put_tensor(RAI_TEXT_PREFIX + sentence.pk, feature)
-
-
-def extract_image_features(story: Story, skip_existing):
-    if len(story.shots) == 0:
-        return
-
-    if skip_existing and all((rai.tensor_exists(RAI_SHOT_PREFIX + shot.pk) for shot in story.shots)):
-        return
-
-    embedding_pipeline = pipeline('towhee/image-embedding-swinbase')
-
-    embeddings = [embedding_pipeline(shot.keyframe) for shot in story.shots]
-
-    for shot, vector in zip(story.shots, embeddings):
-        rai.put_tensor(RAI_SHOT_PREFIX + shot.pk, vector)
-
-
 action_map = {
-    IMG_ACTION: extract_image_features,
-    NLP_ACTION: extract_sentence_features,
     TOPIC_ACTION: extract_topic_features,
-    VIDEO_ACTION: extract_milnce_features
+    MIL_NCE_ACTION: extract_milnce_features
 }
 
 
@@ -147,7 +112,7 @@ def alive_action(videos, actions, skip_existing):
 def main(args):
     actions = args.actions
 
-    if VIDEO_ACTION in actions:
+    if MIL_NCE_ACTION in actions:
         condition = TopicCluster.features == 0 if args.skip_existing else TopicCluster.features >= 0
         clusters = TopicCluster.find(condition).sort_by('-index').all()
 

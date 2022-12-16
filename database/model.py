@@ -42,15 +42,9 @@ class Shot(EmbeddedBaseModel, ABC):
 class MainShot(Shot):
     type: str
 
-    class Meta:
-        model_key_prefix = 'shot'
-
 
 class ShortShot(Shot):
     banner: Banner
-
-    class Meta:
-        model_key_prefix = 'shot'
 
 
 class Story(EmbeddedBaseModel):
@@ -74,6 +68,9 @@ class TopicCluster(BaseModel):
     index: int = Field(index=True, sortable=True)
     features: int = Field(index=True, default=0)
     keywords: List[str]
+
+    n_ts15: int
+    n_ts100: int
 
     ts15s: List[Story]
     ts100s: List[Story]
