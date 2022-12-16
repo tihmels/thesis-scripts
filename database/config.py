@@ -2,8 +2,8 @@ RAI_TOPIC_PREFIX = 'tensor:topic:'
 RAI_SHOT_PREFIX = 'tensor:shot:'
 RAI_TEXT_PREFIX = 'tensor:text:'
 RAI_STORY_PREFIX = 'tensor:story:'
-RAI_M5C_PREFIX = 'tensor:m5c:'
-RAI_VIS_PREFIX = 'tensor:vis:'
+RAI_M5C_PREFIX = 'tensor:mil-nce:m5c:'
+RAI_VIS_PREFIX = 'tensor:mil-nce:vis:'
 
 
 def get_topic_key(pk: str):

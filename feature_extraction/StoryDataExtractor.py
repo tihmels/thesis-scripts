@@ -26,10 +26,9 @@ def load_frames(frame_paths, resize=IMAGE_SHAPE):
 
 
 class StoryDataExtractor:
-    def __init__(self, stories: [Story], window=1, dataset='ts15'):
+    def __init__(self, stories: [Story], window=1):
         self.stories = stories
         self.window = window
-        self.dataset = dataset
         self.lt = LibreTranslateAPI("http://127.0.0.1:5005")
 
     def __len__(self):

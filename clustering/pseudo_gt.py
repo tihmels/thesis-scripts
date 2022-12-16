@@ -12,7 +12,7 @@ matplotlib.use('TkAgg')
 
 from common.utils import read_images, create_dir
 from database import rai, db
-from database.config import RAI_VIS_PREFIX, RAI_TEXT_PREFIX
+from database.config import RAI_TEXT_PREFIX, get_vis_key
 from database.model import TopicCluster, Story
 
 parser = argparse.ArgumentParser('Pseudo Summary Generation')
@@ -46,7 +46,7 @@ def extract_segment_features(story: Story):
     story_segment_count = 1
     story_segments = [(0, 0)]
 
-    segment_features = torch.tensor(rai.get_tensor(RAI_VIS_PREFIX + story.pk))
+    segment_features = torch.tensor(rai.get_tensor(get_vis_key(story.pk)))
     segment_features = F.normalize(segment_features, dim=1)
 
     similarity_matrix = torch.matmul(segment_features, segment_features.t())
@@ -140,7 +140,7 @@ def process_cluster(cluster: TopicCluster, args):
         ts100_similarity_mean = ts100_similarity_matrix.mean(axis=1)
 
         if text_similarity_mean is not None:
-            segment_scores = (ts15_similarity_mean_inv + ts100_similarity_mean + text_similarity_mean) / 3
+            segment_scores = (ts15_similarity_mean_inv + ts100_similarity_mean + 5 * text_similarity_mean) / 7
         else:
             segment_scores = (ts15_similarity_mean + ts100_similarity_mean) / 2
 
@@ -164,7 +164,9 @@ def process_cluster(cluster: TopicCluster, args):
                         frames = story.frames[segment_idx_to_frame_idx(0, start): segment_idx_to_frame_idx(0, end)]
                         summary_video.append(torch.tensor(np.array(read_images(frames))))
 
-        if idx % 5 == 0 and len(summary_video) > 25 and args.pseudo_video_dir:
+        #### CHECK LEN(SUMMARY), should not happen
+
+        if idx % 5 == 0 and args.pseudo_video_dir and len(summary_video) > 1:
             summary_video = torch.cat(summary_video, dim=0)
 
             pseudo_video_dir = Path(args.pseudo_video_dir, str(cluster.index))
@@ -172,7 +174,7 @@ def process_cluster(cluster: TopicCluster, args):
             create_dir(pseudo_video_dir)
 
             io.write_video(
-                os.path.join(str(pseudo_video_dir), "{}.mp4".format(story.headline)),
+                os.path.join(str(pseudo_video_dir), "{}.mp4".format(story.pk)),
                 summary_video,
                 25,
             )

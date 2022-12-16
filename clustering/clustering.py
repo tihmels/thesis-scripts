@@ -122,6 +122,7 @@ def bayesian_search(embeddings, space, label_lower, label_upper, max_evals=100):
                                       n_neighbors=best_params['n_neighbors'],
                                       n_components=best_params['n_components'],
                                       min_cluster_size=best_params['min_cluster_size'],
+                                      min_samples=best_params['min_samples'],
                                       random_state=best_params['random_state'])
 
     return best_params, best_clusters, trials
@@ -158,6 +159,7 @@ def generate_clusters(embeddings,
                       min_dist=0.1,
                       min_cluster_size=15,
                       min_samples=None,
+                      csm='eom',
                       random_state=None):
     # n_neighbors: the number of approximate nearest neighbors used to construct the initial high-dimensional graph.
     # It effectively controls how UMAP balances local versus global structure -
@@ -178,7 +180,7 @@ def generate_clusters(embeddings,
 
     clusters = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size,
                                metric='euclidean', min_samples=min_samples,
-                               cluster_selection_method='leaf', prediction_data=True).fit(umap_embeddings)
+                               cluster_selection_method=csm, prediction_data=True).fit(umap_embeddings)
 
     return mapper, clusters
 
@@ -205,10 +207,11 @@ max_evals = 100
 def process_stories(ts15_stories, ts100_stories):
     ts15_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts15_stories]
 
-    # best_params_use, best_clusters_use, trials_use = bayesian_search(tensors, space=hspace, label_lower=label_lower,
-    #                                                                label_upper=label_upper, max_evals=max_evals)
+    #best_params_use, best_clusters_use, trials_use = bayesian_search(ts15_tensors, space=hspace,
+    #                                                                 label_lower=label_lower,
+    #                                                                 label_upper=label_upper, max_evals=max_evals)
 
-    mapper, cluster = generate_clusters(ts15_tensors, 20, 30, 0.05, 25, random_state=42)
+    mapper, cluster = generate_clusters(ts15_tensors, 22, 45, 0.05, 25, min_samples=5, csm='leaf', random_state=42)
 
     # umap_data = umap.UMAP(n_neighbors=30, n_components=2, min_dist=0.0, metric='cosine').fit_transform(ts15_tensors)
     # result = pd.DataFrame(umap_data, columns=['x', 'y'])
