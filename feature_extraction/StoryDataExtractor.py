@@ -39,7 +39,7 @@ class StoryDataExtractor:
 
         frames = load_frames(story.frames[::3])
 
-        window_len = 16
+        window_len = 24
 
         while len(frames) % window_len != 0:
             extra_frames = window_len - (len(frames) % window_len)

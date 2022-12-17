@@ -55,13 +55,12 @@ def extract_milnce_features(stories: [Story], dataset, skip_existing):
                     bar()
                     continue
 
-                if len(segments) > 0:
-                    vision_output = mil_nce.signatures['video'](tf.constant(tf.cast(segments, dtype=tf.float32)))
-                    segment_features = vision_output['video_embedding'].numpy()
-                    mixed_5c = vision_output['mixed_5c'].numpy()
+                vision_output = mil_nce.signatures['video'](tf.constant(tf.cast(segments, dtype=tf.float32)))
+                segment_features = vision_output['video_embedding'].numpy()
+                mixed_5c = vision_output['mixed_5c'].numpy()
 
-                    rai.put_tensor(get_vis_key(story_pk), segment_features)
-                    rai.put_tensor(get_m5c_key(story_pk), mixed_5c)
+                rai.put_tensor(get_vis_key(story_pk), segment_features)
+                rai.put_tensor(get_m5c_key(story_pk), mixed_5c)
 
                 if len(sentences) > 0:
                     text_output = mil_nce.signatures['text'](tf.constant(sentences))
@@ -113,8 +112,7 @@ def main(args):
     actions = args.actions
 
     if MIL_NCE_ACTION in actions:
-        condition = TopicCluster.features == 0 if args.skip_existing else TopicCluster.features >= 0
-        clusters = TopicCluster.find(condition).sort_by('-index').all()
+        clusters = TopicCluster.find().sort_by('-index').all()
 
         if not args.skip_existing:
             for cluster in clusters:

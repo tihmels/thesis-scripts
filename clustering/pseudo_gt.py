@@ -142,7 +142,7 @@ def process_cluster(cluster: TopicCluster, args):
         ts100_similarity_mean = ts100_similarity_matrix.mean(axis=1)
 
         if text_similarity_mean is not None:
-            segment_scores = (ts15_similarity_mean_inv + ts100_similarity_mean + 5 * text_similarity_mean) / 7
+            segment_scores = (ts15_similarity_mean_inv + ts100_similarity_mean + text_similarity_mean) / 3
         else:
             segment_scores = (ts15_similarity_mean + ts100_similarity_mean) / 2
 
@@ -179,16 +179,16 @@ def process_cluster(cluster: TopicCluster, args):
         y_axis_max = y_max + (y_max - y_min) * 0.1
         plt.axis([0, n_video_segments, y_axis_min, y_axis_max])
 
-        plt.hlines(y=threshold, xmin=0, xmax=n_video_segments, linewidth=1, color=(0, 0, 0, 0.5))
-        plt.vlines(flatten(segments), 0, y_axis_max, linestyles='dotted', colors='grey')
+        plt.hlines(y=threshold, xmin=0, xmax=n_video_segments, linewidth=0.5, color=(0, 0, 0, 1))
+        plt.vlines(flatten(segments), y_axis_min, y_axis_max, linestyles='dotted', colors='grey')
 
         segment_sp.plot(x, y_final, color='b', linewidth=0.8)
-        segment_sp.plot(x, y_ts15, color='r', linewidth=0.8)
-        segment_sp.plot(x, y_ts100, color='g', linewidth=0.8)
-        segment_sp.plot(x, y_text, color='c', linewidth=0.8)
+        segment_sp.plot(x, y_ts15, color='r', linewidth=0.5)
+        segment_sp.plot(x, y_ts100, color='g', linewidth=0.5)
+        segment_sp.plot(x, y_text, color='c', linewidth=0.5, linestyle='dashed')
         plt.xticks(range(0, n_video_segments, 5))
 
-        plt.fill_between(x, 0, y_axis_max, where=(y_final > threshold.numpy()), color='b', alpha=.1)
+        plt.fill_between(x, y_axis_min, y_axis_max, where=(y_final > threshold.numpy()), color='b', alpha=.1)
 
         summary_video = []
         for itr, score in enumerate(segment_scores):
