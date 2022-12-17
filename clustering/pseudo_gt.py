@@ -6,11 +6,12 @@ import random
 import torch
 import torch.nn.functional as F
 import torchvision.io as io
+from matplotlib import pyplot as plt
 from pathlib import Path
 
 matplotlib.use('TkAgg')
 
-from common.utils import read_images, create_dir
+from common.utils import read_images, create_dir, flatten
 from database import rai, db
 from database.config import RAI_TEXT_PREFIX, get_vis_key
 from database.model import TopicCluster, Story
@@ -131,6 +132,7 @@ def process_cluster(cluster: TopicCluster, args):
 
         text_similarity_matrix = get_text_similarity_matrix(story, segment_features)
         text_similarity_mean = text_similarity_matrix.mean(axis=1)
+        text_similarity_mean = F.normalize(text_similarity_mean, dim=0)
 
         ts15_similarity_matrix = torch.matmul(segment_features, all_segment_features.t())
         ts15_similarity_mean = ts15_similarity_matrix.mean(axis=1)
@@ -150,7 +152,43 @@ def process_cluster(cluster: TopicCluster, args):
         machine_summary = np.zeros(n_video_segments)
         machine_summary_scores = np.zeros(n_video_segments)
 
-        threshold = 0.8 * segment_scores.max()
+        threshold = 0.85 * segment_scores.max()
+
+        fig_1 = plt.figure(1, figsize=(18, 4))
+        plt.subplots_adjust(bottom=0.18, left=0.05, right=0.98)
+
+        segment_sp = fig_1.add_subplot(111)
+
+        plt.xlabel('Segment')
+        plt.ylabel('Score')
+
+        x = range(n_video_segments)
+        y_ts15 = flatten(
+            [[seg_score] * (seg[1] - seg[0] + 1) for seg_score, seg in zip(ts15_similarity_mean_inv, segments)])
+        y_ts100 = flatten(
+            [[seg_score] * (seg[1] - seg[0] + 1) for seg_score, seg in zip(ts15_similarity_mean, segments)])
+        y_text = flatten(
+            [[seg_score] * (seg[1] - seg[0] + 1) for seg_score, seg in zip(text_similarity_mean, segments)])
+
+        y_final = flatten([[seg_score] * (seg[1] - seg[0] + 1) for seg_score, seg in zip(segment_scores, segments)])
+
+        y_max = max(max(ts15_similarity_mean_inv), max(ts15_similarity_mean), max(text_similarity_mean))
+        y_min = min(min(ts15_similarity_mean_inv), min(ts15_similarity_mean), min(text_similarity_mean))
+
+        y_axis_min = y_min - (y_max - y_min) * 0.1
+        y_axis_max = y_max + (y_max - y_min) * 0.1
+        plt.axis([0, n_video_segments, y_axis_min, y_axis_max])
+
+        plt.hlines(y=threshold, xmin=0, xmax=n_video_segments, linewidth=1, color=(0, 0, 0, 0.5))
+        plt.vlines(flatten(segments), 0, y_axis_max, linestyles='dotted', colors='grey')
+
+        segment_sp.plot(x, y_final, color='b', linewidth=0.8)
+        segment_sp.plot(x, y_ts15, color='r', linewidth=0.8)
+        segment_sp.plot(x, y_ts100, color='g', linewidth=0.8)
+        segment_sp.plot(x, y_text, color='c', linewidth=0.8)
+        plt.xticks(range(0, n_video_segments, 5))
+
+        plt.fill_between(x, 0, y_axis_max, where=(y_final > threshold.numpy()), color='b', alpha=.1)
 
         summary_video = []
         for itr, score in enumerate(segment_scores):
@@ -163,6 +201,8 @@ def process_cluster(cluster: TopicCluster, args):
                     if idx % 5 == 0 and args.pseudo_video_dir:
                         frames = story.frames[segment_idx_to_frame_idx(0, start): segment_idx_to_frame_idx(0, end)]
                         summary_video.append(torch.tensor(np.array(read_images(frames))))
+
+        plt.show()
 
         #### CHECK LEN(SUMMARY), should not happen
 
