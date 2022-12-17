@@ -22,7 +22,7 @@ parser.add_argument('--pseudo_video_dir', type=str, default='')
 
 
 def segment_idx_to_frame_idx(story_start_idx, segment_idx):
-    return story_start_idx + (segment_idx * 3 * 16)
+    return story_start_idx + (segment_idx * 3 * 24)
 
 
 def segment_to_frame_range(story_start_idx, first_segment_idx: int, last_segment_idx: int = None):
@@ -60,7 +60,7 @@ def extract_segment_features(story: Story):
     for seg_idx in range(1, len(segment_features)):
         similarity = torch.matmul(segment_features[seg_idx], segment_feature.t())
 
-        if similarity > 0.9 * max_similarity:
+        if similarity > 0.95 * max_similarity:
             moving_avg_count += 1
             segment_feature = (segment_feature + segment_features[seg_idx]) / 2
         else:
@@ -152,7 +152,7 @@ def process_cluster(cluster: TopicCluster, args):
         machine_summary = np.zeros(n_video_segments)
         machine_summary_scores = np.zeros(n_video_segments)
 
-        threshold = 0.85 * segment_scores.max()
+        threshold = segment_scores.mean()
 
         fig_1 = plt.figure(1, figsize=(18, 4))
         plt.subplots_adjust(bottom=0.18, left=0.05, right=0.98)
@@ -163,10 +163,12 @@ def process_cluster(cluster: TopicCluster, args):
         plt.ylabel('Score')
 
         x = range(n_video_segments)
-        y_ts15 = flatten(
+        y_ts15_inv = flatten(
             [[seg_score] * (seg[1] - seg[0] + 1) for seg_score, seg in zip(ts15_similarity_mean_inv, segments)])
-        y_ts100 = flatten(
+        y_ts15 = flatten(
             [[seg_score] * (seg[1] - seg[0] + 1) for seg_score, seg in zip(ts15_similarity_mean, segments)])
+        y_ts100 = flatten(
+            [[seg_score] * (seg[1] - seg[0] + 1) for seg_score, seg in zip(ts100_similarity_mean, segments)])
         y_text = flatten(
             [[seg_score] * (seg[1] - seg[0] + 1) for seg_score, seg in zip(text_similarity_mean, segments)])
 
@@ -183,9 +185,10 @@ def process_cluster(cluster: TopicCluster, args):
         plt.vlines(flatten(segments), y_axis_min, y_axis_max, linestyles='dotted', colors='grey')
 
         segment_sp.plot(x, y_final, color='b', linewidth=0.8)
-        segment_sp.plot(x, y_ts15, color='r', linewidth=0.5)
+        segment_sp.plot(x, y_ts15_inv, color='r', linewidth=0.5)
+        segment_sp.plot(x, y_ts15, color='r', linestyle='dashed', linewidth=0.5)
         segment_sp.plot(x, y_ts100, color='g', linewidth=0.5)
-        segment_sp.plot(x, y_text, color='c', linewidth=0.5, linestyle='dashed')
+        segment_sp.plot(x, y_text, color='c', linewidth=0.5)
         plt.xticks(range(0, n_video_segments, 5))
 
         plt.fill_between(x, y_axis_min, y_axis_max, where=(y_final > threshold.numpy()), color='b', alpha=.1)
