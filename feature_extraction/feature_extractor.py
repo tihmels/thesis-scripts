@@ -45,9 +45,10 @@ def extract_milnce_features(stories: [Story], dataset, skip_existing):
     extractor = StoryDataExtractor(stories)
 
     with torch.no_grad():
-        with alive_bar(len(extractor), ctrl_c=False, title=f'MIL-NCE [{dataset}]', length=25, dual_line=True) as bar:
+        with alive_bar(len(extractor), ctrl_c=False, title=f'MIL-NCE [{dataset}]', length=25, dual_line=True,
+                       receipt_text=True) as bar:
             for i in range(len(extractor)):
-                story_pk, segments, sentences = extractor[i]
+                story_pk = stories[i].pk
 
                 bar.text = f'Story: {story_pk}'
 
@@ -55,18 +56,21 @@ def extract_milnce_features(stories: [Story], dataset, skip_existing):
                     bar()
                     continue
 
+                segments, sentences = extractor[i]
+
                 vision_output = mil_nce.signatures['video'](tf.constant(tf.cast(segments, dtype=tf.float32)))
                 segment_features = vision_output['video_embedding'].numpy()
                 mixed_5c = vision_output['mixed_5c'].numpy()
 
-                rai.put_tensor(get_vis_key(story_pk), segment_features)
-                rai.put_tensor(get_m5c_key(story_pk), mixed_5c)
+                if len(segments) > 0:
+                    rai.put_tensor(get_vis_key(story_pk), segment_features)
+                    rai.put_tensor(get_m5c_key(story_pk), mixed_5c)
 
-                if len(sentences) > 0:
-                    text_output = mil_nce.signatures['text'](tf.constant(sentences))
-                    text_features = text_output['text_embedding'].numpy()
+                    if len(sentences) > 0:
+                        text_output = mil_nce.signatures['text'](tf.constant(sentences))
+                        text_features = text_output['text_embedding'].numpy()
 
-                    rai.put_tensor(get_text_key(story_pk), text_features)
+                        rai.put_tensor(get_text_key(story_pk), text_features)
 
                 bar()
 

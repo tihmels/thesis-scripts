@@ -54,4 +54,4 @@ class StoryDataExtractor:
 
         sentences = [self.lt.translate(sentence, 'de', 'en') for sentence in story.sentences]
 
-        return story.pk, segments, sentences
+        return segments, sentences

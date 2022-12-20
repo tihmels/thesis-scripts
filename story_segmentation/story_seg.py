@@ -259,7 +259,7 @@ def preprocess_captions(captions):
     # which is why the banner text is not captured by OCR.
     # we fix this by assuming that this shot belongs to the previous caption.
     for idx, cd in captions.items():
-        if (not cd.text.strip() or cd.confidence < 70) and idx - 1 in captions:
+        if (not cd.text.strip() or cd.confidence < 75) and idx - 1 in captions:
             predecessor = captions[idx - 1]
             captions[idx] = predecessor
 
