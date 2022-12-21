@@ -3,7 +3,6 @@ import matplotlib
 import numpy as np
 import os
 import random
-import seaborn as sns
 import sys
 import torch
 import torch.nn.functional as F
@@ -25,7 +24,7 @@ parser.add_argument('--pseudo_video_dir', type=str, default='')
 
 
 def segment_idx_to_frame_idx(story_start_idx, segment_idx):
-    return story_start_idx + (segment_idx * 2 * 24)
+    return story_start_idx + (segment_idx * 2 * 32)
 
 
 def segment_to_frame_range(story_start_idx, first_segment_idx: int, last_segment_idx: int = None):

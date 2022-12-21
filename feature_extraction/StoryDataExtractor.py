@@ -26,7 +26,7 @@ def load_frames(frame_paths, dataset, resize=IMAGE_SHAPE):
 
 
 class StoryDataExtractor:
-    def __init__(self, stories: [Story], dataset, window=24):
+    def __init__(self, stories: [Story], dataset, window=32):
         self.stories = stories
         self.window = window
         self.dataset = dataset
