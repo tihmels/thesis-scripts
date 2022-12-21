@@ -35,14 +35,14 @@ parser.add_argument('--ts15', action='store_true')
 parser.add_argument('--ts100', action='store_true')
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
-topic_model = SentenceTransformer('all-mpnet-base-v2')
+# topic_model = SentenceTransformer('all-mpnet-base-v2')
 
 mil_nce_module = 'https://tfhub.dev/deepmind/mil-nce/s3d/1'
 mil_nce = hub.load(mil_nce_module)
 
 
 def extract_milnce_features(stories: [Story], dataset, skip_existing):
-    extractor = StoryDataExtractor(stories)
+    extractor = StoryDataExtractor(stories, dataset)
 
     with torch.no_grad():
         with alive_bar(len(extractor), ctrl_c=False, title=f'MIL-NCE [{dataset}]', length=25, dual_line=True,
@@ -58,11 +58,11 @@ def extract_milnce_features(stories: [Story], dataset, skip_existing):
 
                 segments, sentences = extractor[i]
 
-                vision_output = mil_nce.signatures['video'](tf.constant(tf.cast(segments, dtype=tf.float32)))
-                segment_features = vision_output['video_embedding'].numpy()
-                mixed_5c = vision_output['mixed_5c'].numpy()
-
                 if len(segments) > 0:
+                    vision_output = mil_nce.signatures['video'](tf.constant(tf.cast(segments, dtype=tf.float32)))
+                    segment_features = vision_output['video_embedding'].numpy()
+                    mixed_5c = vision_output['mixed_5c'].numpy()
+
                     rai.put_tensor(get_vis_key(story_pk), segment_features)
                     rai.put_tensor(get_m5c_key(story_pk), mixed_5c)
 

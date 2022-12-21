@@ -16,19 +16,20 @@ def crop_center_square(frame):
     return frame[start_y:start_y + min_dim, start_x:start_x + min_dim]
 
 
-def load_frames(frame_paths, resize=IMAGE_SHAPE):
-    frames = [crop_center_square(frame) for frame in read_images(frame_paths)]
-    frames = [cv2.resize(frame, resize) for frame in frames]
+# Maybe try for optimal resizing: https://github.com/sayakpaul/Learnable-Image-Resizing
+def load_frames(frame_paths, dataset, resize=IMAGE_SHAPE):
+    frames = [frame for frame in read_images(frame_paths)]
+    frames = [frame[:224, :] for frame in frames]
+    frames = [cv2.resize(frame, resize, interpolation=cv2.INTER_AREA) for frame in frames]
 
-    frames = np.array(frames)
-
-    return frames / 255.0
+    return np.array(frames) / 255.0
 
 
 class StoryDataExtractor:
-    def __init__(self, stories: [Story], window=1):
+    def __init__(self, stories: [Story], dataset, window=24):
         self.stories = stories
         self.window = window
+        self.dataset = dataset
         self.lt = LibreTranslateAPI("http://127.0.0.1:5005")
 
     def __len__(self):
@@ -37,9 +38,9 @@ class StoryDataExtractor:
     def __getitem__(self, idx):
         story = self.stories[idx]
 
-        frames = load_frames(story.frames[::3])
+        frames = load_frames(story.frames[::2], self.dataset)
 
-        window_len = 24
+        window_len = self.window
 
         while len(frames) % window_len != 0:
             extra_frames = window_len - (len(frames) % window_len)
@@ -52,6 +53,7 @@ class StoryDataExtractor:
 
         segments = np.reshape(frames, (n_segments, window_len, frames.shape[1], frames.shape[2], 3))
 
-        sentences = [self.lt.translate(sentence, 'de', 'en') for sentence in story.sentences]
+        # sentences = [self.lt.translate(sentence, 'de', 'en') for sentence in story.sentences]
+        sentences = []
 
         return segments, sentences

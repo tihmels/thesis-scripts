@@ -480,7 +480,7 @@ class VSum(nn.Module):
     ) -> None:
         super(VSum, self).__init__()
         self.base_model = S3D(
-            num_classes, space_to_depth=True, word2vec_path=word2vec_path, init=init,
+            num_classes, space_to_depth=space_to_depth, word2vec_path=word2vec_path, init=init,
         )
         self.d_model = d_model
         self.pos_enc = PositionalEncoding(self.d_model, dropout)
