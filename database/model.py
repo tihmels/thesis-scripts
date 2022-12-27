@@ -21,7 +21,8 @@ class EmbeddedBaseModel(BaseModel, ABC):
 
 
 class Banner(EmbeddedBaseModel):
-    text: str
+    headline: str
+    subheadline: str
     confidence: int
 
 
@@ -48,7 +49,7 @@ class ShortShot(Shot):
 
 
 class Story(EmbeddedBaseModel):
-    headline: str
+    headline: str = Field(index=True)
     video: str = Field(index=True)
     type: str = Field(index=True)
     first_frame_idx: int
@@ -58,7 +59,8 @@ class Story(EmbeddedBaseModel):
     duration: datetime.time
     frames: List[str]
     shots: List[Shot]
-    sentences: List[str]
+    sentences_de: List[str]
+    sentences_en: List[str]
 
     class Meta:
         model_key_prefix = 'story'

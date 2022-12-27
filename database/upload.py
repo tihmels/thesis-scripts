@@ -1,6 +1,7 @@
 #!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
 
 import argparse
+from libretranslatepy import LibreTranslateAPI
 from pathlib import Path
 from redis_om import Migrator
 
@@ -15,6 +16,8 @@ parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs=
 parser.add_argument('--reset', action='store_true')
 args = parser.parse_args()
 
+lt = LibreTranslateAPI("http://127.0.0.1:5005")
+
 
 def create_video_data(vao: VAO):
     transcripts = [Transcript(from_time=transcript.start,
@@ -26,7 +29,8 @@ def create_video_data(vao: VAO):
         if vao.is_nightly_version:
             return None
 
-        banners = [Banner(text=banner.text, confidence=banner.confidence) for banner in vao.data.banners]
+        banners = [Banner(headline=banner.headline, subheadline=banner.subline, confidence=banner.confidence)
+                   for banner in vao.data.banners]
 
         shots = [ShortShot(first_frame_idx=shot.first_frame_idx,
                            last_frame_idx=shot.last_frame_idx,
@@ -46,8 +50,10 @@ def create_video_data(vao: VAO):
                              microsecond=0),
                          frames=[str(frame) for frame in vao.data.frames[story.first_frame_idx:story.last_frame_idx]],
                          shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx + 1)],
-                         sentences=vao.data.get_story_sentences(idx)).save() for idx, story in
-                   enumerate(vao.data.stories)]
+                         sentences_de=vao.data.get_story_sentences(idx),
+                         sentences_en=[lt.translate(sent, 'de', 'en') for sent in
+                                       vao.data.get_story_sentences(idx)]).save() for
+                   idx, story in enumerate(vao.data.stories)]
 
         video = ShortVideo(pk=str(vao.id),
                            path=str(vao.path),
@@ -66,10 +72,6 @@ def create_video_data(vao: VAO):
                           transcript=get_text(vao.data.get_shot_transcripts(idx)),
                           type=shot.type) for idx, shot in enumerate(vao.data.shots)]
 
-        # keywords=[kw[0] for kw in kw_model.extract_keywords(
-        #                              get_text(vao.data.get_shot_transcripts(story.first_shot_idx, story.last_shot_idx)),
-        #                              vectorizer=vectorizer, use_maxsum=True, nr_candidates=20, top_n=5)]
-
         stories = [Story(headline=vao.data.topics[story.ref_idx],
                          video=str(vao.path),
                          type='ts15',
@@ -81,7 +83,9 @@ def create_video_data(vao: VAO):
                          .replace(microsecond=0),
                          frames=[str(frame) for frame in vao.data.frames[story.first_frame_idx:story.last_frame_idx]],
                          shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx + 1)],
-                         sentences=vao.data.get_story_sentences(idx)).save()
+                         sentences_de=vao.data.get_story_sentences(idx),
+                         sentences_en=[lt.translate(sent, 'de', 'en') for sent in
+                                       vao.data.get_story_sentences(idx)]).save()
                    for idx, story in enumerate(vao.data.stories)]
 
         video = MainVideo(pk=str(vao.id),

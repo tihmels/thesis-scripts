@@ -3,7 +3,6 @@
 import os
 import torch
 from redis_om import Migrator
-from sentence_transformers import SentenceTransformer
 
 from database import rai
 from database.config import RAI_TOPIC_PREFIX, get_vis_key, \
