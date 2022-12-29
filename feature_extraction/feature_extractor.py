@@ -35,7 +35,8 @@ parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
 
 print('Loading Models ...')
-embedder = SentenceTransformer('T-Systems-onsite/cross-en-de-roberta-sentence-transformer')
+topic_model = 'all-mpnet-base-v2'
+embedder = SentenceTransformer(topic_model)
 
 mil_nce_mod = 'https://tfhub.dev/deepmind/mil-nce/s3d/1'
 mil_nce = hub.load(mil_nce_mod)
@@ -91,7 +92,7 @@ def alive_action(videos, actions, skip_existing):
             for video in videos:
 
                 for idx, story in enumerate(video.stories):
-                    bar.text = f'[{video.Meta.model_key_prefix}] {video.pk} {idx + 1}/{len(video.stories)}'
+                    bar.text = f'[{video.Meta.model_key_prefix}] {story.pk}'
                     handler(story, skip_existing)
 
                 bar()
