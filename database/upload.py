@@ -1,13 +1,14 @@
 #!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
-
 import argparse
+from datetime import timedelta, datetime
 from libretranslatepy import LibreTranslateAPI
 from pathlib import Path
 from redis_om import Migrator
+from ulid import ULID
 
 from common.DataModel import get_text
 from common.VAO import get_date_time, VAO
-from common.utils import frame_idx_to_time
+from common.utils import frame_idx_to_time, frame_idx_to_sec
 from database import db
 from database.model import Banner, Story, ShortVideo, ShortShot, MainShot, Transcript, MainVideo, VideoRef
 
@@ -19,15 +20,19 @@ args = parser.parse_args()
 lt = LibreTranslateAPI("http://127.0.0.1:5005")
 
 
+def deter_ulid(start: datetime, index: int):
+    dt = start + timedelta(seconds=frame_idx_to_sec(index))
+    return str(ULID.from_datetime(dt))
+
+
 def create_video_data(vao: VAO):
+    video_pk = str(vao.id)
+
     transcripts = [Transcript(from_time=transcript.start,
                               to_time=transcript.end,
-                              text=transcript.text) for transcript in vao.data.transcripts]
+                              text=transcript.text.strip()) for transcript in vao.data.transcripts]
 
     if vao.is_summary:
-
-        if vao.is_nightly_version:
-            return None
 
         banners = [Banner(headline=banner.headline, subheadline=banner.subline, confidence=banner.confidence)
                    for banner in vao.data.banners]
@@ -39,9 +44,11 @@ def create_video_data(vao: VAO):
                            transcript=get_text(vao.data.get_shot_transcripts(idx)),
                            banner=banner) for idx, (shot, banner) in enumerate(zip(vao.data.shots, banners))]
 
-        stories = [Story(headline=story.headline,
+        stories = [Story(pk=deter_ulid(vao.date, story.first_frame_idx),
+                         headline=story.headline,
                          video=str(vao.path),
                          type='ts100',
+                         is_nightly=vao.is_nightly_version,
                          first_frame_idx=story.first_frame_idx,
                          last_frame_idx=story.last_frame_idx,
                          start=frame_idx_to_time(story.first_frame_idx),
@@ -55,10 +62,11 @@ def create_video_data(vao: VAO):
                                        vao.data.get_story_sentences(idx)]).save() for
                    idx, story in enumerate(vao.data.stories)]
 
-        video = ShortVideo(pk=str(vao.id),
+        video = ShortVideo(pk=video_pk,
                            path=str(vao.path),
                            date=vao.date.date(),
                            time=vao.date.time(),
+                           is_nightly=vao.is_nightly_version,
                            duration=vao.duration,
                            timestamp=vao.date.timestamp(),
                            shots=shots,
@@ -72,7 +80,8 @@ def create_video_data(vao: VAO):
                           transcript=get_text(vao.data.get_shot_transcripts(idx)),
                           type=shot.type) for idx, shot in enumerate(vao.data.shots)]
 
-        stories = [Story(headline=vao.data.topics[story.ref_idx],
+        stories = [Story(pk=deter_ulid(vao.date, story.first_frame_idx),
+                         headline=vao.data.topics[story.ref_idx],
                          video=str(vao.path),
                          type='ts15',
                          first_frame_idx=story.first_frame_idx,
@@ -88,7 +97,7 @@ def create_video_data(vao: VAO):
                                        vao.data.get_story_sentences(idx)]).save()
                    for idx, story in enumerate(vao.data.stories)]
 
-        video = MainVideo(pk=str(vao.id),
+        video = MainVideo(pk=video_pk,
                           path=str(vao.path),
                           date=vao.date.date(),
                           time=vao.date.time(),

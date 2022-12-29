@@ -52,6 +52,7 @@ class Story(EmbeddedBaseModel):
     headline: str = Field(index=True)
     video: str = Field(index=True)
     type: str = Field(index=True)
+    is_nightly: Optional[int]
     first_frame_idx: int
     last_frame_idx: int
     start: datetime.time
@@ -68,7 +69,6 @@ class Story(EmbeddedBaseModel):
 
 class TopicCluster(BaseModel):
     index: int = Field(index=True, sortable=True)
-    features: int = Field(index=True, default=0)
     keywords: List[str]
 
     n_ts15: int
@@ -106,11 +106,14 @@ class MainVideo(VideoBaseModel):
 
 class VideoRef(EmbeddedBaseModel):
     ref_pk: str = Field(index=True)
+
     temp_dist: int = Field(index=True, sortable=True)
     similarity: int = Field(index=True, sortable=True, default=-1)
 
 
 class ShortVideo(VideoBaseModel):
+    is_nightly: int
+
     pre_main: Optional[VideoRef]
     suc_main: Optional[VideoRef]
 

@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-from libretranslatepy import LibreTranslateAPI
 
 from common.utils import read_images
 from database.model import Story
@@ -17,7 +16,7 @@ def crop_center_square(frame):
 
 
 # Maybe try for optimal resizing: https://github.com/sayakpaul/Learnable-Image-Resizing
-def load_frames(frame_paths, dataset, resize=IMAGE_SHAPE):
+def load_frames(frame_paths, resize=IMAGE_SHAPE):
     frames = [frame for frame in read_images(frame_paths)]
     frames = [frame[:224, :] for frame in frames]
     frames = [cv2.resize(frame, resize, interpolation=cv2.INTER_AREA) for frame in frames]
@@ -26,19 +25,12 @@ def load_frames(frame_paths, dataset, resize=IMAGE_SHAPE):
 
 
 class StoryDataExtractor:
-    def __init__(self, stories: [Story], dataset, window=32):
-        self.stories = stories
+    def __init__(self, skip_n=2, window=32):
+        self.skip_n = skip_n
         self.window = window
-        self.dataset = dataset
-        self.lt = LibreTranslateAPI("http://127.0.0.1:5005")
 
-    def __len__(self):
-        return len(self.stories)
-
-    def __getitem__(self, idx):
-        story = self.stories[idx]
-
-        frames = load_frames(story.frames[::2], self.dataset)
+    def extract_data(self, story: Story):
+        frames = load_frames(story.frames[::self.skip_n])
 
         window_len = self.window
 
@@ -53,7 +45,4 @@ class StoryDataExtractor:
 
         segments = np.reshape(frames, (n_segments, window_len, frames.shape[1], frames.shape[2], 3))
 
-        # sentences = [self.lt.translate(sentence, 'de', 'en') for sentence in story.sentences]
-        sentences = []
-
-        return segments, sentences
+        return segments, story.sentences_en
