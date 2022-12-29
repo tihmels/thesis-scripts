@@ -13,7 +13,7 @@ class BannerData:
         return ' '.join([self.headline, self.subline]) if self.subline else self.headline
 
 
-@dataclass
+@dataclass(frozen=True)
 class TranscriptData:
     start: datetime.time
     end: datetime.time
@@ -22,7 +22,7 @@ class TranscriptData:
 
 
 def get_text(tds: [TranscriptData]):
-    return ' '.join([td.text for td in tds])
+    return ' '.join([td.text.strip() for td in tds])
 
 
 @dataclass

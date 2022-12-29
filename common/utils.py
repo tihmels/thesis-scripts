@@ -34,7 +34,7 @@ def frame_idx_to_sec(idx, fps=25):
     return idx / fps
 
 
-def range_intersect(r1: Range, r2: Range):
+def range_overlap(r1: Range, r2: Range):
     latest_start = max(r1.start, r2.start)
     earliest_end = min(r1.end, r2.end)
     delta = (earliest_end - latest_start).total_seconds()

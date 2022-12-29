@@ -14,7 +14,7 @@ from common.Schemas import SHOT_COLUMNS, BANNER_COLUMNS, STORY_COLUMNS, TRANSCRI
 from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT_AUDIO_FILENAME_RE, \
     STORY_TRANSCRIPT_FILENAME_RE, AUDIO_DIR, FRAME_DIR, KF_DIR, TRANSCRIPT_DIR, SM_DIR, TOPICS_FILENAME, \
     CAPTIONS_FILENAME, SHOT_CLASS_FILENAME, SHOT_FILENAME, TRANSCRIPT_FILENAME, STORY_FILENAME, TS_LOGO
-from common.utils import frame_idx_to_time, time_to_datetime, Range, range_intersect
+from common.utils import frame_idx_to_time, time_to_datetime, Range, range_overlap
 
 nltk.download('punkt')
 
@@ -121,27 +121,29 @@ class VAO:
             return read_transcript_from_file(get_main_transcript_file(self._path))
 
         def get_shot_transcripts(self, from_shot_idx, to_shot_idx=None) -> [TranscriptData]:
-            from_shot = self.shots[from_shot_idx]
-            to_shot = self.shots[to_shot_idx] if to_shot_idx else self.shots[from_shot_idx]
+            to_shot_idx = to_shot_idx if to_shot_idx else from_shot_idx
 
-            from_time, to_time = frame_idx_to_time(from_shot.first_frame_idx), frame_idx_to_time(to_shot.last_frame_idx)
+            transcripts = []
 
-            from_time = time_to_datetime(from_time)
-            to_time = time_to_datetime(to_time)
+            for shot in self.shots[from_shot_idx:to_shot_idx + 1]:
+                from_time, to_time = frame_idx_to_time(shot.first_frame_idx), frame_idx_to_time(shot.last_frame_idx)
+                from_time, to_time = time_to_datetime(from_time), time_to_datetime(to_time)
 
-            transcripts = [trans for trans in self.transcripts if
-                           range_intersect(Range(start=from_time, end=to_time),
-                                           Range(time_to_datetime(trans.start), time_to_datetime(trans.end))) >= 0.6 * (
-                                   time_to_datetime(trans.end) - time_to_datetime(trans.start)).total_seconds()]
+                shot_trans = [trans for trans in self.transcripts if
+                              range_overlap(Range(from_time, to_time),
+                                            Range(time_to_datetime(trans.start), time_to_datetime(trans.end))) >=
+                              0.5 * (time_to_datetime(trans.end) - time_to_datetime(trans.start)).total_seconds()]
 
-            return transcripts
+                transcripts.extend(shot_trans)
+
+            return list(dict.fromkeys(transcripts))
 
         def get_story_sentences(self, story_idx) -> [str]:
             story = self.stories[story_idx]
 
             transcripts = self.get_shot_transcripts(story.first_shot_idx, story.last_shot_idx)
 
-            text = ' '.join([transcript.text for transcript in transcripts])
+            text = ' '.join([transcript.text.strip() for transcript in transcripts])
             sentences = nltk.sent_tokenize(text, language='german')
 
             return sentences
@@ -340,3 +342,9 @@ def read_shots_from_file(file: Path) -> [ShotData]:
 def read_topics_from_file(file: Path) -> [str]:
     df = pd.read_csv(file, header=None, keep_default_na=False, decimal=',', usecols=[1])
     return [topic.strip() for sublist in df.values.tolist() for topic in sublist]
+
+
+vao = VAO(Path('/Users/tihmels/TS/ts100/TV-20220614-0811-1700'))
+trans = vao.data.get_story_sentences(0)
+
+print()

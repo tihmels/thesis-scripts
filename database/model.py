@@ -55,6 +55,7 @@ class Story(EmbeddedBaseModel):
     is_nightly: Optional[int]
     first_frame_idx: int
     last_frame_idx: int
+    timestamp: int
     start: datetime.time
     end: datetime.time
     duration: datetime.time

@@ -20,9 +20,9 @@ args = parser.parse_args()
 lt = LibreTranslateAPI("http://127.0.0.1:5005")
 
 
-def deter_ulid(start: datetime, index: int):
-    dt = start + timedelta(seconds=frame_idx_to_sec(index))
-    return str(ULID.from_datetime(dt))
+def get_story_pk(video_pk: str, story_idx: int):
+    suffix = "{:02d}".format(story_idx)
+    return video_pk + "-" + suffix
 
 
 def create_video_data(vao: VAO):
@@ -44,7 +44,7 @@ def create_video_data(vao: VAO):
                            transcript=get_text(vao.data.get_shot_transcripts(idx)),
                            banner=banner) for idx, (shot, banner) in enumerate(zip(vao.data.shots, banners))]
 
-        stories = [Story(pk=deter_ulid(vao.date, story.first_frame_idx),
+        stories = [Story(pk=get_story_pk(video_pk, idx),
                          headline=story.headline,
                          video=str(vao.path),
                          type='ts100',
@@ -53,6 +53,7 @@ def create_video_data(vao: VAO):
                          last_frame_idx=story.last_frame_idx,
                          start=frame_idx_to_time(story.first_frame_idx),
                          end=frame_idx_to_time(story.last_frame_idx),
+                         timestamp=(vao.date + timedelta(seconds=frame_idx_to_sec(story.first_frame_idx))).timestamp(),
                          duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx).replace(
                              microsecond=0),
                          frames=[str(frame) for frame in vao.data.frames[story.first_frame_idx:story.last_frame_idx]],
@@ -80,7 +81,7 @@ def create_video_data(vao: VAO):
                           transcript=get_text(vao.data.get_shot_transcripts(idx)),
                           type=shot.type) for idx, shot in enumerate(vao.data.shots)]
 
-        stories = [Story(pk=deter_ulid(vao.date, story.first_frame_idx),
+        stories = [Story(pk=get_story_pk(video_pk, idx),
                          headline=vao.data.topics[story.ref_idx],
                          video=str(vao.path),
                          type='ts15',
@@ -88,6 +89,7 @@ def create_video_data(vao: VAO):
                          last_frame_idx=story.last_frame_idx,
                          start=frame_idx_to_time(story.first_frame_idx),
                          end=frame_idx_to_time(story.last_frame_idx),
+                         timestamp=(vao.date + timedelta(seconds=frame_idx_to_sec(story.first_frame_idx))).timestamp(),
                          duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx)
                          .replace(microsecond=0),
                          frames=[str(frame) for frame in vao.data.frames[story.first_frame_idx:story.last_frame_idx]],
