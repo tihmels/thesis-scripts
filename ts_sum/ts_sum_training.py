@@ -16,14 +16,35 @@ parser.add_argument("--num_class", type=int, default=512, help="upper epoch limi
 parser.add_argument("--word2vec_path", type=str, default="", help="")
 parser.add_argument("--weight_init", type=str, default="uniform", help="CNN weights inits")
 parser.add_argument("--dropout", "--dropout", default=0.1, type=float, help="Dropout")
+parser.add_argument("--min_time", type=float, default=5.0, help="")
+parser.add_argument("--fps", type=int, default=12, help="")
 parser.add_argument("--heads", "-heads", default=8, type=int, help="number of transformer heads")
 parser.add_argument("--finetune", dest="finetune", action="store_true", help="finetune S3D")
+parser.add_argument("--video_size", type=int, default=224, help="image size")
+parser.add_argument("--crop_only", type=int, default=1, help="random seed")
+parser.add_argument("--centercrop", type=int, default=0, help="random seed")
+parser.add_argument("--random_flip", type=int, default=1, help="random seed")
+parser.add_argument(
+    "--num_candidates", type=int, default=1, help="num candidates for MILNCE loss"
+)
 parser.add_argument(
     "--enc_layers",
     "-enc_layers",
     default=24,
     type=int,
     help="number of layers in transformer encoder",
+)
+parser.add_argument(
+    "--num_frames",
+    type=int,
+    default=896,
+    help="number of frames in each video clip",
+)
+parser.add_argument(
+    "--num_frames_per_segment",
+    type=int,
+    default=32,
+    help="number of frames in each segment",
 )
 
 
@@ -42,9 +63,6 @@ def main(args):
     model = torch.nn.DataParallel(model)
 
     train_dataset = VSum_DataLoader(
-        annt_path=args.annt_path,
-        video_root=args.video_root,
-        caption_root=args.caption_root,
         min_time=args.min_time,
         fps=args.fps,
         num_frames=args.num_frames,
@@ -58,9 +76,6 @@ def main(args):
     )
     # Test data loading code
     test_dataset = VSum_DataLoader(
-        annt_path=args.eval_annt_path,
-        video_root=args.eval_video_root,
-        caption_root=args.caption_root,
         min_time=args.min_time,
         fps=args.fps,
         num_frames=args.num_frames,

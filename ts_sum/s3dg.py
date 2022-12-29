@@ -185,7 +185,7 @@ class Sentence_Embedding(nn.Module):
     ):
         super(Sentence_Embedding, self).__init__()
         if word2vec_path:
-            self.word_embd = nn.Embedding.from_pretrained(torch.load(word2vec_path))
+            self.word_embd = nn.Embedding.from_pretrained(torch.load(word2vec_path, map_location='cpu'))
         else:
             self.word_embd = nn.Embedding(num_embeddings, word_embedding_dim)
         self.fc1 = nn.Linear(word_embedding_dim, output_dim)
@@ -301,7 +301,7 @@ class S3D(nn.Module):
         self.text_module = Sentence_Embedding(
             num_classes,
             os.path.join(os.path.dirname(__file__), token_to_word_path),
-            word2vec_path=os.path.join(os.path.dirname(__file__), word2vec_path),
+            word2vec_path=word2vec_path,
         )
 
         if init == "kaiming_normal":
@@ -482,8 +482,10 @@ class VSum(nn.Module):
         self.base_model = S3D(
             num_classes, space_to_depth=space_to_depth, word2vec_path=word2vec_path, init=init,
         )
+
         self.d_model = d_model
         self.pos_enc = PositionalEncoding(self.d_model, dropout)
+
         encoder_layers = nn.TransformerEncoderLayer(
             d_model=self.d_model, nhead=heads, dropout=dropout
         )

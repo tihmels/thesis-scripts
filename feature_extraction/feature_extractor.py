@@ -35,7 +35,7 @@ parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
 
 print('Loading Models ...')
-embedder = SentenceTransformer('all-mpnet-base-v2')
+embedder = SentenceTransformer('T-Systems-onsite/cross-en-de-roberta-sentence-transformer')
 
 mil_nce_mod = 'https://tfhub.dev/deepmind/mil-nce/s3d/1'
 mil_nce = hub.load(mil_nce_mod)
@@ -73,7 +73,7 @@ def extract_topic_features(story: Story, skip_existing):
 
     embedding = embedder.encode(story.headline)
 
-    rai.put_tensor(RAI_TOPIC_PREFIX + story.pk, embedding)
+    rai.put_tensor(get_topic_key(story.pk), embedding)
 
 
 action_map = {

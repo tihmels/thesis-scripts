@@ -342,9 +342,3 @@ def read_shots_from_file(file: Path) -> [ShotData]:
 def read_topics_from_file(file: Path) -> [str]:
     df = pd.read_csv(file, header=None, keep_default_na=False, decimal=',', usecols=[1])
     return [topic.strip() for sublist in df.values.tolist() for topic in sublist]
-
-
-vao = VAO(Path('/Users/tihmels/TS/ts100/TV-20220614-0811-1700'))
-trans = vao.data.get_story_sentences(0)
-
-print()

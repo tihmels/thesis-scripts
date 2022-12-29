@@ -1,16 +1,16 @@
-import json
+import numpy as np
 import os
+import pandas as pd
 import random
 import re
-
-import numpy as np
-import pandas as pd
 import torch
 import torchvision.io as io
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 
-from database.model import MainVideo
+from database import rai, db
+from database.config import get_sum_key
+from database.model import Story
 
 
 class VSum_DataLoader(Dataset):
@@ -18,16 +18,13 @@ class VSum_DataLoader(Dataset):
 
     def __init__(
             self,
-            annt_path,
-            video_root="",
-            caption_root="",
             min_time=4.0,
             fps=12,
             num_frames=832,
-            num_frames_per_segment=24,
+            num_frames_per_segment=32,
             size=224,
             crop_only=False,
-            center_crop=True,
+            center_crop=False,
             benchmark=False,
             token_to_word_path="data/dict.npy",
             max_words=20,
@@ -36,53 +33,40 @@ class VSum_DataLoader(Dataset):
             video_only=False,
             dataset="pseudo",
     ):
-        """
-        Args:
-        """
         assert isinstance(size, int)
 
-        self.videos = MainVideo.find
-
-        with open(annt_path) as f:
-            self.annts = json.load(f)
-
-        self.video_root = video_root
-        self.videos = [
-            x
-            for x in sorted(os.listdir(self.video_root))
-            if x.split(".")[0] in self.annts.keys() and not x.startswith(".")
-        ]
-        self.caption_root = caption_root
         self.min_time = min_time
-        self.size = size
-        self.num_frames = num_frames
-        self.num_frames_per_segment = num_frames_per_segment
         self.fps = fps
+        self.num_frames = num_frames
         self.num_sec = self.num_frames / float(self.fps)
+        self.num_frames_per_segment = num_frames_per_segment
+        self.size = size
         self.crop_only = crop_only
         self.center_crop = center_crop
         self.benchmark = benchmark
         self.max_words = max_words
+        self.num_candidates = num_candidates
+        self.random_flip = random_left_right_flip
         self.video_only = video_only
+        self.dataset = dataset
+
+        self.stories = Story.find(Story.type == 'ts15').all()
+        self.stories = [story for story in self.stories if db.List(get_sum_key(story.pk))]
+
         token_to_word = np.load(
             os.path.join(os.path.dirname(__file__), token_to_word_path)
         )
+
         self.word_to_token = {}
         for i, t in enumerate(token_to_word):
             self.word_to_token[t] = i + 1
-        self.num_candidates = num_candidates
-        self.random_flip = random_left_right_flip
-        self.dataset = dataset
 
         pos = 0
         neg = 0
-        for v in self.videos:
-            if self.dataset == "wikihow":
-                labels = self.annts[v.split(".")[0]]
-            else:
-                labels = self.annts[v.split(".")[0]]["machine_summary"]
-            pos += np.count_nonzero(np.asarray(labels))
-            neg += len(labels) - np.count_nonzero(np.asarray(labels))
+
+        labels = [db.List(get_sum_key(story.pk)) for story in self.stories] # or db.get()
+        pos += np.count_nonzero(np.asarray(labels))
+        neg += len(labels) - np.count_nonzero(np.asarray(labels))
 
         print("Pos neg: ", pos, neg)
         self.ce_weight = torch.tensor(
@@ -90,7 +74,7 @@ class VSum_DataLoader(Dataset):
         )
 
     def __len__(self):
-        return len(self.videos)
+        return len(self.stories)
 
     def _get_video(self, video_path, start_seek, time):
         # cmd = ffmpeg.input(video_path, ss=start_seek, t=time).filter(

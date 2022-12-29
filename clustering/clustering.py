@@ -1,4 +1,7 @@
 # !/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
+import os
+
+import logging
 from collections import defaultdict
 
 import hdbscan
@@ -6,7 +9,6 @@ import numpy as np
 import pandas as pd
 import random
 import sys
-import umap
 from hyperopt import Trials, partial, fmin, tpe, space_eval, STATUS_OK, hp
 # matplotlib.use('TkAgg')
 from nltk.corpus import stopwords
@@ -14,9 +16,15 @@ from redis_om import Migrator
 from sklearn.feature_extraction.text import CountVectorizer
 from tqdm import trange
 
+from common.utils import set_tf_loglevel
 from database import rai
 from database.config import get_topic_key
 from database.model import MainVideo, TopicCluster, ShortVideo
+
+set_tf_loglevel(logging.FATAL)
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
+import umap
 
 german_stop_words = stopwords.words('german')
 
