@@ -17,7 +17,7 @@ matplotlib.use('TkAgg')
 
 from common.utils import read_images, create_dir, flatten
 from database import rai, db
-from database.config import RAI_TEXT_PREFIX, get_vis_key
+from database.config import RAI_TEXT_PREFIX, get_vis_key, get_sum_key, get_score_key
 from database.model import TopicCluster, Story
 
 parser = argparse.ArgumentParser('Pseudo Summary Generation')
@@ -252,8 +252,8 @@ def process_cluster(cluster: TopicCluster, args):
                 25,
             )
 
-        redis_summary = db.List('pseudo:summary:' + story.pk)
-        redis_scores = db.List('pseudo:scores:' + story.pk)
+        redis_summary = db.List(get_sum_key(story.pk))
+        redis_scores = db.List(get_score_key(story.pk))
 
         redis_summary.extend(machine_summary.tolist())
         redis_scores.extend(machine_summary_scores.tolist())
