@@ -40,7 +40,7 @@ def get_text_similarity_matrix(story: Story, segment_features):
         # text_features = F.normalize(text_features, dim=1)
 
         text_similarity_matrix = torch.matmul(segment_features, text_features.t())
-        text_similarity_matrix = cosine_similarity(segment_features, text_features.t())
+        # text_similarity_matrix = cosine_similarity(segment_features, text_features.t())
 
         return text_similarity_matrix
 
@@ -90,9 +90,9 @@ def extract_segment_features(story: Story, cossim=False, sim_thresh=0.85):
 
             moving_avg_count = 1
 
-    if moving_avg_count > 1:
-        story_segments[-1] = (story_segments[-1][0], len(visual_segment_features) - 1)
-        story_segment_features.append(ref_segment_feature)
+
+    story_segments[-1] = (story_segments[-1][0], len(visual_segment_features) - 1)
+    story_segment_features.append(ref_segment_feature)
 
     assert story_segment_count == len(story_segments)
 
@@ -100,8 +100,8 @@ def extract_segment_features(story: Story, cossim=False, sim_thresh=0.85):
 
 
 def process_cluster(cluster: TopicCluster, args):
-    ts15_stories = cluster.ts15s
-    ts100_stories = cluster.ts100s
+    ts15_stories = [story for story in cluster.ts15s if rai.tensor_exists(get_vis_key(story.pk))]
+    ts100_stories = [story for story in cluster.ts100s if rai.tensor_exists(get_vis_key(story.pk))]
 
     print(f'Keywords: {cluster.keywords[:5]}')
     print(f'{len(ts15_stories)} ts15')
@@ -156,14 +156,14 @@ def process_cluster(cluster: TopicCluster, args):
             continue
 
         ts15_similarity_matrix = torch.matmul(segment_features, all_segment_features.t())
-        ts15_similarity_matrix = cosine_similarity(segment_features, all_segment_features.t())
+        # ts15_similarity_matrix = cosine_similarity(segment_features, all_segment_features.t())
         ts15_similarity_sorted = ts15_similarity_matrix.sort(descending=True).values[:, :len(ts15_stories)]
         ts15_similarity_mean = ts15_similarity_matrix.mean(axis=1)
         ts15_similarity_mean_inv = ts15_similarity_mean
         # ts15_similarity_mean_inv = F.normalize(1 - ts15_similarity_mean, dim=0)
 
         ts100_similarity_matrix = torch.matmul(segment_features, ts100_segment_features.t())
-        ts100_similarity_matrix = cosine_similarity(segment_features, ts100_segment_features.t())
+        # ts100_similarity_matrix = cosine_similarity(segment_features, ts100_segment_features.t())
         ts100_similarity_sorted = ts100_similarity_matrix.sort(descending=True).values[:, :len(ts100_stories)]
         ts100_similarity_mean = ts15_similarity_matrix.mean(axis=1)
         # ts100_similarity_mean = F.normalize(ts100_similarity_mean, dim=0)
