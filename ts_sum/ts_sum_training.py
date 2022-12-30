@@ -1,5 +1,9 @@
+from logging import Logger
+
+import os
 import random
 import torch
+import torch.nn as nn
 import torch.nn.parallel
 import torch.optim
 import torch.utils.data
@@ -12,6 +16,7 @@ from ts_sum.video_loader import VSum_DataLoader
 parser = ArgumentParser('Setup RedisAI DB')
 parser.add_argument("--seed", default=1, type=int, help="seed for initializing training.")
 parser.add_argument("--model_type", "-m", default=1, type=int, help="(1) VSum_Trans (2) VSum_MLP")
+parser.add_argument("--optimizer", type=str, default="adam", choices=['adam', 'sgd'], help="opt algorithm")
 parser.add_argument("--num_class", type=int, default=512, help="upper epoch limit")
 parser.add_argument("--word2vec_path", type=str, default="", help="")
 parser.add_argument("--weight_init", type=str, default="uniform", help="CNN weights inits")
@@ -24,6 +29,15 @@ parser.add_argument("--video_size", type=int, default=224, help="image size")
 parser.add_argument("--crop_only", type=int, default=1, help="random seed")
 parser.add_argument("--centercrop", type=int, default=0, help="random seed")
 parser.add_argument("--random_flip", type=int, default=1, help="random seed")
+parser.add_argument("--batch_size", type=int, default=16, help="batch size")
+parser.add_argument("--num_thread_reader", type=int, default=20, help="")
+parser.add_argument("--rank", default=0, type=int, help="Rank.")
+parser.add_argument(
+    "--batch_size_eval", type=int, default=16, help="batch size eval"
+)
+parser.add_argument(
+    "--pin_memory", dest="pin_memory", action="store_true", help="use pin_memory"
+)
 parser.add_argument(
     "--num_candidates", type=int, default=1, help="num candidates for MILNCE loss"
 )
@@ -46,6 +60,69 @@ parser.add_argument(
     default=32,
     help="number of frames in each segment",
 )
+parser.add_argument(
+    "--lrv",
+    "--learning-rate-vsum",
+    default=0.001,
+    type=float,
+    metavar="LRV",
+    help="initial learning rate",
+    dest="lrv",
+)
+parser.add_argument(
+    "--weight_decay",
+    "--wd",
+    default=0.00001,
+    type=float,
+    metavar="W",
+    help="weight decay (default: 1e-4)",
+)
+parser.add_argument(
+    "--checkpoint_dir",
+    type=str,
+    default="vsum_checkpoint",
+    help="checkpoint model folder",
+)
+parser.add_argument(
+    "--log_root", type=str, default="vsum_tboard_log", help="log dir root"
+)
+parser.add_argument(
+    "--log_name",
+    default="exp",
+    help="name of the experiment for checkpoints and logs",
+)
+
+
+def create_logger(args):
+    args.log_name = "{}_model_{}_bs_{}_lr_{}_nframes_{}_nfps_{}_nheads_{}_nenc_{}_dropout_{}_finetune_{}".format(
+        args.log_name,
+        args.model_type,
+        args.batch_size,
+        args.lrv,
+        args.num_frames,
+        args.num_frames_per_segment,
+        args.heads,
+        args.enc_layers,
+        args.dropout,
+        args.finetune,
+    )
+    tb_logdir = os.path.join(args.log_root, args.log_name)
+    tb_logger = Logger(tb_logdir)
+    if args.rank == 0:
+        os.makedirs(tb_logdir, exist_ok=True)
+
+    return tb_logger
+
+
+def log(output, args):
+    print(output)
+    with open(
+            os.path.join(
+                os.path.dirname(__file__), "vsum_ouptut_log", args.log_name + ".txt"
+            ),
+            "a",
+    ) as f:
+        f.write(output + "\n")
 
 
 def main(args):
@@ -87,6 +164,85 @@ def main(args):
         num_candidates=args.num_candidates,
         video_only=True,
         dataset="wikihow",
+    )
+
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        drop_last=False,
+        num_workers=args.num_thread_reader,
+        pin_memory=args.pin_memory
+    )
+
+    test_loader = torch.utils.data.DataLoader(
+        test_dataset,
+        batch_size=args.batch_size_eval,
+        shuffle=False,
+        drop_last=False,
+        num_workers=args.num_thread_reader
+    )
+
+    logger = create_logger(args)
+
+    criterion_c = nn.MSELoss(reduction="none")
+    criterion_r = nn.MSELoss()
+    criterion_d = nn.CosineSimilarity(dim=1, eps=1e-6)
+
+    vsum_params = []
+    base_params = []
+
+    for name, param in model.named_parameters():
+        if "base" not in name:
+            vsum_params.append(param)
+        elif "mixed_5" in name and "base" in name:
+            base_params.append(param)
+
+    if args.optimizer == "adam":
+        if args.finetune:
+            optimizer = torch.optim.Adam(
+                [
+                    {"params": base_params, "lr": args.lrs},
+                    {"params": vsum_params, "lr": args.lrv},
+                ],
+                weight_decay=args.weight_decay,
+            )
+        else:
+            optimizer = torch.optim.Adam(
+                model.parameters(), args.lrv, weight_decay=args.weight_decay
+            )
+    elif args.optimizer == "sgd":
+        if args.finetune:
+            optimizer = torch.optim.SGD(
+                [
+                    {"params": base_params, "lr": args.lrs},
+                    {"params": vsum_params, "lr": args.lrv},
+                ],
+                momentum=args.momemtum,
+                weight_decay=args.weight_decay,
+            )
+        else:
+            optimizer = torch.optim.SGD(
+                model.parameters(),
+                args.lrv,
+                momentum=args.momemtum,
+                weight_decay=args.weight_decay,
+            )
+
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=300, gamma=1.0)
+    checkpoint_dir = os.path.join(
+        os.path.dirname(__file__), args.checkpoint_dir, args.log_name
+    )
+
+    if args.checkpoint_dir != "" and args.rank == 0:
+        os.makedirs(checkpoint_dir, exist_ok=True)
+
+    total_batch_size = args.world_size * args.batch_size
+    log(
+        "Starting training loop for rank: {}, total batch size: {}".format(
+            args.rank, total_batch_size
+        ),
+        args,
     )
 
 

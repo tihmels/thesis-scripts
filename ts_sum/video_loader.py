@@ -64,9 +64,11 @@ class VSum_DataLoader(Dataset):
         pos = 0
         neg = 0
 
-        labels = [db.List(get_sum_key(story.pk)) for story in self.stories] # or db.get()
-        pos += np.count_nonzero(np.asarray(labels))
-        neg += len(labels) - np.count_nonzero(np.asarray(labels))
+        labels = [db.List(get_sum_key(story.pk)).as_list() for story in self.stories]
+        labels = [list(map(float, label)) for label in labels]
+
+        pos += sum([np.count_nonzero(np.asarray(label)) for label in labels])
+        neg += sum(len(label) - np.count_nonzero(np.asarray(label)) for label in labels)
 
         print("Pos neg: ", pos, neg)
         self.ce_weight = torch.tensor(
