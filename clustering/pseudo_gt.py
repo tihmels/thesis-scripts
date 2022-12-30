@@ -7,7 +7,6 @@ import sys
 import torch
 import torch.nn.functional as F
 import torchvision.io as io
-import seaborn as sns
 from alive_progress import alive_bar
 from matplotlib import pyplot as plt
 from pathlib import Path
@@ -48,15 +47,18 @@ def get_text_similarity_matrix(story: Story, segment_features):
     return None
 
 
-def extract_segment_features(story: Story):
+def extract_segment_features(story: Story, cossim=False, sim_thresh=0.85):
     story_segment_features = []
     story_segment_count = 1
     story_segments = [(0, 0)]
 
     visual_segment_features = torch.tensor(rai.get_tensor(get_vis_key(story.pk)))
 
-    similarity_matrix = torch.matmul(visual_segment_features, visual_segment_features.t())
-    similarity_matrix = cosine_similarity(visual_segment_features, visual_segment_features.t())
+    if cossim:
+        similarity_matrix = cosine_similarity(visual_segment_features, visual_segment_features)
+    else:
+        similarity_matrix = torch.matmul(visual_segment_features, visual_segment_features.t())
+
     similarity_means = similarity_matrix.mean(axis=1)
     max_similarity = similarity_means.max()
 
@@ -64,12 +66,18 @@ def extract_segment_features(story: Story):
     moving_avg_count = 1
 
     for seg_idx in range(1, len(visual_segment_features)):
-        similarity = torch.matmul(visual_segment_features[seg_idx], ref_segment_feature.t())
-        similarity = cosine_similarity(visual_segment_features[seg_idx], ref_segment_feature.t())
 
-        if similarity > 0.85 * max_similarity:
+        current_segment = visual_segment_features[seg_idx]
+
+        if cossim:
+            similarity = cosine_similarity(current_segment.view(1, -1),
+                                           ref_segment_feature.view(1, -1))
+        else:
+            similarity = torch.matmul(current_segment, ref_segment_feature.t())
+
+        if similarity > sim_thresh * max_similarity:
             moving_avg_count += 1
-            ref_segment_feature = (ref_segment_feature + visual_segment_features[seg_idx]) / 2
+            ref_segment_feature = (ref_segment_feature + current_segment) / 2
         else:
             story_segment_count += 1
 
@@ -78,7 +86,7 @@ def extract_segment_features(story: Story):
 
             story_segment_features.append(ref_segment_feature)
 
-            ref_segment_feature = visual_segment_features[seg_idx]
+            ref_segment_feature = current_segment
 
             moving_avg_count = 1
 
@@ -106,10 +114,11 @@ def process_cluster(cluster: TopicCluster, args):
     with alive_bar(len(ts15_stories),
                    ctrl_c=False, title="Feature Extraction [ts15]",
                    length=25, force_tty=True, dual_line=True, receipt_text=True) as bar:
+
         for story in ts15_stories:
             bar.text = f'Story: {story.pk} -> {story.video}'
 
-            segments, features = extract_segment_features(story)
+            segments, features = extract_segment_features(story, sim_thresh=0.85)
 
             segment_features_per_story.append(torch.stack(features))
             segments_per_story.append(segments)
@@ -151,7 +160,7 @@ def process_cluster(cluster: TopicCluster, args):
         ts15_similarity_sorted = ts15_similarity_matrix.sort(descending=True).values[:, :len(ts15_stories)]
         ts15_similarity_mean = ts15_similarity_matrix.mean(axis=1)
         ts15_similarity_mean_inv = ts15_similarity_mean
-        #ts15_similarity_mean_inv = F.normalize(1 - ts15_similarity_mean, dim=0)
+        # ts15_similarity_mean_inv = F.normalize(1 - ts15_similarity_mean, dim=0)
 
         ts100_similarity_matrix = torch.matmul(segment_features, ts100_segment_features.t())
         ts100_similarity_matrix = cosine_similarity(segment_features, ts100_segment_features.t())
@@ -262,14 +271,13 @@ def process_cluster(cluster: TopicCluster, args):
 def main(args):
     if args.index:
         clusters = [TopicCluster.find(TopicCluster.index == index).first() for index in args.index]
-        assert all(cluster.features == 1 for cluster in clusters)
-
     else:
-        clusters = TopicCluster.find(TopicCluster.features == 1).sort_by('-index').all()
+        clusters = TopicCluster.find().sort_by('-index').all()
         random.shuffle(clusters)
 
     for cluster in clusters:
         print(f'----- Cluster {cluster.index} -----')
+
         process_cluster(cluster, args)
         print()
 

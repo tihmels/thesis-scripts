@@ -33,7 +33,7 @@ german_stop_words = stopwords.words('german')
 # https://towardsdatascience.com/clustering-sentence-embeddings-to-identify-intents-in-short-text-48d22d3bf02e
 
 def extract_top_n_words_per_topic(tf_idf, count, docs_per_topic, n=20):
-    words = count.get_feature_names()
+    words = count.get_feature_names_out()
     labels = list(docs_per_topic.Topic)
     tf_idf_transposed = tf_idf.T
     indices = tf_idf_transposed.argsort()[:, -n:]
@@ -190,7 +190,11 @@ def generate_clusters(embeddings,
                                metric='euclidean', min_samples=min_samples,
                                cluster_selection_method=csm, prediction_data=True).fit(umap_embeddings)
 
-    return mapper, clusters
+    n_clusters = dict.fromkeys(set(clusters.labels_), 0)
+    for label in clusters.labels_:
+        n_clusters[label] = n_clusters[label] + 1
+
+    return mapper, clusters, n_clusters
 
 
 space = {
@@ -219,7 +223,7 @@ def process_stories(ts15_stories, ts100_stories):
     #                                                                 label_lower=label_lower,
     #                                                                 label_upper=label_upper, max_evals=max_evals)
 
-    mapper, cluster = generate_clusters(ts15_tensors, 22, 45, 0.05, 25, min_samples=5, csm='leaf', random_state=42)
+    mapper, cluster, n = generate_clusters(ts15_tensors, 5, 50, 0.05, min_cluster_size=20, min_samples=2, csm='leaf', random_state=42)
 
     # umap_data = umap.UMAP(n_neighbors=30, n_components=2, min_dist=0.0, metric='cosine').fit_transform(ts15_tensors)
     # result = pd.DataFrame(umap_data, columns=['x', 'y'])

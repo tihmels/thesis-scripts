@@ -9,7 +9,7 @@ from redis_om import Migrator
 
 from common.utils import set_tf_loglevel
 from database import rai
-from database.config import RAI_TOPIC_PREFIX, get_vis_key, \
+from database.config import get_vis_key, \
     get_m5c_key, get_text_key, get_topic_key
 from database.model import MainVideo, ShortVideo, Story
 from feature_extraction.StoryDataExtractor import StoryDataExtractor
@@ -33,9 +33,9 @@ parser.add_argument('--ts15', action='store_true')
 parser.add_argument('--ts100', action='store_true')
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
-
 print('Loading Models ...')
-topic_model = 'all-mpnet-base-v2'
+
+topic_model = 'T-Systems-onsite/cross-en-de-roberta-sentence-transformer'
 embedder = SentenceTransformer(topic_model)
 
 mil_nce_mod = 'https://tfhub.dev/deepmind/mil-nce/s3d/1'
@@ -72,7 +72,7 @@ def extract_topic_features(story: Story, skip_existing):
     if skip_existing and rai.tensor_exists(get_topic_key(story.pk)):
         return
 
-    embedding = embedder.encode(story.headline)
+    embedding = embedder.encode(story.headline, convert_to_numpy=True)
 
     rai.put_tensor(get_topic_key(story.pk), embedding)
 
