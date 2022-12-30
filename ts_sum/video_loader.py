@@ -8,8 +8,8 @@ import torchvision.io as io
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 
-from database import rai, db
-from database.config import get_sum_key
+from database import db
+from database.config import get_sum_key, get_score_key
 from database.model import Story
 
 
@@ -64,11 +64,13 @@ class VSum_DataLoader(Dataset):
         pos = 0
         neg = 0
 
-        labels = [db.List(get_sum_key(story.pk)).as_list() for story in self.stories]
-        labels = [list(map(float, label)) for label in labels]
+        self.summaries = [db.List(get_sum_key(story.pk)).as_list() for story in self.stories]
+        self.summaries = [list(map(float, label)) for label in self.summaries]
 
-        pos += sum([np.count_nonzero(np.asarray(label)) for label in labels])
-        neg += sum(len(label) - np.count_nonzero(np.asarray(label)) for label in labels)
+        self.scores = [db.List(get_score_key(story.pk)) for story in self.stories]
+
+        pos += sum([np.count_nonzero(np.asarray(label)) for label in self.summaries])
+        neg += sum(len(label) - np.count_nonzero(np.asarray(label)) for label in self.summaries)
 
         print("Pos neg: ", pos, neg)
         self.ce_weight = torch.tensor(
@@ -78,49 +80,8 @@ class VSum_DataLoader(Dataset):
     def __len__(self):
         return len(self.stories)
 
-    def _get_video(self, video_path, start_seek, time):
-        # cmd = ffmpeg.input(video_path, ss=start_seek, t=time).filter(
-        #         "fps", fps=self.fps
-        #     )
-        # if self.split == "train":
-        #     if self.center_crop:
-        #         aw, ah = 0.5, 0.5
-        #     else:
-        #         aw, ah = random.uniform(0, 1), random.uniform(0, 1)
-        #     if self.crop_only:
-        #         cmd = cmd.crop(
-        #             "(iw - {})*{}".format(self.size, aw),
-        #             "(ih - {})*{}".format(self.size, ah),
-        #             str(self.size),
-        #             str(self.size),
-        #         )
-        #     else:
-        #         cmd = cmd.crop(
-        #             "(iw - min(iw,ih))*{}".format(aw),
-        #             "(ih - min(iw,ih))*{}".format(ah),
-        #             "min(iw,ih)",
-        #             "min(iw,ih)",
-        #         ).filter("scale", self.size, self.size)
+    def _get_story(self, video_path, start_seek, time):
 
-        #     if (
-        #         self.split == "train"
-        #         and self.random_flip
-        #         and random.uniform(0, 1) > 0.5
-        #     ):
-        #         cmd = cmd.hflip()
-        # else:
-        #     cmd = cmd.filter("scale", self.size, self.size)
-
-        # out, _ = cmd.output("pipe:", format="rawvideo", pix_fmt="rgb24").run(
-        #     capture_stdout=True, quiet=True
-        # )
-
-        # video = np.frombuffer(out, np.uint8).reshape([-1, self.size, self.size, 3])
-        # video = torch.from_numpy(video.copy())
-        # video = video.view(-1, self.size, self.size, 3)
-
-        # # [B, H, W, C] -> [C, B, H, W]
-        # video = video.permute(3, 0, 1, 2)
         frames, _, _ = io.read_video(
             video_path, start_pts=start_seek, end_pts=start_seek + time, pts_unit="sec",
         )
@@ -208,31 +169,16 @@ class VSum_DataLoader(Dataset):
         return words, int(start), int(end)
 
     def __getitem__(self, idx):
-        video_file = self.videos[idx]
-        video_path = os.path.join(self.video_root, video_file)
-        video_id = video_file.split(".")[0]
+        story = self.stories[idx]
 
-        if self.dataset == "wikihow":
-            print("Video: ", video_file)
-            # original labels are per frame for WikiHowTo
-            orig_labels = torch.FloatTensor(self.annts[video_id])
-            num_frames_in_video = len(orig_labels)
+        print(f'Story: {story.pk}')
 
-            # get original fps of video; retrieve video at original fps
-            reader = io.VideoReader(os.path.join(video_path), "video")
-            fps = reader.get_metadata()["video"]["fps"][0]
-            self.fps = fps
-            self.num_sec = self.num_frames / float(self.fps)
-        else:
-            labels = torch.LongTensor(self.annts[video_id]["machine_summary"])
-            label_scores = (
-                    torch.FloatTensor(self.annts[video_id]["machine_summary_scores"]) / 0.1
-            )
-            num_frames_in_video = (
-                    len(labels) * self.num_frames_per_segment
-            )  # labels are for each segment and each segment has 32 frames
+        summary = torch.LongTensor(self.summaries[idx])
+        scores = torch.FloatTensor(self.scores[idx]) / 0.1
 
-        end = num_frames_in_video / self.fps  # num_frames/fps_of_video
+        n_frames = len(summary) * self.num_frames_per_segment
+
+        end = n_frames / self.fps
         start_seek = random.randint(0, int(max(0, end - self.num_sec)))
         # start_seek = 0
         time = self.num_sec + 0.1
