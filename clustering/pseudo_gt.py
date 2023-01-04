@@ -33,7 +33,7 @@ def segment_idx_to_frame_idx(story_start_idx, segment_idx):
 
 
 def segment_to_frame_range(story_start_idx, first_segment_idx: int, last_segment_idx: int = None):
-    last_segment_idx = last_segment_idx if last_segment_idx else first_segment_idx + 1
+    last_segment_idx = last_segment_idx + 1 if last_segment_idx else first_segment_idx + 1
     return (segment_idx_to_frame_idx(story_start_idx, first_segment_idx),
             segment_idx_to_frame_idx(story_start_idx, last_segment_idx))
 
@@ -82,10 +82,10 @@ def get_text_similarity_matrix(segment_features, story_pk):
     return None
 
 
-def extract_segment_features(story: Story, sim_thresh=0.85):
+def extract_segment_features(story: Story, sim_thresh=0.95):
     story_segment_features = []
-    story_segment_count = 1
     story_segments = [(0, 0)]  # story segments (from, to) - inclusive to
+    story_segment_count = 1
 
     segment_features = torch.tensor(rai.get_tensor(get_vis_key(story.pk)))
     segment_features = F.normalize(segment_features, dim=1)
@@ -110,19 +110,18 @@ def extract_segment_features(story: Story, sim_thresh=0.85):
             story_segment_count += 1
 
             story_segments[-1] = (story_segments[-1][0], seg_idx - 1)
-            story_segments.append((seg_idx, seg_idx))
-
             story_segment_features.append(ref_segment_feature)
+
+            story_segments.append((seg_idx, seg_idx))
 
             ref_segment_feature = curr_segment
 
             moving_avg_count = 1
 
-    if moving_avg_count > 1:
-        story_segments[-1] = (story_segments[-1][0], len(segment_features) - 1)
-        story_segment_features.append(ref_segment_feature)
+    story_segments[-1] = (story_segments[-1][0], len(segment_features) - 1)
+    story_segment_features.append(ref_segment_feature)
 
-    assert story_segment_count == len(story_segments)
+    assert story_segment_count == len(story_segments) == len(story_segment_features)
 
     return story_segments, story_segment_features
 
@@ -274,7 +273,10 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         machine_summary = np.zeros(n_video_segments)
         machine_summary_scores = np.zeros(n_video_segments)
 
+        store_video_bool = random.random() < 0.2 and args.pseudo_video_dir
+
         summary_video = []
+
         for segment, score in zip(segments, segment_scores):
             start, end = segment
 
@@ -282,15 +284,14 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
                 machine_summary_scores[start: end + 1] = score
                 if score >= threshold:
                     machine_summary[start: end + 1] = 1
-                    if idx % 5 == 0 and args.pseudo_video_dir:
-                        segment_to_frame_range(0, start, end)
-                        from_idx, to_idx = segment_idx_to_frame_idx(0, start), segment_idx_to_frame_idx(0, end)
+                    if store_video_bool:
+                        from_idx, to_idx = segment_to_frame_range(0, start, end)
                         frames = story.frames[from_idx:to_idx]
                         summary_video.append(torch.tensor(np.array(read_images(frames))))
 
-        plt.show()
+        # plt.show()
 
-        if idx % 5 == 0 and args.pseudo_video_dir and len(summary_video) > 1:
+        if store_video_bool:
             summary_video = torch.cat(summary_video, dim=0)
 
             pseudo_video_dir = Path(args.pseudo_video_dir, str(cluster.index))
