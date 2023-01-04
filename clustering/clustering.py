@@ -1,11 +1,10 @@
 # !/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
-import os
-
-import logging
 from collections import defaultdict
 
 import hdbscan
+import logging
 import numpy as np
+import os
 import pandas as pd
 import random
 import sys
@@ -19,7 +18,7 @@ from tqdm import trange
 from common.utils import set_tf_loglevel
 from database import rai
 from database.config import get_topic_key
-from database.model import MainVideo, TopicCluster, ShortVideo
+from database.model import TopicCluster, Story
 
 set_tf_loglevel(logging.FATAL)
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
@@ -219,11 +218,11 @@ max_evals = 100
 def process_stories(ts15_stories, ts100_stories):
     ts15_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts15_stories]
 
-    #best_params_use, best_clusters_use, trials_use = bayesian_search(ts15_tensors, space=hspace,
+    # best_params_use, best_clusters_use, trials_use = bayesian_search(ts15_tensors, space=hspace,
     #                                                                 label_lower=label_lower,
     #                                                                 label_upper=label_upper, max_evals=max_evals)
 
-    mapper, cluster, n = generate_clusters(ts15_tensors, 5, 50, 0.05, min_cluster_size=20, min_samples=2, csm='leaf', random_state=42)
+    mapper, cluster, n = generate_clusters(ts15_tensors, 12, 30, 0.05, 25, min_samples=5, csm='leaf', random_state=42)
 
     # umap_data = umap.UMAP(n_neighbors=30, n_components=2, min_dist=0.0, metric='cosine').fit_transform(ts15_tensors)
     # result = pd.DataFrame(umap_data, columns=['x', 'y'])
@@ -272,15 +271,13 @@ def process_stories(ts15_stories, ts100_stories):
 
 
 def main():
-    ts15_videos = MainVideo.find().sort_by('timestamp').all()
-    ts100_videos = ShortVideo.find().sort_by('timestamp').all()
+    ts15_stories = Story.find(Story.type == 'ts15').all()
+    ts100_stories = Story.find(Story.type == 'ts100').all()
 
-    assert len(ts15_videos) > 0, 'No suitable video files have been found.'
+    ts15_stories = [story for story in ts15_stories if rai.tensor_exists(get_topic_key(story.pk))]
+    ts100_stories = [story for story in ts100_stories if rai.tensor_exists(get_topic_key(story.pk))]
 
-    ts15_stories = [story for video in ts15_videos for story in video.stories if
-                    rai.tensor_exists(get_topic_key(story.pk))]
-    ts100_stories = [story for video in ts100_videos for story in video.stories if
-                     rai.tensor_exists(get_topic_key(story.pk))]
+    assert len(ts15_stories) > 0, 'No suitable stories have been found.'
 
     process_stories(ts15_stories, ts100_stories)
 

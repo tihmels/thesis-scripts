@@ -3,6 +3,7 @@ import matplotlib
 import numpy as np
 import os
 import random
+import seaborn as sns
 import sys
 import torch
 import torch.nn.functional as F
@@ -16,7 +17,7 @@ matplotlib.use('TkAgg')
 
 from common.utils import read_images, create_dir, flatten
 from database import rai, db
-from database.config import RAI_TEXT_PREFIX, get_vis_key, get_sum_key, get_score_key
+from database.config import RAI_TEXT_PREFIX, get_vis_key, get_sum_key, get_score_key, get_m5c_key
 from database.model import TopicCluster, Story
 
 parser = argparse.ArgumentParser('Pseudo Summary Generation')
@@ -52,14 +53,32 @@ def extract_segment_features(story: Story, cossim=False, sim_thresh=0.85):
     story_segment_count = 1
     story_segments = [(0, 0)]
 
+    fig, axs = plt.subplots(nrows=2, ncols=2)
+
     visual_segment_features = torch.tensor(rai.get_tensor(get_vis_key(story.pk)))
+    visual_segment_features_m5c = torch.tensor(rai.get_tensor(get_m5c_key(story.pk)))
 
-    if cossim:
-        similarity_matrix = cosine_similarity(visual_segment_features, visual_segment_features)
-    else:
-        similarity_matrix = torch.matmul(visual_segment_features, visual_segment_features.t())
+    similarity_matrix_cos = cosine_similarity(visual_segment_features, visual_segment_features)
+    similarity_matrix_dot = torch.matmul(visual_segment_features, visual_segment_features.t())
 
-    similarity_means = similarity_matrix.mean(axis=1)
+    similarity_matrix_m5c_cos = cosine_similarity(visual_segment_features_m5c, visual_segment_features_m5c)
+    similarity_matrix_m5c_dot = torch.matmul(visual_segment_features_m5c, visual_segment_features_m5c.t())
+
+    sns.heatmap(similarity_matrix_cos, ax=axs[0, 0])
+    sns.heatmap(similarity_matrix_dot, ax=axs[0, 1])
+
+    axs[0, 0].set_title('SIM_MAT_COS')
+    axs[0, 1].set_title('SIM_MAT_DOT')
+
+    sns.heatmap(similarity_matrix_m5c_cos, ax=axs[1, 0])
+    sns.heatmap(similarity_matrix_m5c_dot, ax=axs[1, 1])
+
+    axs[1, 0].set_title('SIM_MAT_M5C_COS')
+    axs[1, 1].set_title('SIM_MAT_M5C_DOT')
+
+    plt.show()
+
+    similarity_means = similarity_matrix_cos.mean(axis=1)
     max_similarity = similarity_means.max()
 
     ref_segment_feature = visual_segment_features[0]
@@ -89,7 +108,6 @@ def extract_segment_features(story: Story, cossim=False, sim_thresh=0.85):
             ref_segment_feature = current_segment
 
             moving_avg_count = 1
-
 
     story_segments[-1] = (story_segments[-1][0], len(visual_segment_features) - 1)
     story_segment_features.append(ref_segment_feature)
