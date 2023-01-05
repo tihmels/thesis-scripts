@@ -1,0 +1,6 @@
+Starting training loop for rank: 0, total batch size: 6
+Starting training loop for rank: 0, total batch size: 6
+Starting training loop for rank: 0, total batch size: 6
+Starting training loop for rank: 0, total batch size: 6
+Starting training loop for rank: 0, total batch size: 6
+Starting training loop for rank: 0, total batch size: 6

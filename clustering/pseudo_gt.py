@@ -10,7 +10,6 @@ import torchvision.io as io
 from alive_progress import alive_bar
 from matplotlib import pyplot as plt
 from pathlib import Path
-from sklearn.metrics.pairwise import cosine_similarity
 
 matplotlib.use('TkAgg')
 
@@ -38,11 +37,8 @@ def segment_to_frame_range(story_start_idx, first_segment_idx: int, last_segment
             segment_idx_to_frame_idx(story_start_idx, last_segment_idx))
 
 
-def get_segment_similarity(segment_features, other_segment_features, cossim=True, mean_co=None):
-    if cossim:
-        segment_similarity = cosine_similarity(segment_features, other_segment_features)
-    else:
-        segment_similarity = np.matmul(segment_features, other_segment_features.T)
+def get_segment_similarity(segment_features, other_segment_features, mean_co=None):
+    segment_similarity = np.matmul(segment_features, other_segment_features.T)
 
     segment_similarity = np.sort(segment_similarity, axis=1)
     segment_similarity = segment_similarity[:, -mean_co:].mean(axis=1) if mean_co else segment_similarity.mean(axis=1)
@@ -50,7 +46,7 @@ def get_segment_similarity(segment_features, other_segment_features, cossim=True
     return segment_similarity
 
 
-def get_inter_cluster_similarity(segment_features, other_clusters, cossim, mean_co=None):
+def get_inter_cluster_similarity(segment_features, other_clusters, mean_co=None):
     segment_similarities = []
 
     for cluster in other_clusters:
@@ -59,7 +55,8 @@ def get_inter_cluster_similarity(segment_features, other_clusters, cossim, mean_
         for story in other_stories:
             _, features = extract_segment_features(story)
 
-            segment_similarity = get_segment_similarity(segment_features, np.stack(features), cossim=cossim,
+            segment_similarity = get_segment_similarity(segment_features,
+                                                        np.stack(features),
                                                         mean_co=mean_co)
 
             segment_similarities.append(segment_similarity)
@@ -82,7 +79,7 @@ def get_text_similarity_matrix(segment_features, story_pk):
     return None
 
 
-def extract_segment_features(story: Story, sim_thresh=0.95):
+def extract_segment_features(story: Story, sim_thresh=0.9):
     story_segment_features = []
     story_segments = [(0, 0)]  # story segments (from, to) - inclusive to
     story_segment_count = 1
@@ -145,7 +142,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         for story in ts15_stories:
             bar.text = f'Story: {story.pk} -> {story.video}'
 
-            segments, features = extract_segment_features(story, sim_thresh=0.9)
+            segments, features = extract_segment_features(story)
 
             segment_features_per_story.append(torch.stack(features))
             segments_per_story.append(segments)
@@ -165,7 +162,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         for story in ts100_stories:
             bar.text = f'Story: {story.pk} -> {story.video}'
 
-            _, features = extract_segment_features(story, sim_thresh=0.9)
+            _, features = extract_segment_features(story)
 
             ts100_segment_features.extend(features)
             bar()
@@ -184,19 +181,17 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
 
         inter_cluster_sim_matmul = get_inter_cluster_similarity(segment_features,
                                                                 other_clusters,
-                                                                cossim=False,
-                                                                mean_co=5)
+                                                                mean_co=15)
+
         intra_cluster_sim_matmul = get_segment_similarity(segment_features,
                                                           all_segment_features,
-                                                          cossim=False,
-                                                          mean_co=5)
+                                                          mean_co=15)
 
         inter_cluster_sim_inv = 1 - inter_cluster_sim_matmul
         intra_cluster_sim_inv = 1 - intra_cluster_sim_matmul
 
         ts100_similarity = get_segment_similarity(segment_features,
                                                   ts100_segment_features,
-                                                  cossim=False,
                                                   mean_co=5)
 
         text_similarity_matrix = get_text_similarity_matrix(segment_features, story.pk)
@@ -213,7 +208,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
                               intra_cluster_sim_inv +
                               ts100_similarity) / 3
 
-        segment_scores = torch.tensor((inter_cluster_sim_inv + intra_cluster_sim_inv + ts100_similarity) / 3)
+        segment_scores = torch.tensor((inter_cluster_sim_inv + intra_cluster_sim_inv) / 2)
         # segment_scores = F.normalize(segment_scores, dim=0)
 
         n_video_segments = segments[-1][1] + 1
@@ -257,7 +252,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         ax.vlines(flatten(segments), y_axis_min, y_axis_max, linestyles='dotted', colors='grey')
 
         ax.plot(x, y_final, color='b', linewidth=0.8, label="Final Score")
-        # ax.plot(x, y_inter_sim, color='r', linewidth=0.5, label="Inter-Cluster Score")
+        ax.plot(x, y_inter_sim, color='g', linestyle='dashed', linewidth=0.5, label="Inter-Cluster Score")
         ax.plot(x, y_inter_sim_inv, color='g', linewidth=0.5, label="Inter-Cluster Score (inv)")
         ax.plot(x, y_intra_sim_inv, color='r', linewidth=0.5, label="Intra-Cluster Score (inv)")
         # ax.plot(x, y_ts15, color='r', linestyle='dashed', linewidth=0.5)
@@ -273,7 +268,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         machine_summary = np.zeros(n_video_segments)
         machine_summary_scores = np.zeros(n_video_segments)
 
-        store_video_bool = random.random() < 0.2 and args.pseudo_video_dir
+        random_video_bool = random.random() < 0.25 and args.pseudo_video_dir
 
         summary_video = []
 
@@ -284,14 +279,14 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
                 machine_summary_scores[start: end + 1] = score
                 if score >= threshold:
                     machine_summary[start: end + 1] = 1
-                    if store_video_bool:
+                    if random_video_bool:
                         from_idx, to_idx = segment_to_frame_range(0, start, end)
                         frames = story.frames[from_idx:to_idx]
                         summary_video.append(torch.tensor(np.array(read_images(frames))))
 
         # plt.show()
 
-        if store_video_bool:
+        if random_video_bool:
             summary_video = torch.cat(summary_video, dim=0)
 
             pseudo_video_dir = Path(args.pseudo_video_dir, str(cluster.index))
