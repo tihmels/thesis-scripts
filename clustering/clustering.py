@@ -222,7 +222,7 @@ def process_stories(ts15_stories, ts100_stories):
     #                                                                 label_lower=label_lower,
     #                                                                 label_upper=label_upper, max_evals=max_evals)
 
-    mapper, cluster, n = generate_clusters(ts15_tensors, 12, 30, 0.05, 25, min_samples=5, csm='leaf', random_state=42)
+    mapper, cluster, n = generate_clusters(ts15_tensors, 10, 45, 0.05, 25, min_samples=5, csm='leaf', random_state=42)
 
     # umap_data = umap.UMAP(n_neighbors=30, n_components=2, min_dist=0.0, metric='cosine').fit_transform(ts15_tensors)
     # result = pd.DataFrame(umap_data, columns=['x', 'y'])

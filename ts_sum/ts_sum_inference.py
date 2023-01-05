@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 import os
 import torch
@@ -18,7 +20,7 @@ parser = ArgumentParser(description="PyTorch ASR Video Segment MIL-NCE")
 parser.add_argument(
     "--checkpoint_dir",
     type=str,
-    default="/Users/tihmels/Scripts/thesis-scripts/ts_sum/vsum_checkpoint/exp_model_1_bs_3_lr_0.001_nframes_896_nfps_32_nheads_8_nenc_24_dropout_0.1_finetune_False",
+    default="/Users/tihmels/Scripts/thesis-scripts/ts_sum/vsum_checkpoint/exp_model_1_bs_8_lr_0.001_nframes_896_nfps_32_nheads_8_nenc_6_dropout_0.1_finetune_False",
     help="checkpoint model folder",
 )
 parser.add_argument(
@@ -125,7 +127,7 @@ def main(args):
 
     all_video_summaries = {}
 
-    model = s3dg.VSum(space_to_depth=True, word2vec_path=args.word2vec_path, enc_layers=24, heads=8)
+    model = s3dg.VSum(space_to_depth=True, word2vec_path=args.word2vec_path)
     model = model.eval()
     print("Created model")
 
@@ -144,7 +146,7 @@ def main(args):
         )
 
         with torch.no_grad():
-            for itr, video in enumerate(videos):
+            for itr, video in enumerate(random.sample(videos, 2)):
                 print("Starting video: ", video.pk)
 
                 frames = flatten([story.frames for story in video.stories])
@@ -181,7 +183,7 @@ def main(args):
 
                 scores = torch.stack(scores)
 
-                summary_frames = nn.functional.softmax(scores, dim=1)[:, 0]
+                summary_frames = nn.functional.softmax(scores, dim=1)[:, 1]
                 summary_frames[summary_frames > 0.5] = 1
                 summary_frames = np.repeat(summary_frames.detach().cpu().numpy(), 32)
                 print("Shape of summary frames:", summary_frames.shape)

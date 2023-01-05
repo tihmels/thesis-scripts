@@ -16,7 +16,7 @@ from tqdm import tqdm
 import s3dg
 from ts_sum.evaluate_and_log import evaluate_summary
 from ts_sum.ts_sum_utils import Logger, AverageMeter
-from ts_sum.video_loader import TVSumStoryLoader, TVSumVideoLoader
+from ts_sum.video_loader import TVSumStoryLoader
 
 parser = ArgumentParser('Setup RedisAI DB')
 parser.add_argument("--seed", default=1, type=int, help="seed for initializing training.")
@@ -75,7 +75,7 @@ parser.add_argument(
     help="number of frames in each segment",
 )
 parser.add_argument(
-    "--log_freq", type=int, default=5, help="Information display frequence"
+    "--log_freq", type=int, default=3, help="Information display frequence"
 )
 parser.add_argument(
     "--lrv",
@@ -266,26 +266,12 @@ def main(args):
         size=args.video_size,
     )
 
-    test_dataset = TVSumVideoLoader(
-        fps=args.fps,
-        num_frames=10880,
-        num_frames_per_segment=args.num_frames_per_segment,
-        size=args.video_size,
-    )
-
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,
         pin_memory=False
-    )
-
-    test_loader = torch.utils.data.DataLoader(
-        test_dataset,
-        batch_size=args.batch_size_eval,
-        shuffle=False,
-        drop_last=False
     )
 
     logger = create_logger(args)
@@ -407,7 +393,7 @@ def train(
     for idx, batch in enumerate(train_loader):
 
         batch_loss = TrainOneBatch(
-            model, optimizer, scheduler, batch, criterion, args, epoch
+            model, optimizer, scheduler, batch, criterion
         )
 
         running_loss += batch_loss
@@ -477,7 +463,7 @@ def create_model(args):
     else:
         model = s3dg.VSum_MLP(
             args.num_class,
-            space_to_depth=False,
+            space_to_depth=True,
             word2vec_path=args.word2vec_path,
             init=args.weight_init,
             dropout=args.dropout)

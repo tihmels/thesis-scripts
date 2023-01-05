@@ -208,8 +208,8 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
                               intra_cluster_sim_inv +
                               ts100_similarity) / 3
 
-        segment_scores = torch.tensor((inter_cluster_sim_inv + intra_cluster_sim_inv) / 2)
-        # segment_scores = F.normalize(segment_scores, dim=0)
+        segment_scores = torch.tensor((inter_cluster_sim_inv + intra_cluster_sim_inv + ts100_similarity) / 3)
+        segment_scores = F.normalize(segment_scores, dim=0)
 
         n_video_segments = segments[-1][1] + 1
 

@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 import os
 import torch
@@ -31,7 +33,7 @@ class TVSumStoryLoader(Dataset):
 
         self.stories = Story.find(Story.type == 'ts15').all()
         self.stories = [story for story in self.stories if db.List(get_sum_key(story.pk))]
-        self.stories = self.stories[:12]
+        self.stories = random.sample(self.stories, 56)
 
         token_to_word = np.load(
             os.path.join(os.path.dirname(__file__), token_to_word_path)
