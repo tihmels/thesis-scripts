@@ -35,8 +35,9 @@ parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 
 print('Loading Models ...')
 
-topic_model = 'T-Systems-onsite/cross-en-de-roberta-sentence-transformer'
-embedder = SentenceTransformer(topic_model)
+multi_mpnet_model = 'paraphrase-multilingual-mpnet-base-v2'
+t_systems_model = 'T-Systems-onsite/cross-en-de-roberta-sentence-transformer'
+embedder = SentenceTransformer(multi_mpnet_model)
 
 mil_nce_model = 'https://tfhub.dev/deepmind/mil-nce/s3d/1'
 mil_nce = hub.load(mil_nce_model)

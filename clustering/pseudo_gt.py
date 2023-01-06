@@ -10,6 +10,7 @@ import torchvision.io as io
 from alive_progress import alive_bar
 from matplotlib import pyplot as plt
 from pathlib import Path
+import seaborn as sns
 
 matplotlib.use('TkAgg')
 
@@ -48,6 +49,8 @@ def get_segment_similarity(segment_features, other_segment_features, mean_co=Non
 
 def get_inter_cluster_similarity(segment_features, other_clusters, mean_co=None):
     segment_similarities = []
+
+    stories = Story.find(Story.type == 'ts15').all()
 
     for cluster in other_clusters:
         other_stories = [story for story in cluster.ts15s if rai.tensor_exists(get_vis_key(story.pk))]
@@ -156,6 +159,8 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
 
     ts100_segment_features = []
 
+    ts100_stories = [story for story in ts100_stories if story.is_nightly == 0]
+
     with alive_bar(len(ts100_stories),
                    ctrl_c=False, title="Feature Extraction [ts100]",
                    length=25, force_tty=True, dual_line=True, receipt_text=True) as bar:
@@ -169,23 +174,29 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
 
     ts100_segment_features = torch.stack(ts100_segment_features)
 
+    intra_cluster_threshold = torch.matmul(all_segment_features, all_segment_features.t()).mean()
+
     for idx, (segments, segment_features) in enumerate(zip(segments_per_story, segment_features_per_story)):
 
         story = ts15_stories[idx]
 
         print(f"[{idx + 1}/{len(cluster.ts15s)}] Story: {story.headline} ({story.pk})")
 
-        if len(segment_features) == 0:
-            print('No features could be extracted ...')
-            continue
+        n_video_segments = segments[-1][1] + 1
+
+        x = list(range(n_video_segments))
 
         inter_cluster_sim_matmul = get_inter_cluster_similarity(segment_features,
                                                                 other_clusters,
-                                                                mean_co=15)
+                                                                mean_co=5)
+
+        y_inter = flatten(seg_scores(segments, inter_cluster_sim_matmul))
 
         intra_cluster_sim_matmul = get_segment_similarity(segment_features,
                                                           all_segment_features,
-                                                          mean_co=15)
+                                                          mean_co=5)
+
+        y_intra = flatten(seg_scores(segments, intra_cluster_sim_matmul))
 
         inter_cluster_sim_inv = 1 - inter_cluster_sim_matmul
         intra_cluster_sim_inv = 1 - intra_cluster_sim_matmul
@@ -200,20 +211,19 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
             text_similarity = text_similarity_matrix.mean(axis=1)
 
             segment_scores = (inter_cluster_sim_inv +
-                              intra_cluster_sim_inv +
-                              ts100_similarity +
-                              text_similarity) / 4
+                              intra_cluster_sim_inv) / 2
         else:
             segment_scores = (inter_cluster_sim_inv +
                               intra_cluster_sim_inv +
                               ts100_similarity) / 3
 
-        segment_scores = torch.tensor((inter_cluster_sim_inv + intra_cluster_sim_inv + ts100_similarity) / 3)
-        segment_scores = F.normalize(segment_scores, dim=0)
+        # segment_scores = torch.tensor((inter_cluster_sim_inv + intra_cluster_sim_inv + ts100_similarity) / 3)
+        segment_scores = torch.tensor(segment_scores)
+        #segment_scores = F.normalize(segment_scores, dim=0)
 
-        n_video_segments = segments[-1][1] + 1
 
-        threshold = segment_scores.max() * 0.85
+
+        threshold = segment_scores.max() * 0.9
 
         fig = plt.figure(1, figsize=(18, 4))
         plt.subplots_adjust(bottom=0.18, left=0.05, right=0.98)
@@ -223,7 +233,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         plt.xlabel('Segment')
         plt.ylabel('Score')
 
-        x = list(range(n_video_segments))
+
 
         y_inter_sim = flatten(seg_scores(segments, inter_cluster_sim_matmul))
         y_inter_sim_inv = flatten(seg_scores(segments, inter_cluster_sim_inv))
@@ -252,12 +262,11 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         ax.vlines(flatten(segments), y_axis_min, y_axis_max, linestyles='dotted', colors='grey')
 
         ax.plot(x, y_final, color='b', linewidth=0.8, label="Final Score")
-        ax.plot(x, y_inter_sim, color='g', linestyle='dashed', linewidth=0.5, label="Inter-Cluster Score")
+        # ax.plot(x, y_inter_sim, color='g', linestyle='dashed', linewidth=0.5, label="Inter-Cluster Score")
         ax.plot(x, y_inter_sim_inv, color='g', linewidth=0.5, label="Inter-Cluster Score (inv)")
         ax.plot(x, y_intra_sim_inv, color='r', linewidth=0.5, label="Intra-Cluster Score (inv)")
-        # ax.plot(x, y_ts15, color='r', linestyle='dashed', linewidth=0.5)
-        # ax.plot(x, y_ts100, color='g', linewidth=0.5, label="ts100 score")
-        # ax.plot(x, y_text, color='c', linewidth=0.5, label="Text score")
+        ax.plot(x, y_ts100_sim, color='y', linewidth=0.5, label="ts100 score")
+        # ax.plot(x, y_text_sim, color='c', linewidth=0.5, label="Text score")
 
         ax.legend()
 

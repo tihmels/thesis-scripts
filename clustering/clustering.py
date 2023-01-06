@@ -90,11 +90,13 @@ def random_search(embeddings, space, num_evals):
         n_components = random.choice(space['n_components'])
         min_cluster_size = random.choice(space['min_cluster_size'])
 
-        clusters = generate_clusters(embeddings,
-                                     n_neighbors=n_neighbors,
-                                     n_components=n_components,
-                                     min_cluster_size=min_cluster_size,
-                                     random_state=space['random_state'])
+        result = generate_clusters(embeddings,
+                                   n_neighbors=n_neighbors,
+                                   n_components=n_components,
+                                   min_cluster_size=min_cluster_size,
+                                   random_state=space['random_state'])
+
+        _, clusters, _ = result
 
         label_count, cost = score_clusters(clusters, prob_threshold=0.05)
 
@@ -129,7 +131,6 @@ def bayesian_search(embeddings, space, label_lower, label_upper, max_evals=100):
                                       n_neighbors=best_params['n_neighbors'],
                                       n_components=best_params['n_components'],
                                       min_cluster_size=best_params['min_cluster_size'],
-                                      min_samples=best_params['min_samples'],
                                       random_state=best_params['random_state'])
 
     return best_params, best_clusters, trials
@@ -141,17 +142,17 @@ def objective(params, embeddings, label_lower, label_upper):
     on the number of clusters we want to identify
     """
 
-    clusters = generate_clusters(embeddings,
-                                 n_neighbors=params['n_neighbors'],
-                                 n_components=params['n_components'],
-                                 min_cluster_size=params['min_cluster_size'],
-                                 random_state=params['random_state'])
+    _, clusters, _ = generate_clusters(embeddings,
+                                       n_neighbors=params['n_neighbors'],
+                                       n_components=params['n_components'],
+                                       min_cluster_size=params['min_cluster_size'],
+                                       random_state=params['random_state'])
 
     label_count, cost = score_clusters(clusters, prob_threshold=0.05)
 
     # 15% penalty on the cost function if outside the desired range of groups
     if (label_count < label_lower) | (label_count > label_upper):
-        penalty = 0.15
+        penalty = 0.25
     else:
         penalty = 0
 
@@ -168,14 +169,6 @@ def generate_clusters(embeddings,
                       min_samples=None,
                       csm='eom',
                       random_state=None):
-    # n_neighbors: the number of approximate nearest neighbors used to construct the initial high-dimensional graph.
-    # It effectively controls how UMAP balances local versus global structure -
-    # low values will push UMAP to focus more on local structure by constraining the number of neighboring points considered when analyzing the data in high dimensions,
-    # while high values will push UMAP towards representing the big-picture structure while losing fine detail.
-
-    # min_dist, the minimum distance between points in low-dimensional space.
-    # This parameter controls how tightly UMAP clumps points together, with low values leading to more tightly packed embeddings.
-    # Larger values of min_dist will make UMAP pack points together more loosely, focusing instead on the preservation of the broad topological structure.
 
     mapper = umap.UMAP(n_neighbors=n_neighbors,
                        n_components=n_components,
@@ -197,32 +190,35 @@ def generate_clusters(embeddings,
 
 
 space = {
-    "n_neighbors": range(2, 15),
-    "n_components": range(2, 5),
-    "min_cluster_size": range(10, 25),
+    "n_neighbors": range(2, 25),
+    "n_components": range(10, 45),
+    "min_cluster_size": range(15, 30),
+    "min_samples": range(5, 20),
     "random_state": 42
 }
 
 hspace = {
-    "n_neighbors": hp.choice('n_neighbors', range(3, 16)),
-    "n_components": hp.choice('n_components', range(3, 16)),
-    "min_cluster_size": hp.choice('min_cluster_size', range(12, 20)),
+    "n_neighbors": hp.choice('n_neighbors', range(3, 20)),
+    "n_components": hp.choice('n_components', range(3, 50)),
+    "min_cluster_size": hp.choice('min_cluster_size', range(10, 25)),
     "random_state": 42
 }
 
-label_lower = 30
-label_upper = 100
-max_evals = 100
+label_lower = 7
+label_upper = 20
+max_evals = 150
 
 
 def process_stories(ts15_stories, ts100_stories):
     ts15_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts15_stories]
 
     # best_params_use, best_clusters_use, trials_use = bayesian_search(ts15_tensors, space=hspace,
-    #                                                                 label_lower=label_lower,
-    #                                                                 label_upper=label_upper, max_evals=max_evals)
+    #                                                                  label_lower=label_lower,
+    #                                                                  label_upper=label_upper,
+    #                                                                  max_evals=max_evals)
 
-    mapper, cluster, n = generate_clusters(ts15_tensors, 10, 45, 0.05, 25, min_samples=5, csm='leaf', random_state=42)
+    # {'min_cluster_size': 10, 'n_components': 32, 'n_neighbors': 6, 'random_state': 42} label count = 12
+    mapper, cluster, n = generate_clusters(ts15_tensors, 6, 32, 0.05, 10, min_samples=5, csm='leaf', random_state=42)
 
     # umap_data = umap.UMAP(n_neighbors=30, n_components=2, min_dist=0.0, metric='cosine').fit_transform(ts15_tensors)
     # result = pd.DataFrame(umap_data, columns=['x', 'y'])
