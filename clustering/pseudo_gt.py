@@ -5,12 +5,10 @@ import os
 import random
 import sys
 import torch
-import torch.nn.functional as F
 import torchvision.io as io
-from alive_progress import alive_bar
 from matplotlib import pyplot as plt
 from pathlib import Path
-import seaborn as sns
+from sklearn.metrics.pairwise import cosine_similarity
 
 matplotlib.use('TkAgg')
 
@@ -23,8 +21,10 @@ parser = argparse.ArgumentParser('Pseudo Summary Generation')
 parser.add_argument('--index', type=int, nargs='*', help="Generate pseudo summary for cluster index")
 parser.add_argument('--pseudo_video_dir', type=str, default='')
 
+sim_thresh = 0.98
 
-def seg_scores(segments, scores):
+
+def score_per_seg(segments, scores):
     return [[seg_score] * (seg[1] - seg[0] + 1) for seg_score, seg in zip(scores, segments)]
 
 
@@ -38,7 +38,16 @@ def segment_to_frame_range(story_start_idx, first_segment_idx: int, last_segment
             segment_idx_to_frame_idx(story_start_idx, last_segment_idx))
 
 
-def get_segment_similarity(segment_features, other_segment_features, mean_co=None):
+def mean_segment_similarity(segment_features, other_segment_features, mean_co=None):
+    segment_similarity = cosine_similarity(segment_features, other_segment_features)
+
+    segment_similarity = np.sort(segment_similarity, axis=1)
+    segment_similarity = segment_similarity[:, -mean_co:].mean(axis=1) if mean_co else segment_similarity.mean(axis=1)
+
+    return segment_similarity
+
+
+def mean_segment_similarity_matmul(segment_features, other_segment_features, mean_co=None):
     segment_similarity = np.matmul(segment_features, other_segment_features.T)
 
     segment_similarity = np.sort(segment_similarity, axis=1)
@@ -47,48 +56,61 @@ def get_segment_similarity(segment_features, other_segment_features, mean_co=Non
     return segment_similarity
 
 
-def get_inter_cluster_similarity(segment_features, other_clusters, mean_co=None):
+def get_inter_cluster_similarity_matmul(segment_features, other_clusters, mean_co=None):
     segment_similarities = []
 
-    stories = Story.find(Story.type == 'ts15').all()
+    other_stories = flatten([cluster.ts15s for cluster in other_clusters])
 
-    for cluster in other_clusters:
-        other_stories = [story for story in cluster.ts15s if rai.tensor_exists(get_vis_key(story.pk))]
+    for story in other_stories:
+        _, features = extract_segment_features(story, sim_thresh=sim_thresh)
 
-        for story in other_stories:
-            _, features = extract_segment_features(story)
+        segment_similarity = mean_segment_similarity_matmul(segment_features,
+                                                            np.stack(features),
+                                                            mean_co=mean_co)
 
-            segment_similarity = get_segment_similarity(segment_features,
-                                                        np.stack(features),
-                                                        mean_co=mean_co)
-
-            segment_similarities.append(segment_similarity)
+        segment_similarities.append(segment_similarity)
 
     segment_similarities = np.stack(segment_similarities, axis=1)
 
     return segment_similarities.mean(axis=1)
 
 
-def get_text_similarity_matrix(segment_features, story_pk):
+def get_inter_cluster_similarity(segment_features, other_clusters, mean_co=None):
+    segment_similarities = []
+
+    other_stories = flatten([cluster.ts15s for cluster in other_clusters])
+
+    for story in other_stories:
+        _, features = extract_segment_features(story, sim_thresh=sim_thresh)
+
+        segment_similarity = mean_segment_similarity(segment_features,
+                                                     np.stack(features),
+                                                     mean_co=mean_co)
+
+        segment_similarities.append(segment_similarity)
+
+    segment_similarities = np.stack(segment_similarities, axis=1)
+
+    return segment_similarities.mean(axis=1)
+
+
+def get_text_similarity(segment_features, story_pk):
     if rai.tensor_exists(get_text_key(story_pk)):
         text_features = torch.tensor(rai.get_tensor(get_text_key(story_pk)))
-        text_features = F.normalize(text_features, dim=1)
 
-        text_similarity_matrix = np.matmul(segment_features, text_features.t())
-        # text_similarity_matrix = cosine_similarity(segment_features, text_features)
+        text_similarity = mean_segment_similarity(segment_features, text_features)
 
-        return text_similarity_matrix.numpy()
+        return text_similarity
 
     return None
 
 
-def extract_segment_features(story: Story, sim_thresh=0.9):
+def extract_segment_features(story: Story, sim_thresh=0.95):
     story_segment_features = []
     story_segments = [(0, 0)]  # story segments (from, to) - inclusive to
     story_segment_count = 1
 
     segment_features = torch.tensor(rai.get_tensor(get_vis_key(story.pk)))
-    segment_features = F.normalize(segment_features, dim=1)
 
     similarity_matrix = torch.matmul(segment_features, segment_features.t())
     similarity_means = similarity_matrix.mean(axis=1)
@@ -103,7 +125,7 @@ def extract_segment_features(story: Story, sim_thresh=0.9):
         similarity = torch.matmul(curr_segment, ref_segment_feature.t())
 
         if similarity > sim_thresh * max_similarity:
-            ref_segment_feature = (ref_segment_feature + curr_segment) / 2
+            ref_segment_feature = torch.div(ref_segment_feature + curr_segment, 2)
 
             moving_avg_count += 1
         else:
@@ -126,9 +148,19 @@ def extract_segment_features(story: Story, sim_thresh=0.9):
     return story_segments, story_segment_features
 
 
-def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args):
-    ts15_stories = [story for story in cluster.ts15s if rai.tensor_exists(get_vis_key(story.pk))]
-    ts100_stories = [story for story in cluster.ts100s if rai.tensor_exists(get_vis_key(story.pk))]
+def align_mean(population, mean):
+    pop_mean = np.mean(population)
+    if pop_mean > mean:
+        return population - (pop_mean - mean)
+    else:
+        return population + (mean - pop_mean)
+
+
+def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster]):
+    ts15_stories = [story for story in cluster.ts15s if
+                    rai.tensor_exists(get_vis_key(story.pk)) and len(story.shots) > 1]
+    ts100_stories = [story for story in cluster.ts100s if
+                     rai.tensor_exists(get_vis_key(story.pk)) and story.is_nightly == 0]
 
     print(f'Keywords: {cluster.keywords[:5]}')
     print(f'{len(ts15_stories)} ts15')
@@ -138,141 +170,85 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
     segments_per_story = []
     all_segment_features = []
 
-    with alive_bar(len(ts15_stories),
-                   ctrl_c=False, title="Feature Extraction [ts15]",
-                   length=25, force_tty=True, dual_line=True, receipt_text=True) as bar:
+    for story in ts15_stories:
+        segments, features = extract_segment_features(story, sim_thresh=sim_thresh)
 
-        for story in ts15_stories:
-            bar.text = f'Story: {story.pk} -> {story.video}'
-
-            segments, features = extract_segment_features(story)
-
-            segment_features_per_story.append(torch.stack(features))
-            segments_per_story.append(segments)
-            all_segment_features.extend(features)
-
-            bar()
+        segment_features_per_story.append(torch.stack(features))
+        segments_per_story.append(segments)
+        all_segment_features.extend(features)
 
     all_segment_features = torch.stack(all_segment_features)
 
-    # TS100
-
     ts100_segment_features = []
 
-    ts100_stories = [story for story in ts100_stories if story.is_nightly == 0]
+    for story in ts100_stories:
+        _, features = extract_segment_features(story, sim_thresh=sim_thresh)
 
-    with alive_bar(len(ts100_stories),
-                   ctrl_c=False, title="Feature Extraction [ts100]",
-                   length=25, force_tty=True, dual_line=True, receipt_text=True) as bar:
-        for story in ts100_stories:
-            bar.text = f'Story: {story.pk} -> {story.video}'
-
-            _, features = extract_segment_features(story)
-
-            ts100_segment_features.extend(features)
-            bar()
+        ts100_segment_features.extend(features)
 
     ts100_segment_features = torch.stack(ts100_segment_features)
 
-    intra_cluster_threshold = torch.matmul(all_segment_features, all_segment_features.t()).mean()
+    all_other_features = []
+
+    other_stories = flatten([cluster.ts15s for cluster in other_clusters])
+    for story in other_stories:
+        _, features = extract_segment_features(story, sim_thresh=sim_thresh)
+
+        all_other_features.extend(features)
+
+    all_other_features = torch.stack(all_other_features)
+    all_features = torch.cat((all_segment_features, all_other_features))
+
+    inter_cluster_threshold = cosine_similarity(all_features, all_features).mean(axis=1).max() * 0.9
+    intra_cluster_threshold = cosine_similarity(all_segment_features, all_segment_features).mean(axis=1).max() * 0.9
+
+    dist = abs(inter_cluster_threshold - intra_cluster_threshold)
+
+    if inter_cluster_threshold > intra_cluster_threshold:
+        threshold = inter_cluster_threshold - dist
+    else:
+        threshold = inter_cluster_threshold + dist
 
     for idx, (segments, segment_features) in enumerate(zip(segments_per_story, segment_features_per_story)):
 
         story = ts15_stories[idx]
 
-        print(f"[{idx + 1}/{len(cluster.ts15s)}] Story: {story.headline} ({story.pk})")
+        print(
+            f"[{idx + 1}/{len(cluster.ts15s)}] Story: {story.headline} ({story.pk}) {story.video} {story.start} - {story.end}")
+
+        inter_cluster_sim = get_inter_cluster_similarity(segment_features, other_clusters, mean_co=3)
+        inter_cluster_dist = 1 - inter_cluster_sim
+
+        inter_mean = np.mean(inter_cluster_dist)
+
+        intra_cluster_sim = mean_segment_similarity(segment_features, all_segment_features, mean_co=5)
+        intra_cluster_dist = align_mean(1 - intra_cluster_sim, inter_mean)
+
+        ts100_sim = mean_segment_similarity(segment_features, ts100_segment_features, mean_co=5)
+        ts100_sim[0] = 1 - ts100_sim[0]
+        ts100_sim = align_mean(ts100_sim, inter_mean)
+
+        text_sim = get_text_similarity(segment_features, story.pk)
+        text_sim = align_mean(text_sim, inter_mean)
+
+        if text_sim is not None:
+            segment_scores = (inter_cluster_dist + intra_cluster_dist + ts100_sim + text_sim) / 4
+        else:
+            segment_scores = (inter_cluster_dist + intra_cluster_dist + ts100_sim) / 3
 
         n_video_segments = segments[-1][1] + 1
 
-        x = list(range(n_video_segments))
+        threshold = (threshold + np.mean(segment_scores)) / 2
 
-        inter_cluster_sim_matmul = get_inter_cluster_similarity(segment_features,
-                                                                other_clusters,
-                                                                mean_co=5)
+        ax = plot_it(segments,
+                     threshold,
+                     inter_cluster_dist,
+                     intra_cluster_dist,
+                     ts100_sim,
+                     text_sim,
+                     segment_scores)
 
-        y_inter = flatten(seg_scores(segments, inter_cluster_sim_matmul))
-
-        intra_cluster_sim_matmul = get_segment_similarity(segment_features,
-                                                          all_segment_features,
-                                                          mean_co=5)
-
-        y_intra = flatten(seg_scores(segments, intra_cluster_sim_matmul))
-
-        inter_cluster_sim_inv = 1 - inter_cluster_sim_matmul
-        intra_cluster_sim_inv = 1 - intra_cluster_sim_matmul
-
-        ts100_similarity = get_segment_similarity(segment_features,
-                                                  ts100_segment_features,
-                                                  mean_co=5)
-
-        text_similarity_matrix = get_text_similarity_matrix(segment_features, story.pk)
-
-        if text_similarity_matrix is not None:
-            text_similarity = text_similarity_matrix.mean(axis=1)
-
-            segment_scores = (inter_cluster_sim_inv +
-                              intra_cluster_sim_inv) / 2
-        else:
-            segment_scores = (inter_cluster_sim_inv +
-                              intra_cluster_sim_inv +
-                              ts100_similarity) / 3
-
-        # segment_scores = torch.tensor((inter_cluster_sim_inv + intra_cluster_sim_inv + ts100_similarity) / 3)
-        segment_scores = torch.tensor(segment_scores)
-        #segment_scores = F.normalize(segment_scores, dim=0)
-
-
-
-        threshold = segment_scores.max() * 0.9
-
-        fig = plt.figure(1, figsize=(18, 4))
-        plt.subplots_adjust(bottom=0.18, left=0.05, right=0.98)
-
-        ax = fig.add_subplot(111)
-
-        plt.xlabel('Segment')
-        plt.ylabel('Score')
-
-
-
-        y_inter_sim = flatten(seg_scores(segments, inter_cluster_sim_matmul))
-        y_inter_sim_inv = flatten(seg_scores(segments, inter_cluster_sim_inv))
-        y_intra_sim = flatten(seg_scores(segments, intra_cluster_sim_matmul))
-        y_intra_sim_inv = flatten(seg_scores(segments, intra_cluster_sim_inv))
-        y_ts100_sim = flatten(seg_scores(segments, ts100_similarity))
-        y_text_sim = flatten(seg_scores(segments, text_similarity))
-
-        y_final = flatten(seg_scores(segments, segment_scores))
-
-        y_min = min(min(inter_cluster_sim_inv),
-                    min(intra_cluster_sim_inv),
-                    max(ts100_similarity),
-                    max(text_similarity))
-        y_max = max(max(inter_cluster_sim_inv),
-                    max(intra_cluster_sim_inv),
-                    max(ts100_similarity),
-                    max(text_similarity))
-
-        y_axis_min = y_min - (y_max - y_min) * 0.1
-        y_axis_max = y_max + (y_max - y_min) * 0.1
-
-        ax.axis([0, n_video_segments - 1, y_axis_min, y_axis_max])
-
-        ax.hlines(y=threshold, xmin=0, xmax=n_video_segments, linewidth=0.5, color=(0, 0, 0, 1))
-        ax.vlines(flatten(segments), y_axis_min, y_axis_max, linestyles='dotted', colors='grey')
-
-        ax.plot(x, y_final, color='b', linewidth=0.8, label="Final Score")
-        # ax.plot(x, y_inter_sim, color='g', linestyle='dashed', linewidth=0.5, label="Inter-Cluster Score")
-        ax.plot(x, y_inter_sim_inv, color='g', linewidth=0.5, label="Inter-Cluster Score (inv)")
-        ax.plot(x, y_intra_sim_inv, color='r', linewidth=0.5, label="Intra-Cluster Score (inv)")
-        ax.plot(x, y_ts100_sim, color='y', linewidth=0.5, label="ts100 score")
-        # ax.plot(x, y_text_sim, color='c', linewidth=0.5, label="Text score")
-
-        ax.legend()
-
-        plt.xticks(range(0, n_video_segments, 5))
-
-        ax.fill_between(x, y_axis_min, y_axis_max, where=(y_final > threshold.numpy()), color='b', alpha=.1)
+        # plt.show()
 
         machine_summary = np.zeros(n_video_segments)
         machine_summary_scores = np.zeros(n_video_segments)
@@ -286,16 +262,14 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
 
             if end >= start:
                 machine_summary_scores[start: end + 1] = score
-                if score >= threshold:
+                if score >= inter_cluster_threshold:
                     machine_summary[start: end + 1] = 1
                     if random_video_bool:
                         from_idx, to_idx = segment_to_frame_range(0, start, end)
                         frames = story.frames[from_idx:to_idx]
                         summary_video.append(torch.tensor(np.array(read_images(frames))))
 
-        # plt.show()
-
-        if random_video_bool:
+        if random_video_bool and len(summary_video) > 0:
             summary_video = torch.cat(summary_video, dim=0)
 
             pseudo_video_dir = Path(args.pseudo_video_dir, str(cluster.index))
@@ -315,6 +289,64 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         redis_scores.extend(machine_summary_scores.tolist())
 
 
+def plot_it(segments,
+            threshold,
+            inter_cluster_dist,
+            intra_cluster_dist,
+            ts100_sim,
+            text_sim,
+            final_score):
+    n_video_segments = segments[-1][1] + 1
+    x = list(range(n_video_segments))
+
+    fig = plt.figure(1, figsize=(18, 4))
+    plt.subplots_adjust(bottom=0.18, left=0.05, right=0.98)
+    ax = fig.add_subplot(111)
+
+    plt.xlabel('Segment')
+    plt.ylabel('Score')
+
+    y_inter = flatten(score_per_seg(segments, inter_cluster_dist))
+    y_intra = flatten(score_per_seg(segments, intra_cluster_dist))
+    y_ts100 = flatten(score_per_seg(segments, ts100_sim))
+    y_text = flatten(score_per_seg(segments, text_sim))
+    y_final = flatten(score_per_seg(segments, final_score))
+
+    y_min = min(min(y_inter),
+                min(y_intra),
+                min(y_ts100),
+                min(y_text),
+                min(y_final),
+                threshold)
+
+    y_max = max(max(y_inter),
+                max(y_intra),
+                max(y_ts100),
+                max(y_text),
+                max(y_final),
+                threshold)
+
+    y_ax_min = y_min - (y_max - y_min) * 0.1
+    y_ax_max = y_max + (y_max - y_min) * 0.1
+
+    ax.axis([0, n_video_segments - 1, y_ax_min, y_ax_max])
+
+    ax.hlines(y=threshold, xmin=0, xmax=n_video_segments, linewidth=0.5, color=(0, 0, 0, 1))
+    ax.vlines(flatten(segments), y_ax_min, y_ax_max, linestyles='dotted', colors='grey')
+
+    ax.plot(x, y_inter, color='c', linewidth=0.5, label='Inter-Cluster Distance')
+    ax.plot(x, y_intra, color='r', linewidth=0.5, label='Intra-Cluster Distance')
+    ax.plot(x, y_ts100, color='g', linewidth=0.5, label='ts100 Similarity')
+    ax.plot(x, y_text, color='y', linewidth=0.5, label='Text Similarity')
+    ax.plot(x, y_final, color='b', linewidth=0.8, label="Final Score")
+
+    ax.legend()
+    plt.xticks(range(0, n_video_segments, 5))
+    ax.fill_between(x, y_ax_min, y_ax_max, where=(y_final > threshold), color='b', alpha=.1)
+
+    return ax
+
+
 def main(args):
     if args.index:
         clusters = [TopicCluster.find(TopicCluster.index == index).first() for index in args.index]
@@ -325,7 +357,10 @@ def main(args):
     for cluster in clusters:
         print(f'----- Cluster {cluster.index} -----')
 
-        process_cluster(cluster, TopicCluster.find(TopicCluster.index != cluster.index).sort_by('index').all(), args)
+        other_clusters = TopicCluster.find(TopicCluster.index != cluster.index).all()
+
+        process_cluster(cluster, other_clusters)
+
         print()
 
     sys.exit()
