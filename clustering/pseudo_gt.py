@@ -21,7 +21,7 @@ parser = argparse.ArgumentParser('Pseudo Summary Generation')
 parser.add_argument('--index', type=int, nargs='*', help="Generate pseudo summary for cluster index")
 parser.add_argument('--pseudo_video_dir', type=str, default='')
 
-sim_thresh = 0.98
+sim_thresh = 1
 
 
 def score_per_seg(segments, scores):
@@ -98,7 +98,7 @@ def get_text_similarity(segment_features, story_pk):
     if rai.tensor_exists(get_text_key(story_pk)):
         text_features = torch.tensor(rai.get_tensor(get_text_key(story_pk)))
 
-        text_similarity = mean_segment_similarity(segment_features, text_features)
+        text_similarity = mean_segment_similarity(segment_features, text_features, mean_co=1)
 
         return text_similarity
 
@@ -199,24 +199,20 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster]):
     all_other_features = torch.stack(all_other_features)
     all_features = torch.cat((all_segment_features, all_other_features))
 
-    inter_cluster_threshold = cosine_similarity(all_features, all_features).mean(axis=1).max() * 0.9
-    intra_cluster_threshold = cosine_similarity(all_segment_features, all_segment_features).mean(axis=1).max() * 0.9
+    inter_cluster_threshold = cosine_similarity(all_features, all_features).mean(axis=1).max() * 0.75
+    intra_cluster_threshold = cosine_similarity(all_segment_features, all_segment_features).mean(axis=1).max() * 0.75
 
-    dist = abs(inter_cluster_threshold - intra_cluster_threshold)
-
-    if inter_cluster_threshold > intra_cluster_threshold:
-        threshold = inter_cluster_threshold - dist
-    else:
-        threshold = inter_cluster_threshold + dist
+    threshold = (inter_cluster_threshold + intra_cluster_threshold) / 2
 
     for idx, (segments, segment_features) in enumerate(zip(segments_per_story, segment_features_per_story)):
 
         story = ts15_stories[idx]
 
         print(
-            f"[{idx + 1}/{len(cluster.ts15s)}] Story: {story.headline} ({story.pk}) {story.video} {story.start} - {story.end}")
+            f"[{idx + 1}/{len(cluster.ts15s)}] Story: {story.headline} "
+            f"({story.pk}) {story.video} {story.start} - {story.end}")
 
-        inter_cluster_sim = get_inter_cluster_similarity(segment_features, other_clusters, mean_co=3)
+        inter_cluster_sim = get_inter_cluster_similarity(segment_features, other_clusters, mean_co=1)
         inter_cluster_dist = 1 - inter_cluster_sim
 
         inter_mean = np.mean(inter_cluster_dist)
@@ -226,6 +222,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster]):
 
         ts100_sim = mean_segment_similarity(segment_features, ts100_segment_features, mean_co=5)
         ts100_sim[0] = 1 - ts100_sim[0]
+
         ts100_sim = align_mean(ts100_sim, inter_mean)
 
         text_sim = get_text_similarity(segment_features, story.pk)
@@ -238,15 +235,19 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster]):
 
         n_video_segments = segments[-1][1] + 1
 
-        threshold = (threshold + np.mean(segment_scores)) / 2
+        mean_thresh = (threshold + np.mean(segment_scores)) / 2
 
         ax = plot_it(segments,
-                     threshold,
+                     mean_thresh,
                      inter_cluster_dist,
                      intra_cluster_dist,
                      ts100_sim,
                      text_sim,
                      segment_scores)
+
+        ax.hlines(y=threshold, xmin=0, xmax=n_video_segments, linewidth=0.5, linestyles='dotted', color=(0, 0, 0, 1))
+        ax.hlines(y=np.mean(segment_scores), xmin=0, xmax=n_video_segments, linewidth=0.5, linestyles='dotted',
+                  color=(0, 0, 0, 1))
 
         # plt.show()
 
@@ -264,10 +265,11 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster]):
                 machine_summary_scores[start: end + 1] = score
                 if score >= inter_cluster_threshold:
                     machine_summary[start: end + 1] = 1
+
                     if random_video_bool:
                         from_idx, to_idx = segment_to_frame_range(0, start, end)
                         frames = story.frames[from_idx:to_idx]
-                        summary_video.append(torch.tensor(np.array(read_images(frames))))
+                        summary_video.append(torch.tensor(read_images(frames)))
 
         if random_video_bool and len(summary_video) > 0:
             summary_video = torch.cat(summary_video, dim=0)

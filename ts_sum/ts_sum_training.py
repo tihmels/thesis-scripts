@@ -259,15 +259,20 @@ def main(args):
         if "mixed_5" in name and args.finetune:
             param.requires_grad = True
 
-    train_dataset = TVSumStoryLoader(
+    dataset = TVSumStoryLoader(
         fps=args.fps,
         num_frames=args.num_frames,
         num_frames_per_segment=args.num_frames_per_segment,
         size=args.video_size,
     )
 
+    train_size = int(0.9 * len(dataset))
+    test_size = len(dataset) - train_size
+
+    train_set, val_set = torch.utils.data.random_split(dataset, [train_size, test_size])
+
     train_loader = torch.utils.data.DataLoader(
-        train_dataset,
+        train_set,
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=False,

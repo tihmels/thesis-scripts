@@ -1,5 +1,3 @@
-import random
-
 import numpy as np
 import os
 import torch
@@ -9,7 +7,7 @@ from torch.utils.data import Dataset
 from common.utils import read_images, flatten
 from database import db, rai
 from database.config import get_sum_key, get_score_key
-from database.model import Story, MainVideo
+from database.model import Story, MainVideo, TopicCluster
 
 
 class TVSumStoryLoader(Dataset):
@@ -20,8 +18,7 @@ class TVSumStoryLoader(Dataset):
             fps=12,
             num_frames=832,
             num_frames_per_segment=32,
-            size=224,
-            token_to_word_path="data/dict.npy",
+            size=224
     ):
         assert isinstance(size, int)
 
@@ -33,24 +30,17 @@ class TVSumStoryLoader(Dataset):
 
         self.stories = Story.find(Story.type == 'ts15').all()
         self.stories = [story for story in self.stories if db.List(get_sum_key(story.pk))]
-        self.stories = random.sample(self.stories, 56)
 
-        token_to_word = np.load(
-            os.path.join(os.path.dirname(__file__), token_to_word_path)
-        )
-
-        self.word_to_token = {}
-        for i, t in enumerate(token_to_word):
-            self.word_to_token[t] = i + 1
-
-        pos = 0
-        neg = 0
+        clusters = TopicCluster.find().all()
 
         self.summaries = [db.List(get_sum_key(story.pk)).as_list() for story in self.stories]
         self.summaries = [list(map(int, map(float, label))) for label in self.summaries]
 
         self.scores = [db.List(get_score_key(story.pk)).as_list() for story in self.stories]
         self.scores = [list(map(float, score)) for score in self.scores]
+
+        pos = 0
+        neg = 0
 
         pos += sum([np.count_nonzero(np.asarray(label)) for label in self.summaries])
         neg += sum(len(label) - np.count_nonzero(np.asarray(label)) for label in self.summaries)
