@@ -14,8 +14,7 @@ matplotlib.use('TkAgg')
 
 from common.utils import read_images, create_dir, flatten
 from database import rai, db
-from database.config import get_vis_key, get_sum_key, get_score_key, get_text_key
-from database.model import TopicCluster, Story
+from database.model import TopicCluster, Story, get_text_key, get_vis_key, get_sum_key, get_score_key
 
 parser = argparse.ArgumentParser('Pseudo Summary Generation')
 parser.add_argument('--index', type=int, nargs='*', help="Generate pseudo summary for cluster index")
@@ -199,8 +198,8 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster]):
     all_other_features = torch.stack(all_other_features)
     all_features = torch.cat((all_segment_features, all_other_features))
 
-    inter_cluster_threshold = cosine_similarity(all_features, all_features).mean(axis=1).max() * 0.75
-    intra_cluster_threshold = cosine_similarity(all_segment_features, all_segment_features).mean(axis=1).max() * 0.75
+    inter_cluster_threshold = cosine_similarity(all_features, all_features).mean(axis=1).max()
+    intra_cluster_threshold = cosine_similarity(all_segment_features, all_segment_features).mean(axis=1).max()
 
     threshold = (inter_cluster_threshold + intra_cluster_threshold) / 2
 
@@ -221,8 +220,6 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster]):
         intra_cluster_dist = align_mean(1 - intra_cluster_sim, inter_mean)
 
         ts100_sim = mean_segment_similarity(segment_features, ts100_segment_features, mean_co=5)
-        ts100_sim[0] = 1 - ts100_sim[0]
-
         ts100_sim = align_mean(ts100_sim, inter_mean)
 
         text_sim = get_text_similarity(segment_features, story.pk)
@@ -249,7 +246,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster]):
         ax.hlines(y=np.mean(segment_scores), xmin=0, xmax=n_video_segments, linewidth=0.5, linestyles='dotted',
                   color=(0, 0, 0, 1))
 
-        # plt.show()
+        plt.show()
 
         machine_summary = np.zeros(n_video_segments)
         machine_summary_scores = np.zeros(n_video_segments)

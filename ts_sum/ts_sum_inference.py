@@ -10,8 +10,7 @@ from torchvision.transforms import transforms
 
 from common.utils import read_images, flatten
 from database import rai, db
-from database.config import get_sum_key, get_score_key
-from database.model import MainVideo
+from database.model import MainVideo, get_sum_key, get_score_key
 from ts_sum import s3dg
 from ts_sum.ts_sum_utils import get_last_checkpoint, Logger, AverageMeter
 

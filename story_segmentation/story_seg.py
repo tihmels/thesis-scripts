@@ -1,28 +1,29 @@
 #!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
-
-import operator
-import re
-from argparse import ArgumentParser
-from pathlib import Path
-
+import matplotlib
 import numpy as np
+import operator
 import pandas as pd
+import re
 import spacy
+import textwrap
 from HanTa import HanoverTagger as ht
 from PIL import Image
+from argparse import ArgumentParser
 from fuzzywuzzy import fuzz
 from nltk.corpus import stopwords
+from pathlib import Path
 from pytesseract import pytesseract, Output
 from sklearn.feature_extraction.text import CountVectorizer
 
 from banner_ocr.ocr import crop_frame, sharpen_frame, resize_frame
-from common.DataModel import get_text
 from common.Schemas import STORY_COLUMNS
 from common.VAO import VAO, get_shot_file, get_date_time, get_banner_caption_file, get_story_file, \
-    get_topic_file, is_summary, read_shots_from_file
+    get_topic_file, is_summary, read_shots_from_file, get_text
 from common.constants import TV_FILENAME_RE
 from common.utils import frame_idx_to_sec, sec_to_time, time_to_datetime, flatten
 from story_segmentation.charsplit.splitter import Splitter
+
+matplotlib.use('TkAgg')
 
 parser = ArgumentParser('Story Segmentation')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+')
@@ -42,7 +43,7 @@ abbrvs = {'AKW': 'Atomkraftwerk',
 
 
 def lemmatizer(text):
-    return [tag for word in text for tag in tagger.analyze(word)[:1]]
+    return [tag.lower() for word in text for tag in tagger.analyze(word)[:1]]
 
 
 def extract_story_data(shots, first_shot_idx: int, last_shot_idx: int):
@@ -85,19 +86,18 @@ def custom_preprocessor(text):
     text = abbreviations(text)
 
     text = text.lower()
-    text = umlauts(text)
 
-    text = re.sub("\\W", " ", text)
-
-    stop_words = [umlauts(word) for word in german_stop_words]
-
-    text_wo_stop_words = [word for word in text.split() if word not in stop_words]
-
-    return text_wo_stop_words
+    return text
 
 
 def custom_tokenizer(text):
-    splits = flatten([split[1:] for word in text for split in splitter.split_compound(word) if split[0] > 0.9])
+    token_pattern = re.compile(r"(?u)\b\w\w+\b")
+    text = token_pattern.findall(text)
+
+    text = [word for word in text if word not in german_stop_words]
+
+    splits = flatten([split[1:] for word in text for split in splitter.split_compound(word) if split[0] > 0.7])
+    splits = [split.lower() for split in splits]
 
     return lemmatizer(text + splits)
 
@@ -110,32 +110,73 @@ def get_vectorizer(text) -> CountVectorizer:
     return vectorizer
 
 
-def get_topic_to_shot(topics, anchor_shots, anchor_transcripts, anchor_captions):
-    dt_matrix = np.zeros(shape=(len(topics), len(anchor_shots)))
+def wrap_labels(ax, width, break_long_words=True):
+    labels = []
+    for label in ax.get_yticklabels():
+        text = label.get_text()
+        labels.append(textwrap.fill(text, width=width,
+                                    break_long_words=break_long_words))
+    ax.set_yticklabels(labels, rotation=0)
+
+
+def assign_topics_to_shots(topics, shots, transcripts, texts):
+    dt_matrix = np.zeros(shape=(len(topics), len(shots)))
 
     for idx, topic in topics.items():
         vectorizer = get_vectorizer(topic)
 
         voc = vectorizer.vocabulary_
 
-        bow_caption = vectorizer.transform([caption for caption in anchor_captions.values()])
-        bow_transcript = vectorizer.transform([transcript for transcript in anchor_transcripts.values()])
+        bow_caption = vectorizer.transform([caption for caption in texts.values()])
+        bow_transcript = vectorizer.transform([transcript for transcript in transcripts.values()])
 
         bow = bow_transcript.toarray() + np.multiply(bow_caption.toarray(), 2)
 
         bow_sum = [sum(vec) for vec in bow]
         dt_matrix[idx] = bow_sum
 
-    argmax, values = np.argmax(dt_matrix, axis=1), np.max(dt_matrix, axis=1)
+    argmax, values = [], []
 
-    to_shot_idx = np.vectorize(lambda dt_idx: list(anchor_shots.keys())[dt_idx])
+    for idx, topic in enumerate(topics.values()):
+        lower_bound = argmax[-1] + 1 if len(argmax) > 0 else 0
+
+        row = dt_matrix[idx, lower_bound:].astype(int)
+        argmax.append(np.argmax(row) + lower_bound)
+        values.append(np.max(row))
+
+    # ax = sns.heatmap(dt_matrix, cmap='Blues', yticklabels=list(topics.values()),
+    #                  cbar_kws={'label': 'Vocabulary hits'})
+    #
+    # ax.xaxis.tick_top()
+    # ax.xaxis.set_label_position('top')
+    # cbar = ax.collections[0].colorbar
+    #
+    # cbar.set_ticks([])
+    # wrap_labels(ax, 40)
+    # ax.set(xlabel='Shots')
+    # plt.subplots_adjust(left=0.2, right=0.98)
+    #
+    # for aidx, amax in enumerate(argmax):
+    #     ax.add_patch(
+    #         patches.Rectangle(
+    #             (amax, -1),
+    #             1.0,
+    #             float(len(topics)) + 1,
+    #             edgecolor='black',
+    #             fill=False,
+    #             lw=0.5
+    #         ))
+    #
+    # plt.show()
+
+    to_shot_idx = np.vectorize(lambda dt_idx: list(shots.keys())[dt_idx])
     shot_idxs = to_shot_idx(argmax)
 
     return {topic_idx: shot_idx for idx, (topic_idx, shot_idx) in enumerate(zip(topics, shot_idxs)) if
             (values[idx] > 0 and all(pre_shot_idx < shot_idx for pre_shot_idx in shot_idxs[:idx]))}
 
 
-def get_anchor_transcripts(vao: VAO, anchor_shots, max_shots=1):
+def get_shot_transcripts(vao: VAO, anchor_shots, max_shots=1):
     return {
         idx: get_text(vao.data.get_shot_transcripts(idx,
                                                     min(next(
@@ -178,7 +219,7 @@ def get_caption(frame: Path, resize_factor=3):
     return confidence_text(news_text_data)
 
 
-def get_anchor_captions(vao: VAO, anchor_shots):
+def get_shot_text(vao: VAO, anchor_shots):
     return {
         idx: get_caption(vao.data.frames[shot.center_frame_idx]) for idx, shot in anchor_shots.items()
     }
@@ -206,14 +247,14 @@ def segment_ts15(vao: VAO):
 
     shot_cutoff_idx = next(
         idx for idx, shot in enumerate(vao.data.shots) if shot.type == 'weather' or shot.type == 'lotto')
-    # anchor_shots = {idx: sd for idx, sd in enumerate(vao.data.shots) if sd.type == 'anchor' and idx < shot_cutoff_idx}
-    anchor_shots = {idx: sd for idx, sd in enumerate(vao.data.shots) if idx < shot_cutoff_idx}
 
-    anchor_transcripts = get_anchor_transcripts(vao, anchor_shots)
-    anchor_captions = get_anchor_captions(vao, anchor_shots)
+    shots = {idx: sd for idx, sd in enumerate(vao.data.shots) if idx < shot_cutoff_idx}
 
-    topic_to_shot = get_topic_to_shot(news_topics, anchor_shots, anchor_transcripts, anchor_captions)
-    topic_to_shot = post_processing(topic_to_shot, news_topics, anchor_shots)
+    transcripts = get_shot_transcripts(vao, shots)
+    banner_texts = get_shot_text(vao, shots)
+
+    topic_to_shot = assign_topics_to_shots(news_topics, shots, transcripts, banner_texts)
+    topic_to_shot = post_processing(topic_to_shot, news_topics, shots)
 
     missing_topics = [idx for idx in news_topics.keys() if idx not in topic_to_shot.keys()]
     if len(missing_topics) > 0:
@@ -232,8 +273,8 @@ def segment_ts15(vao: VAO):
             last_shot_idx = next((idx for idx in list(topic_to_shot.values()) if idx > first_shot_idx)) - 1
         else:
             last_shot_idx = next(
-                (idx for idx, cd in anchor_shots.items() if idx > first_shot_idx and cd.type == 'anchor'),
-                len(anchor_shots)) - 1
+                (idx for idx, cd in shots.items() if idx > first_shot_idx and cd.type == 'anchor'),
+                len(shots)) - 1
 
         story_data = extract_story_data(vao.data.shots, first_shot_idx, last_shot_idx)
 
@@ -259,7 +300,7 @@ def preprocess_captions(captions):
     # which is why the banner text is not captured by OCR.
     # we fix this by assuming that this shot belongs to the previous caption.
     for idx, cd in captions.items():
-        if (not cd.text.strip() or cd.confidence < 75) and idx - 1 in captions:
+        if (not cd.text.strip() or cd.confidence < 70) and idx - 1 in captions:
             predecessor = captions[idx - 1]
             captions[idx] = predecessor
 
@@ -354,8 +395,8 @@ def main(args):
 
     print(f'Story Segmentation for {len(video_files)} videos ... \n')
 
-    total_topics = 0
-    unassigned_topics = 0
+    n_total = 0
+    unassigned_topics = []
 
     for idx, vf in enumerate(video_files):
         vao = VAO(vf)
@@ -367,18 +408,22 @@ def main(args):
         df = segmentor(vao)
 
         if not vao.is_summary:
-            assigned_topics = df.shape[0]
+            assigned_topics_idxs = df.loc[:, 'ref_idx'].astype(int).tolist()
 
             topics_cutoff_idx = next(
                 idx for idx, topic in enumerate(vao.data.topics) if re.search(r"^(Die Lottozahlen|Das Wetter)$", topic))
 
             n_topics = topics_cutoff_idx
-            total_topics += n_topics
-            unassigned_topics += n_topics - assigned_topics
+            n_total += n_topics
+
+            unassigned_topics.extend(
+                [topic for idx, topic in enumerate(vao.data.topics[:topics_cutoff_idx]) if
+                 idx not in assigned_topics_idxs])
 
         df.to_csv(get_story_file(vao), index=False)
 
-    print(f'{total_topics - unassigned_topics} / {total_topics} topics could be assigned.')
+    print(f'{n_total - len(unassigned_topics)} / {n_total} topics could be assigned.')
+    print(f'unassigned topics are: ${unassigned_topics}')
 
 
 if __name__ == "__main__":

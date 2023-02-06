@@ -17,6 +17,7 @@ import s3dg
 from ts_sum.evaluate_and_log import evaluate_summary
 from ts_sum.ts_sum_utils import Logger, AverageMeter
 from ts_sum.video_loader import TVSumStoryLoader
+from ts_sum.vsum import VSum, VSum_MLP
 
 parser = ArgumentParser('Setup RedisAI DB')
 parser.add_argument("--seed", default=1, type=int, help="seed for initializing training.")
@@ -324,7 +325,7 @@ def main(args):
             optimizer,
             scheduler,
             epoch,
-            train_dataset,
+            train_set,
             logger,
             args,
         )
@@ -457,7 +458,7 @@ def TrainOneBatch(model, opt, scheduler, data, loss_fun):
 
 def create_model(args):
     if args.model_type == 1:
-        model = s3dg.VSum(
+        model = VSum(
             args.num_class,
             space_to_depth=True,
             word2vec_path=args.word2vec_path,
@@ -466,7 +467,7 @@ def create_model(args):
             heads=args.heads,
             dropout=args.dropout)
     else:
-        model = s3dg.VSum_MLP(
+        model = VSum_MLP(
             args.num_class,
             space_to_depth=True,
             word2vec_path=args.word2vec_path,

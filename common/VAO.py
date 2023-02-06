@@ -3,13 +3,11 @@ import numpy as np
 import pandas as pd
 import re
 from PIL import Image
-from datetime import datetime
 from functools import cached_property
 from pathlib import Path
 from skimage.feature import match_template
 from typing import Union
 
-from common.DataModel import BannerData, TranscriptData, StoryData, ShotData
 from common.Schemas import SHOT_COLUMNS, BANNER_COLUMNS, STORY_COLUMNS, TRANSCRIPT_COLUMNS
 from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT_AUDIO_FILENAME_RE, \
     STORY_TRANSCRIPT_FILENAME_RE, AUDIO_DIR, FRAME_DIR, KF_DIR, TRANSCRIPT_DIR, SM_DIR, TOPICS_FILENAME, \
@@ -17,6 +15,57 @@ from common.constants import TV_AUDIO_FILENAME_RE, STORY_AUDIO_FILENAME_RE, SHOT
 from common.utils import frame_idx_to_time, time_to_datetime, Range, range_overlap
 
 nltk.download('punkt')
+
+from dataclasses import dataclass
+from datetime import datetime
+
+
+@dataclass
+class BannerData:
+    headline: str
+    subline: str
+    confidence: float
+
+    @property
+    def text(self):
+        return ' '.join([self.headline, self.subline]) if self.subline else self.headline
+
+
+@dataclass(frozen=True)
+class TranscriptData:
+    start: datetime.time
+    end: datetime.time
+    text: str
+    color: str = None
+
+
+def get_text(tds: [TranscriptData]):
+    return ' '.join([td.text.strip() for td in tds])
+
+
+@dataclass
+class ShotData:
+    first_frame_idx: int
+    last_frame_idx: int
+    type: str = None
+
+    @property
+    def center_frame_idx(self):
+        return int((self.first_frame_idx + self.last_frame_idx) / 2)
+
+    @property
+    def n_frames(self):
+        return self.last_frame_idx - self.first_frame_idx + 1
+
+
+@dataclass
+class StoryData:
+    ref_idx: int
+    headline: str
+    first_frame_idx: int
+    last_frame_idx: int
+    first_shot_idx: int
+    last_shot_idx: int
 
 
 class VAO:

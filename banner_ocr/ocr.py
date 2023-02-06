@@ -38,10 +38,10 @@ def binarize_frame(frame, is_nightly):
         # binary = skimage.morphology.binary_dilation(binary, footprint=skimage.morphology.diamond(1))
         return binary
     else:
-        thresh = skimage.filters.thresholding.threshold_li(frame, initial_guess=150)
-        # thresh = 165
+        thresh = skimage.filters.thresholding.threshold_li(frame)
+        thresh = 165
         binary = frame > thresh
-        # binary = skimage.morphology.binary_erosion(binary, footprint=skimage.morphology.diamond(2))
+        #binary = skimage.morphology.binary_erosion(binary, footprint=skimage.morphology.diamond(1))
         return binary
 
 
@@ -65,7 +65,7 @@ def extract_caption_data_from_frame(frame: Path, resize_factor, is_nightly, cust
     frame = crop_frame(frame, area)
     frame.save('/Users/tihmels/Desktop/out/2_area.jpg')
 
-    frame = sharpen_frame(frame, 1.5)
+    frame = sharpen_frame(frame, 2)
     frame.save('/Users/tihmels/Desktop/out/3_sharpened.jpg')
 
     frame = resize_frame(frame, resize_factor)
@@ -176,7 +176,7 @@ def main(args):
                 headline = ' '.join(headline).strip()
                 subline = ' '.join([sub for subline in sublines for sub in subline]).strip()
 
-                captions.append((headline, subline, int(np.rint(100 - (np.std(confidences))))))
+                captions.append((headline, subline, int(np.rint(np.max(confidences) - (np.std(confidences))))))
 
                 bar()
 

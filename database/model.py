@@ -36,7 +36,8 @@ class Shot(EmbeddedBaseModel, ABC):
     first_frame_idx: int
     last_frame_idx: int
     duration: datetime.time
-    transcript: str
+    transcript_de: str
+    transcript_en: str
     keyframe: str
 
 
@@ -52,7 +53,6 @@ class Story(EmbeddedBaseModel):
     headline: str = Field(index=True)
     video: str = Field(index=True)
     type: str = Field(index=True)
-    is_nightly: Optional[int]
     first_frame_idx: int
     last_frame_idx: int
     timestamp: int
@@ -107,16 +107,54 @@ class MainVideo(VideoBaseModel):
 
 class VideoRef(EmbeddedBaseModel):
     ref_pk: str = Field(index=True)
-
     temp_dist: int = Field(index=True, sortable=True)
-    similarity: int = Field(index=True, sortable=True, default=-1)
 
 
 class ShortVideo(VideoBaseModel):
-    is_nightly: int
-
     pre_main: Optional[VideoRef]
     suc_main: Optional[VideoRef]
 
     class Meta:
         model_key_prefix = 'ts100'
+
+
+RAI_TOPIC_PREFIX = 'tensor:topic:'
+RAI_SHOT_PREFIX = 'tensor:shot:'
+RAI_TEXT_PREFIX = 'tensor:mil-nce:text:'
+RAI_STORY_PREFIX = 'tensor:story:'
+RAI_M5C_PREFIX = 'tensor:mil-nce:m5c:'
+RAI_VIS_PREFIX = 'tensor:mil-nce:vis:'
+RAI_PSEUDO_SUM_PREFIX = 'pseudo:summary:'
+RAI_PSEUDO_SCORE_PREFIX = 'pseudo:scores:'
+
+
+def get_topic_key(pk: str):
+    return RAI_TOPIC_PREFIX + pk
+
+
+def get_shot_key(pk: str):
+    return RAI_SHOT_PREFIX + pk
+
+
+def get_text_key(pk: str):
+    return RAI_TEXT_PREFIX + pk
+
+
+def get_story_key(pk: str):
+    return RAI_STORY_PREFIX + pk
+
+
+def get_m5c_key(pk: str):
+    return RAI_M5C_PREFIX + pk
+
+
+def get_vis_key(pk: str):
+    return RAI_VIS_PREFIX + pk
+
+
+def get_sum_key(pk: str):
+    return RAI_PSEUDO_SUM_PREFIX + pk
+
+
+def get_score_key(pk: str):
+    return RAI_PSEUDO_SCORE_PREFIX + pk

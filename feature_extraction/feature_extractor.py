@@ -9,9 +9,7 @@ from redis_om import Migrator
 
 from common.utils import set_tf_loglevel
 from database import rai
-from database.config import get_vis_key, \
-    get_m5c_key, get_text_key, get_topic_key
-from database.model import MainVideo, ShortVideo, Story
+from database.model import MainVideo, ShortVideo, Story, get_vis_key, get_m5c_key, get_topic_key, get_text_key
 from feature_extraction.StoryDataExtractor import StoryDataExtractor
 
 set_tf_loglevel(logging.FATAL)

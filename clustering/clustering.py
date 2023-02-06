@@ -8,6 +8,7 @@ import os
 import pandas as pd
 import random
 import sys
+from bertopic import BERTopic
 from hyperopt import Trials, partial, fmin, tpe, space_eval, STATUS_OK, hp
 # matplotlib.use('TkAgg')
 from nltk.corpus import stopwords
@@ -17,8 +18,7 @@ from tqdm import trange
 
 from common.utils import set_tf_loglevel
 from database import rai
-from database.config import get_topic_key
-from database.model import TopicCluster, Story
+from database.model import TopicCluster, Story, get_topic_key
 
 set_tf_loglevel(logging.FATAL)
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
@@ -209,7 +209,15 @@ label_upper = 20
 max_evals = 150
 
 
-def process_stories(ts15_stories, ts100_stories):
+def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
+    ts15_headlines = [story.headline for story in ts15_stories]
+    ts15_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts15_stories]
+
+    ts100_headlines = [story.headline for story in ts100_stories]
+    ts100_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts100_stories]
+
+    topic_model = BERTopic(language='german').fit_transform(ts15_headlines, ts15_tensors)
+
     ts15_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts15_stories]
 
     # best_params_use, best_clusters_use, trials_use = bayesian_search(ts15_tensors, space=hspace,

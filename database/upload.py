@@ -26,13 +26,16 @@ def get_story_pk(video_pk: str, story_idx: int):
 
 
 def create_video_data(vao: VAO):
-    video_pk = str(vao.id)
+    pk = str(vao.id)
 
     transcripts = [Transcript(from_time=transcript.start,
                               to_time=transcript.end,
                               text=transcript.text.strip()) for transcript in vao.data.transcripts]
 
     if vao.is_summary:
+
+        if vao.is_nightly_version:
+            return
 
         banners = [Banner(headline=banner.headline, subheadline=banner.subline, confidence=banner.confidence)
                    for banner in vao.data.banners]
@@ -44,11 +47,10 @@ def create_video_data(vao: VAO):
                            transcript=get_text(vao.data.get_shot_transcripts(idx)),
                            banner=banner) for idx, (shot, banner) in enumerate(zip(vao.data.shots, banners))]
 
-        stories = [Story(pk=get_story_pk(video_pk, idx),
+        stories = [Story(pk=get_story_pk(pk, idx),
                          headline=story.headline,
                          video=str(vao.path),
                          type='ts100',
-                         is_nightly=vao.is_nightly_version,
                          first_frame_idx=story.first_frame_idx,
                          last_frame_idx=story.last_frame_idx,
                          start=frame_idx_to_time(story.first_frame_idx),
@@ -63,11 +65,10 @@ def create_video_data(vao: VAO):
                                        vao.data.get_story_sentences(idx)]).save() for
                    idx, story in enumerate(vao.data.stories)]
 
-        video = ShortVideo(pk=video_pk,
+        video = ShortVideo(pk=pk,
                            path=str(vao.path),
                            date=vao.date.date(),
                            time=vao.date.time(),
-                           is_nightly=vao.is_nightly_version,
                            duration=vao.duration,
                            timestamp=vao.date.timestamp(),
                            shots=shots,
@@ -81,7 +82,7 @@ def create_video_data(vao: VAO):
                           transcript=get_text(vao.data.get_shot_transcripts(idx)),
                           type=shot.type) for idx, shot in enumerate(vao.data.shots)]
 
-        stories = [Story(pk=get_story_pk(video_pk, idx),
+        stories = [Story(pk=get_story_pk(pk, idx),
                          headline=vao.data.topics[story.ref_idx],
                          video=str(vao.path),
                          type='ts15',
@@ -99,7 +100,7 @@ def create_video_data(vao: VAO):
                                        vao.data.get_story_sentences(idx)]).save()
                    for idx, story in enumerate(vao.data.stories)]
 
-        video = MainVideo(pk=video_pk,
+        video = MainVideo(pk=pk,
                           path=str(vao.path),
                           date=vao.date.date(),
                           time=vao.date.time(),

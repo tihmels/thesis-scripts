@@ -5,6 +5,11 @@ stories = Story.find(Story.type == 'ts15').all()
 
 for story in stories:
 
+    if story.shots[0].type != 'anchor':
+        print(story.pk)
+
+    continue
+
     if len(story.shots) == 0:
         print(f'Story {story.pk} has no shots! Please check')
         continue

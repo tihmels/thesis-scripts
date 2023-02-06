@@ -42,7 +42,7 @@ def process_video(vao: VAO, threshold):
         transcript = vao.data.transcripts
         shots = fix_first_anchorshot_segment(shots, transcript)
 
-    shots = shots[shots[:, 1] - shots[:, 0] > 13]
+    shots = shots[shots[:, 1] - shots[:, 0] > 12]
 
     return shots, img
 

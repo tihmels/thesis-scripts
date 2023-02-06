@@ -6,8 +6,7 @@ from torch.utils.data import Dataset
 
 from common.utils import read_images, flatten
 from database import db, rai
-from database.config import get_sum_key, get_score_key
-from database.model import Story, MainVideo, TopicCluster
+from database.model import Story, MainVideo, TopicCluster, get_sum_key, get_score_key
 
 
 class TVSumStoryLoader(Dataset):
@@ -32,6 +31,13 @@ class TVSumStoryLoader(Dataset):
         self.stories = [story for story in self.stories if db.List(get_sum_key(story.pk))]
 
         clusters = TopicCluster.find().all()
+        self.clusters = []
+        for story in self.stories:
+            for cluster in clusters:
+                pks = [s.pk for s in cluster.ts15s]
+                if story.pk in pks:
+                    self.clusters.append(cluster.index)
+                    continue
 
         self.summaries = [db.List(get_sum_key(story.pk)).as_list() for story in self.stories]
         self.summaries = [list(map(int, map(float, label))) for label in self.summaries]

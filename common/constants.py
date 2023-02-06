@@ -19,7 +19,7 @@ TRANSCRIPT_DIR = 'transcripts'
 SM_DIR = 'sm'
 
 TRANSCRIPT_FILENAME = 'transcript.csv'
-CAPTIONS_FILENAME = 'captions.csv'
+CAPTIONS_FILENAME = 'banners.csv'
 SHOT_FILENAME = 'shots.csv'
 SHOT_CLASS_FILENAME = 'classifications.csv'
 STORY_FILENAME = 'stories.csv'
