@@ -24,6 +24,7 @@ def trans(text):
     else:
         return ""
 
+
 def get_story_pk(video_pk: str, story_idx: int):
     suffix = "{:02d}".format(story_idx)
     return video_pk + "-" + suffix

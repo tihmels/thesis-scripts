@@ -5,11 +5,13 @@ import operator
 import pandas as pd
 import re
 import spacy
+import seaborn as sns
 import textwrap
 from HanTa import HanoverTagger as ht
 from PIL import Image
 from argparse import ArgumentParser
 from fuzzywuzzy import fuzz
+from matplotlib import pyplot as plt, patches
 from nltk.corpus import stopwords
 from pathlib import Path
 from pytesseract import pytesseract, Output
@@ -144,30 +146,30 @@ def assign_topics_to_shots(topics, shots, transcripts, texts):
         argmax.append(np.argmax(row) + lower_bound)
         values.append(np.max(row))
 
-    # ax = sns.heatmap(dt_matrix, cmap='Blues', yticklabels=list(topics.values()),
-    #                  cbar_kws={'label': 'Vocabulary hits'})
-    #
-    # ax.xaxis.tick_top()
-    # ax.xaxis.set_label_position('top')
-    # cbar = ax.collections[0].colorbar
-    #
-    # cbar.set_ticks([])
-    # wrap_labels(ax, 40)
-    # ax.set(xlabel='Shots')
-    # plt.subplots_adjust(left=0.2, right=0.98)
-    #
-    # for aidx, amax in enumerate(argmax):
-    #     ax.add_patch(
-    #         patches.Rectangle(
-    #             (amax, -1),
-    #             1.0,
-    #             float(len(topics)) + 1,
-    #             edgecolor='black',
-    #             fill=False,
-    #             lw=0.5
-    #         ))
-    #
-    # plt.show()
+    ax = sns.heatmap(dt_matrix[:, :100], cmap='Blues', yticklabels=list(topics.values()),
+                     cbar_kws={'label': 'Vocabulary hits', 'shrink': 0.8})
+
+    ax.xaxis.tick_top()
+    ax.xaxis.set_label_position('top')
+    cbar = ax.collections[0].colorbar
+
+    cbar.set_ticks([])
+    wrap_labels(ax, 38)
+    ax.set(xlabel='Shots')
+    plt.subplots_adjust(left=0.2, right=0.98)
+
+    for aidx, amax in enumerate(argmax):
+        ax.add_patch(
+            patches.Rectangle(
+                (amax, -1),
+                1.0,
+                float(len(topics)) + 1,
+                edgecolor='black',
+                fill=False,
+                lw=0.5
+            ))
+
+    plt.show()
 
     to_shot_idx = np.vectorize(lambda dt_idx: list(shots.keys())[dt_idx])
     shot_idxs = to_shot_idx(argmax)
