@@ -8,7 +8,6 @@ from collections import defaultdict
 import hdbscan
 import numpy as np
 import pandas as pd
-from bertopic import BERTopic
 from hyperopt import Trials, partial, fmin, tpe, space_eval, STATUS_OK, hp
 # matplotlib.use('TkAgg')
 from nltk.corpus import stopwords
@@ -18,7 +17,8 @@ from tqdm import trange
 
 from common.utils import set_tf_loglevel
 from database import rai
-from database.model import TopicCluster, Story, get_headline_key
+from database.model import TopicCluster, Story, get_headline_key, get_topic_key
+from feature_extraction.feature_extractor import topic_text
 
 set_tf_loglevel(logging.FATAL)
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
@@ -210,14 +210,16 @@ max_evals = 150
 
 def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
     ts15_headlines = [story.headline for story in ts15_stories]
-    ts15_tensors = [rai.get_tensor(get_headline_key(story.pk)) for story in ts15_stories]
+    ts15_headline_tensors = [rai.get_tensor(get_headline_key(story.pk)) for story in ts15_stories]
+
+    ts15_texts = [topic_text(story) for story in ts15_stories]
+    ts15_texts_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts15_stories]
 
     ts100_headlines = [story.headline for story in ts100_stories]
-    ts100_tensors = [rai.get_tensor(get_headline_key(story.pk)) for story in ts100_stories]
+    ts100_headline_tensors = [rai.get_tensor(get_headline_key(story.pk)) for story in ts100_stories]
 
-    topic_model = BERTopic(language='german').fit_transform(ts15_headlines, ts15_tensors)
-
-    ts15_tensors = [rai.get_tensor(get_headline_key(story.pk)) for story in ts15_stories]
+    ts100_texts = [topic_text(story) for story in ts100_stories]
+    ts100_texts_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts100_stories]
 
     # best_params_use, best_clusters_use, trials_use = bayesian_search(ts15_tensors, space=hspace,
     #                                                                  label_lower=label_lower,
@@ -225,7 +227,8 @@ def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
     #                                                                  max_evals=max_evals)
 
     # {'min_cluster_size': 10, 'n_components': 32, 'n_neighbors': 6, 'random_state': 42} label count = 12
-    mapper, cluster, n = generate_clusters(ts15_tensors, 6, 32, 0.05, 10, min_samples=5, csm='leaf', random_state=42)
+    mapper, cluster, n = generate_clusters(ts15_texts_tensors, 6, 32, 0.0, 15, min_samples=5, csm='leaf',
+                                           random_state=42)
 
     # umap_data = umap.UMAP(n_neighbors=30, n_components=2, min_dist=0.0, metric='cosine').fit_transform(ts15_tensors)
     # result = pd.DataFrame(umap_data, columns=['x', 'y'])

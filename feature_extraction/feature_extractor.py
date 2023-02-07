@@ -27,6 +27,8 @@ HEADLINE_ACTION = 'hl'
 
 parser = ArgumentParser('Setup RedisAI DB')
 parser.add_argument('--top', '--topic', dest='actions', action='append_const', const=TOPIC_ACTION,
+                    help='Generate sentence embeddings for headlines plus first story sentences and save them to RedisAI')
+parser.add_argument('--hl', '--headline', dest='actions', action='append_const', const=HEADLINE_ACTION,
                     help='Generate sentence embeddings for each story headline and save them to RedisAI')
 parser.add_argument('--mil', dest='actions', action='append_const', const=MIL_NCE_ACTION,
                     help='Generate sentence embeddings for each story sentence and save them to RedisAI')
@@ -42,6 +44,10 @@ embedder = SentenceTransformer(t_systems_model)
 
 mil_nce_model = 'https://tfhub.dev/deepmind/mil-nce/s3d/1'
 mil_nce = hub.load(mil_nce_model)
+
+
+def topic_text(story: Story):
+    return f'{story.headline}. {" ".join(story.sentences_de[:5])}'
 
 
 def extract_milnce_features(story: Story, skip_existing):
@@ -73,10 +79,7 @@ def extract_topic_embeddings(story: Story, skip_existing):
     if skip_existing and rai.tensor_exists(get_topic_key(story.pk)):
         return
 
-    first_sentences = story.sentences_de[:5]
-    text = f'{story.headline}. {" ".join(first_sentences)}'
-
-    embedding = embedder.encode(text, convert_to_numpy=True)
+    embedding = embedder.encode(topic_text(story), convert_to_numpy=True)
 
     rai.put_tensor(get_topic_key(story.pk), embedding)
 

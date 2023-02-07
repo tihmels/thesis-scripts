@@ -1,7 +1,8 @@
 import datetime
 from abc import ABC
-from redis_om import Field, JsonModel
 from typing import List, Optional
+
+from redis_om import Field, JsonModel
 
 from database import db
 
@@ -130,8 +131,10 @@ RAI_PSEUDO_SCORE_PREFIX = 'pseudo:scores:'
 def get_headline_key(pk: str):
     return RAI_HEADLINE_PREFIX + pk
 
+
 def get_topic_key(pk: str):
     return RAI_TOPIC_PREFIX + pk
+
 
 def get_text_key(pk: str):
     return RAI_TEXT_PREFIX + pk
