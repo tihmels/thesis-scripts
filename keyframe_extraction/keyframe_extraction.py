@@ -20,7 +20,7 @@ parser = argparse.ArgumentParser('Keyframe Extraction')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help='Tagesschau video file(s)')
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing',
                     help='Recalculate keyframes for all videos')
-parser.add_argument('--center', action='store_true', help="Use shot center frame as keyframe")
+parser.add_argument('--gradmag', action='store_true', help="Use gradient magnitude for keyframe detection")
 
 
 def get_center_kf_idx(frames):
@@ -117,13 +117,13 @@ def main(args):
     print(f'Extracting shot keyframes for {len(video_files)} videos ... ', end='\n\n')
 
     for idx, vf in enumerate(video_files):
-        vd = VAO(vf)
+        vao = VAO(vf)
 
-        create_dir(vd.dirs.keyframe_dir, rm_if_exist=True)
+        create_dir(vao.dirs.keyframe_dir, rm_if_exist=True)
 
-        with alive_bar(vd.n_shots, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vd}', length=20) as bar:
-            for kf_idx in detect_keyframes(vd, get_center_kf_idx if args.center else get_magnitude_gradient_kf_idx):
-                copy(vd.data.frames[kf_idx], vd.dirs.keyframe_dir)
+        with alive_bar(vao.n_shots, ctrl_c=False, title=f'[{idx + 1}/{len(video_files)}] {vao}', length=20) as bar:
+            for kf_idx in detect_keyframes(vao, get_magnitude_gradient_kf_idx if args.gradmag else get_center_kf_idx):
+                copy(vao.data.frames[kf_idx], vao.dirs.keyframe_dir)
                 bar()
 
 

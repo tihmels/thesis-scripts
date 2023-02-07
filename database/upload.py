@@ -1,13 +1,11 @@
 #!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
 import argparse
-from datetime import timedelta, datetime
+from datetime import timedelta
 from libretranslatepy import LibreTranslateAPI
 from pathlib import Path
 from redis_om import Migrator
-from ulid import ULID
 
-from common.DataModel import get_text
-from common.VAO import get_date_time, VAO
+from common.VAO import get_date_time, VAO, get_text
 from common.utils import frame_idx_to_time, frame_idx_to_sec
 from database import db
 from database.model import Banner, Story, ShortVideo, ShortShot, MainShot, Transcript, MainVideo, VideoRef
@@ -19,6 +17,12 @@ args = parser.parse_args()
 
 lt = LibreTranslateAPI("http://127.0.0.1:5005")
 
+
+def trans(text):
+    if text:
+        return lt.translate(text, 'de', 'en')
+    else:
+        return ""
 
 def get_story_pk(video_pk: str, story_idx: int):
     suffix = "{:02d}".format(story_idx)
@@ -44,7 +48,8 @@ def create_video_data(vao: VAO):
                            last_frame_idx=shot.last_frame_idx,
                            duration=frame_idx_to_time(shot.last_frame_idx - shot.first_frame_idx),
                            keyframe=str(vao.data.keyframes[idx]),
-                           transcript=get_text(vao.data.get_shot_transcripts(idx)),
+                           transcript_de=get_text(vao.data.get_shot_transcripts(idx)),
+                           transcript_en=trans(get_text(vao.data.get_shot_transcripts(idx))),
                            banner=banner) for idx, (shot, banner) in enumerate(zip(vao.data.shots, banners))]
 
         stories = [Story(pk=get_story_pk(pk, idx),
@@ -61,7 +66,7 @@ def create_video_data(vao: VAO):
                          frames=[str(frame) for frame in vao.data.frames[story.first_frame_idx:story.last_frame_idx]],
                          shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx + 1)],
                          sentences_de=vao.data.get_story_sentences(idx),
-                         sentences_en=[lt.translate(sent, 'de', 'en') for sent in
+                         sentences_en=[trans(sent) for sent in
                                        vao.data.get_story_sentences(idx)]).save() for
                    idx, story in enumerate(vao.data.stories)]
 
@@ -79,7 +84,8 @@ def create_video_data(vao: VAO):
                           last_frame_idx=shot.last_frame_idx,
                           duration=frame_idx_to_time(shot.last_frame_idx - shot.first_frame_idx),
                           keyframe=str(vao.data.keyframes[idx]),
-                          transcript=get_text(vao.data.get_shot_transcripts(idx)),
+                          transcript_de=get_text(vao.data.get_shot_transcripts(idx)),
+                          transcript_en=trans(get_text(vao.data.get_shot_transcripts(idx))),
                           type=shot.type) for idx, shot in enumerate(vao.data.shots)]
 
         stories = [Story(pk=get_story_pk(pk, idx),
@@ -96,7 +102,7 @@ def create_video_data(vao: VAO):
                          frames=[str(frame) for frame in vao.data.frames[story.first_frame_idx:story.last_frame_idx]],
                          shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx + 1)],
                          sentences_de=vao.data.get_story_sentences(idx),
-                         sentences_en=[lt.translate(sent, 'de', 'en') for sent in
+                         sentences_en=[trans(sent) for sent in
                                        vao.data.get_story_sentences(idx)]).save()
                    for idx, story in enumerate(vao.data.stories)]
 

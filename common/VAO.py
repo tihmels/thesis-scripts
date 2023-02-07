@@ -40,7 +40,8 @@ class TranscriptData:
 
 
 def get_text(tds: [TranscriptData]):
-    return ' '.join([td.text.strip() for td in tds])
+    text = ' '.join([td.text.strip() for td in tds])
+    return text
 
 
 @dataclass
