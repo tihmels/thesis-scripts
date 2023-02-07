@@ -2,14 +2,16 @@
 import logging
 import os
 import sys
+from argparse import ArgumentParser
+
 import torch
 from alive_progress import alive_bar
-from argparse import ArgumentParser
 from redis_om import Migrator
 
 from common.utils import set_tf_loglevel
 from database import rai
-from database.model import MainVideo, ShortVideo, Story, get_vis_key, get_m5c_key, get_topic_key, get_text_key
+from database.model import MainVideo, ShortVideo, Story, get_vis_key, get_m5c_key, get_headline_key, get_text_key, \
+    get_topic_key
 from feature_extraction.StoryDataExtractor import StoryDataExtractor
 
 set_tf_loglevel(logging.FATAL)
@@ -21,6 +23,7 @@ from sentence_transformers import SentenceTransformer
 
 TOPIC_ACTION = 'top'
 MIL_NCE_ACTION = 'mil'
+HEADLINE_ACTION = 'hl'
 
 parser = ArgumentParser('Setup RedisAI DB')
 parser.add_argument('--top', '--topic', dest='actions', action='append_const', const=TOPIC_ACTION,
@@ -35,7 +38,7 @@ print('Loading Models ...')
 
 multi_mpnet_model = 'paraphrase-multilingual-mpnet-base-v2'
 t_systems_model = 'T-Systems-onsite/cross-en-de-roberta-sentence-transformer'
-embedder = SentenceTransformer(multi_mpnet_model)
+embedder = SentenceTransformer(t_systems_model)
 
 mil_nce_model = 'https://tfhub.dev/deepmind/mil-nce/s3d/1'
 mil_nce = hub.load(mil_nce_model)
@@ -66,17 +69,30 @@ def extract_milnce_features(story: Story, skip_existing):
                 rai.put_tensor(get_text_key(story.pk), text_features)
 
 
-def extract_topic_features(story: Story, skip_existing):
+def extract_topic_embeddings(story: Story, skip_existing):
     if skip_existing and rai.tensor_exists(get_topic_key(story.pk)):
         return
 
-    embedding = embedder.encode(story.headline, convert_to_numpy=True)
+    first_sentences = story.sentences_de[:5]
+    text = f'{story.headline}. {" ".join(first_sentences)}'
+
+    embedding = embedder.encode(text, convert_to_numpy=True)
 
     rai.put_tensor(get_topic_key(story.pk), embedding)
 
 
+def extract_headline_embeddings(story: Story, skip_existing):
+    if skip_existing and rai.tensor_exists(get_headline_key(story.pk)):
+        return
+
+    embedding = embedder.encode(story.headline, convert_to_numpy=True)
+
+    rai.put_tensor(get_headline_key(story.pk), embedding)
+
+
 action_map = {
-    TOPIC_ACTION: ('Topic Embedding', extract_topic_features),
+    HEADLINE_ACTION: ('Headline Embedding', extract_headline_embeddings),
+    TOPIC_ACTION: ('Topic Embedding', extract_topic_embeddings),
     MIL_NCE_ACTION: ('MIL-NCE', extract_milnce_features)
 }
 

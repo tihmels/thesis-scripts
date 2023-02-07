@@ -1,13 +1,13 @@
 # !/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
+import logging
+import os
+import random
+import sys
 from collections import defaultdict
 
 import hdbscan
-import logging
 import numpy as np
-import os
 import pandas as pd
-import random
-import sys
 from bertopic import BERTopic
 from hyperopt import Trials, partial, fmin, tpe, space_eval, STATUS_OK, hp
 # matplotlib.use('TkAgg')
@@ -18,7 +18,7 @@ from tqdm import trange
 
 from common.utils import set_tf_loglevel
 from database import rai
-from database.model import TopicCluster, Story, get_topic_key
+from database.model import TopicCluster, Story, get_headline_key
 
 set_tf_loglevel(logging.FATAL)
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
@@ -169,7 +169,6 @@ def generate_clusters(embeddings,
                       min_samples=None,
                       csm='eom',
                       random_state=None):
-
     mapper = umap.UMAP(n_neighbors=n_neighbors,
                        n_components=n_components,
                        min_dist=min_dist,
@@ -211,14 +210,14 @@ max_evals = 150
 
 def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
     ts15_headlines = [story.headline for story in ts15_stories]
-    ts15_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts15_stories]
+    ts15_tensors = [rai.get_tensor(get_headline_key(story.pk)) for story in ts15_stories]
 
     ts100_headlines = [story.headline for story in ts100_stories]
-    ts100_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts100_stories]
+    ts100_tensors = [rai.get_tensor(get_headline_key(story.pk)) for story in ts100_stories]
 
     topic_model = BERTopic(language='german').fit_transform(ts15_headlines, ts15_tensors)
 
-    ts15_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts15_stories]
+    ts15_tensors = [rai.get_tensor(get_headline_key(story.pk)) for story in ts15_stories]
 
     # best_params_use, best_clusters_use, trials_use = bayesian_search(ts15_tensors, space=hspace,
     #                                                                  label_lower=label_lower,
@@ -237,7 +236,7 @@ def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
         if label != -1:
             ts15_cluster[label].append(story)
 
-    ts100_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts100_stories]
+    ts100_tensors = [rai.get_tensor(get_headline_key(story.pk)) for story in ts100_stories]
     ts100_embeddings = mapper.transform(ts100_tensors)
 
     labels, strengths = hdbscan.approximate_predict(cluster, ts100_embeddings)
@@ -278,8 +277,8 @@ def main():
     ts15_stories = Story.find(Story.type == 'ts15').all()
     ts100_stories = Story.find(Story.type == 'ts100').all()
 
-    ts15_stories = [story for story in ts15_stories if rai.tensor_exists(get_topic_key(story.pk))]
-    ts100_stories = [story for story in ts100_stories if rai.tensor_exists(get_topic_key(story.pk))]
+    ts15_stories = [story for story in ts15_stories if rai.tensor_exists(get_headline_key(story.pk))]
+    ts100_stories = [story for story in ts100_stories if rai.tensor_exists(get_headline_key(story.pk))]
 
     assert len(ts15_stories) > 0, 'No suitable stories have been found.'
 

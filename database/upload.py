@@ -1,8 +1,9 @@
 #!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
 import argparse
 from datetime import timedelta
-from libretranslatepy import LibreTranslateAPI
 from pathlib import Path
+
+from libretranslatepy import LibreTranslateAPI
 from redis_om import Migrator
 
 from common.VAO import get_date_time, VAO, get_text
@@ -13,6 +14,7 @@ from database.model import Banner, Story, ShortVideo, ShortShot, MainShot, Trans
 parser = argparse.ArgumentParser('Uploads filesystem data to a Redis instance')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")
 parser.add_argument('--reset', action='store_true')
+parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 args = parser.parse_args()
 
 lt = LibreTranslateAPI("http://127.0.0.1:5005")
@@ -30,8 +32,13 @@ def get_story_pk(video_pk: str, story_idx: int):
     return video_pk + "-" + suffix
 
 
-def create_video_data(vao: VAO):
+def create_video_data(vao: VAO, skip_existing):
     pk = str(vao.id)
+
+    if skip_existing:
+        prefix = 'tsv:ts100:' if vao.is_summary else 'tsv:ts15:'
+        if db.hash_exists(prefix + pk):
+            return
 
     transcripts = [Transcript(from_time=transcript.start,
                               to_time=transcript.end,
@@ -177,7 +184,7 @@ def main(args):
 
         print(f'[{idx + 1}/{len(video_files)}] {vao}')
 
-        video = create_video_data(vao)
+        video = create_video_data(vao, args.skip_existing)
 
         if video:
             video.save()

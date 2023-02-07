@@ -118,30 +118,23 @@ class ShortVideo(VideoBaseModel):
         model_key_prefix = 'ts100'
 
 
+RAI_HEADLINE_PREFIX = 'tensor:headline:'
 RAI_TOPIC_PREFIX = 'tensor:topic:'
-RAI_SHOT_PREFIX = 'tensor:shot:'
 RAI_TEXT_PREFIX = 'tensor:mil-nce:text:'
-RAI_STORY_PREFIX = 'tensor:story:'
 RAI_M5C_PREFIX = 'tensor:mil-nce:m5c:'
 RAI_VIS_PREFIX = 'tensor:mil-nce:vis:'
 RAI_PSEUDO_SUM_PREFIX = 'pseudo:summary:'
 RAI_PSEUDO_SCORE_PREFIX = 'pseudo:scores:'
 
 
+def get_headline_key(pk: str):
+    return RAI_HEADLINE_PREFIX + pk
+
 def get_topic_key(pk: str):
     return RAI_TOPIC_PREFIX + pk
 
-
-def get_shot_key(pk: str):
-    return RAI_SHOT_PREFIX + pk
-
-
 def get_text_key(pk: str):
     return RAI_TEXT_PREFIX + pk
-
-
-def get_story_key(pk: str):
-    return RAI_STORY_PREFIX + pk
 
 
 def get_m5c_key(pk: str):
