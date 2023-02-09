@@ -6,19 +6,21 @@ import sys
 from collections import defaultdict
 
 import hdbscan
+import matplotlib
 import numpy as np
 import pandas as pd
 from hyperopt import Trials, partial, fmin, tpe, space_eval, STATUS_OK, hp
-# matplotlib.use('TkAgg')
+from matplotlib import pyplot as plt
+
+matplotlib.use('TkAgg')
 from nltk.corpus import stopwords
 from redis_om import Migrator
 from sklearn.feature_extraction.text import CountVectorizer
 from tqdm import trange
 
-from common.utils import set_tf_loglevel
+from common.utils import set_tf_loglevel, topic_text
 from database import rai
 from database.model import TopicCluster, Story, get_headline_key, get_topic_key
-from feature_extraction.feature_extractor import topic_text
 
 set_tf_loglevel(logging.FATAL)
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
@@ -52,7 +54,8 @@ def extract_topic_sizes(df):
 
 
 def c_tf_idf(documents, m, ngram_range=(1, 1)):
-    count = CountVectorizer(ngram_range=ngram_range, stop_words=german_stop_words + ['wegen']).fit(
+    count = CountVectorizer(ngram_range=ngram_range, token_pattern=r"(?u)\b\w\w\w+\b",
+                            stop_words=german_stop_words + ['wegen']).fit(
         documents)
     t = count.transform(documents).toarray()
     w = t.sum(axis=1)
@@ -208,39 +211,60 @@ label_upper = 20
 max_evals = 150
 
 
-def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
-    ts15_headlines = [story.headline for story in ts15_stories]
-    ts15_headline_tensors = [rai.get_tensor(get_headline_key(story.pk)) for story in ts15_stories]
+def visualize_clusters(top_n_words, shape=(5, 4)):
+    top_n_words.pop(-1)
 
+    fig, axes = plt.subplots(nrows=shape[0], ncols=shape[1], figsize=(10, 25), dpi=120)
+
+    for ax in axes.flatten():
+        ax.set_axis_off()
+
+    for idx, (label, n_words) in enumerate(top_n_words.items()):
+        ax_idx = np.unravel_index(idx, shape)
+
+        words = list(reversed([w[0] for w in n_words]))
+        score = list(reversed([w[1] for w in n_words]))
+
+        ax = axes[ax_idx]
+
+        ax.set_axis_on()
+        ax.barh(words, score)
+
+        if idx % 2 == 1:
+            ax.set_yticklabels([])  # Hide the left y-axis tick-labels
+            ax.set_yticks([])
+            ax.invert_xaxis()  # labels read top-to-bottom
+            ax2 = ax.twinx()
+            ax2.set_ylim(ax.get_ylim())
+            ax2.set_yticks(range(len(words)))
+            ax2.set_yticklabels(words)
+
+        # ax.set_title(f'Topic {idx + 1}')
+        ax.title.set_size(10)
+
+    fig.tight_layout()
+    plt.show()
+
+    print()
+
+
+def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
     ts15_texts = [topic_text(story) for story in ts15_stories]
     ts15_texts_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts15_stories]
-
-    ts100_headlines = [story.headline for story in ts100_stories]
-    ts100_headline_tensors = [rai.get_tensor(get_headline_key(story.pk)) for story in ts100_stories]
 
     ts100_texts = [topic_text(story) for story in ts100_stories]
     ts100_texts_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts100_stories]
 
-    # best_params_use, best_clusters_use, trials_use = bayesian_search(ts15_tensors, space=hspace,
-    #                                                                  label_lower=label_lower,
-    #                                                                  label_upper=label_upper,
-    #                                                                  max_evals=max_evals)
+    mapper, cluster, n = generate_clusters(ts15_texts_tensors, n_neighbors=15, n_components=5, min_cluster_size=10,
+                                           min_samples=10, random_state=42)
 
-    # {'min_cluster_size': 10, 'n_components': 32, 'n_neighbors': 6, 'random_state': 42} label count = 12
-    mapper, cluster, n = generate_clusters(ts15_texts_tensors, 6, 32, 0.0, 15, min_samples=5, csm='leaf',
-                                           random_state=42)
-
-    # umap_data = umap.UMAP(n_neighbors=30, n_components=2, min_dist=0.0, metric='cosine').fit_transform(ts15_tensors)
-    # result = pd.DataFrame(umap_data, columns=['x', 'y'])
-    # result['labels'] = cluster.labels_
-
+    print(n[-1])
     ts15_cluster = defaultdict(list)
     for story, label in zip(ts15_stories, cluster.labels_):
         if label != -1:
             ts15_cluster[label].append(story)
 
-    ts100_tensors = [rai.get_tensor(get_headline_key(story.pk)) for story in ts100_stories]
-    ts100_embeddings = mapper.transform(ts100_tensors)
+    ts100_embeddings = mapper.transform(ts100_texts_tensors)
 
     labels, strengths = hdbscan.approximate_predict(cluster, ts100_embeddings)
     data = [(story, label) for idx, (story, label) in enumerate(zip(ts100_stories, labels)) if strengths[idx] > 0.8]
@@ -250,16 +274,16 @@ def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
         if label != -1:
             ts100_cluster[label].append(story)
 
-    headlines = [story.headline for story in ts15_stories]
-
-    docs_df = pd.DataFrame(headlines, columns=["Doc"])
+    docs_df = pd.DataFrame(ts15_texts, columns=["Doc"])
     docs_df['Topic'] = cluster.labels_
     docs_df['Doc_ID'] = range(len(docs_df))
     docs_per_topic = docs_df.groupby(['Topic'], as_index=False)
     docs_per_topic_agg = docs_per_topic.agg({'Doc': ' '.join})
 
-    tf_idf, count = c_tf_idf(docs_per_topic_agg.Doc.values, m=len(ts15_stories), ngram_range=(1, 2))
-    top_n_words = extract_top_n_words_per_topic(tf_idf, count, docs_per_topic_agg, n=20)
+    tf_idf, count = c_tf_idf(docs_per_topic_agg.Doc.values, m=len(ts15_stories), ngram_range=(1, 1))
+    top_n_words = extract_top_n_words_per_topic(tf_idf, count, docs_per_topic_agg, n=5)
+
+    # visualize_clusters(top_n_words, shape=(10, 2))
 
     TopicCluster.find().delete()
 
@@ -276,7 +300,18 @@ def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
     return
 
 
+def cluster_to_table():
+    clusters = TopicCluster.find().sort_by('index').all()
+
+    for cluster in clusters:
+        print(f'{cluster.index} & {", ".join(cluster.keywords)} & {len(cluster.ts15s)} & {len(cluster.ts100s)} \\\\')
+
+
 def main():
+    cluster_to_table()
+
+    return
+
     ts15_stories = Story.find(Story.type == 'ts15').all()
     ts100_stories = Story.find(Story.type == 'ts100').all()
 

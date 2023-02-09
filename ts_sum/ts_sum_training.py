@@ -13,7 +13,6 @@ from argparse import ArgumentParser
 from prettytable import PrettyTable
 from tqdm import tqdm
 
-import s3dg
 from ts_sum.evaluate_and_log import evaluate_summary
 from ts_sum.ts_sum_utils import Logger, AverageMeter
 from ts_sum.video_loader import TVSumStoryLoader

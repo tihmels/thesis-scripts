@@ -1,17 +1,22 @@
-from collections import namedtuple
-
-import cv2
 import itertools
 import logging
 import os
 import re
+from collections import namedtuple
 from datetime import datetime, timedelta
 from pathlib import Path
 from shutil import rmtree
 
+import cv2
+
 from common.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE
+from database.model import Story
 
 Range = namedtuple('Range', ['start', 'end'])
+
+
+def topic_text(story: Story):
+    return f'{story.headline}. {" ".join(story.sentences_de[:5])}'
 
 
 def crop_center_square(frame):

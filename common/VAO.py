@@ -182,7 +182,7 @@ class VAO:
                 shot_trans = [trans for trans in self.transcripts if
                               range_overlap(Range(from_time, to_time),
                                             Range(time_to_datetime(trans.start), time_to_datetime(trans.end))) >=
-                              0.5 * (time_to_datetime(trans.end) - time_to_datetime(trans.start)).total_seconds()]
+                              0.6 * (time_to_datetime(trans.end) - time_to_datetime(trans.start)).total_seconds()]
 
                 transcripts.extend(shot_trans)
 

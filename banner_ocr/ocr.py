@@ -40,8 +40,8 @@ def binarize_frame(frame, is_nightly):
     else:
         thresh = skimage.filters.thresholding.threshold_li(frame)
         thresh = 165
-        binary = frame > thresh
-        #binary = skimage.morphology.binary_erosion(binary, footprint=skimage.morphology.diamond(1))
+        binary = frame < thresh
+        # binary = skimage.morphology.binary_erosion(binary, footprint=skimage.morphology.diamond(1))
         return binary
 
 
