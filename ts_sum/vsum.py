@@ -82,12 +82,15 @@ class VSum(nn.Module):
             word2vec_path="",
             init="uniform",
             token_to_word_path="data/dict.npy",
+            window_len=32,
             heads=8,
             enc_layers=6,
             d_model=512,
             dropout=0.1,
     ) -> None:
         super(VSum, self).__init__()
+        self.window_len = window_len
+
         self.base_model = S3D(
             num_classes, space_to_depth=space_to_depth, word2vec_path=word2vec_path, init=init,
         )
@@ -110,10 +113,10 @@ class VSum(nn.Module):
 
         # [B, S, C, H, W] -> [B*S, C, H, W]
         video = video.contiguous().view(-1, 3, H, W)
-        n_segs = int(video.shape[0] / 32)
+        n_segs = int(video.shape[0] / self.window_len)
 
         # [B*S, C, H, W] -> [n_segs, 32, C, H, W]
-        video = video.view(n_segs, 32, 3, H, W)
+        video = video.view(n_segs, self.window_len, 3, H, W)
 
         # [n_segs, T, C, H, W] -> [n_segs, C, T, H, W]
         video = video.permute(0, 2, 1, 3, 4)

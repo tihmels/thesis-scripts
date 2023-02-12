@@ -1,6 +1,5 @@
 #!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
 import logging
-import os
 import sys
 from argparse import ArgumentParser
 
@@ -8,23 +7,21 @@ import torch
 from alive_progress import alive_bar
 from redis_om import Migrator
 
-from common.utils import set_tf_loglevel, topic_text
+from common.utils import topic_text, set_tf_loglevel
 from database import rai
 from database.model import MainVideo, ShortVideo, Story, get_vis_key, get_m5c_key, get_headline_key, get_text_key, \
-    get_topic_key, get_5fps_vis_key, get_5fps_m5c_key
+    get_topic_key, get_5fps_vis_key, get_5fps_m5c_key, get_6fps_vis_key, get_6fps_m5c_key
 from feature_extraction.StoryDataExtractor import StoryDataExtractor
-from feature_extraction.s3dg_original import S3D
 
 set_tf_loglevel(logging.FATAL)
-os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
 import tensorflow as tf
 import tensorflow_hub as hub
-from sentence_transformers import SentenceTransformer
 
 TOPIC_ACTION = 'top'
 MIL_NCE_ACTION = 'mil'
-FPS_MIL_NCE_ACTION = 'mil5'
+FPS_5_MIL_NCE_ACTION = 'mil5'
+FPS_6_MIL_NCE_ACTION = 'mil6'
 HEADLINE_ACTION = 'hl'
 
 parser = ArgumentParser('Setup RedisAI DB')
@@ -34,7 +31,9 @@ parser.add_argument('--hl', '--headline', dest='actions', action='append_const',
                     help='Generate sentence embeddings for each story headline and save them to RedisAI')
 parser.add_argument('--mil', dest='actions', action='append_const', const=MIL_NCE_ACTION,
                     help='Generate sentence embeddings for each story sentence and save them to RedisAI')
-parser.add_argument('--mil5', dest='actions', action='append_const', const=FPS_MIL_NCE_ACTION,
+parser.add_argument('--mil5', dest='actions', action='append_const', const=FPS_5_MIL_NCE_ACTION,
+                    help='Generate sentence embeddings for each story sentence and save them to RedisAI')
+parser.add_argument('--mil6', dest='actions', action='append_const', const=FPS_6_MIL_NCE_ACTION,
                     help='Generate sentence embeddings for each story sentence and save them to RedisAI')
 parser.add_argument('--ts15', action='store_true')
 parser.add_argument('--ts100', action='store_true')
@@ -44,10 +43,35 @@ print('Loading Models ...')
 
 multi_mpnet_model = 'paraphrase-multilingual-mpnet-base-v2'
 t_systems_model = 'T-Systems-onsite/cross-en-de-roberta-sentence-transformer'
-embedder = SentenceTransformer(t_systems_model)
+# embedder = SentenceTransformer(t_systems_model)
 
-#mil_nce_model = 'https://tfhub.dev/deepmind/mil-nce/s3d/1'
-#mil_nce = hub.load(mil_nce_model)
+mil_nce_model = 'https://tfhub.dev/deepmind/mil-nce/s3d/1'
+mil_nce = hub.load(mil_nce_model)
+
+
+def extract_6fps_milnce_features(story: Story, skip_existing):
+    if skip_existing and rai.tensor_exists(get_6fps_vis_key(story.pk)):
+        return
+
+    extractor = StoryDataExtractor(skip_n=4, window=16)
+
+    with torch.no_grad():
+
+        segments, sentences = extractor.extract_data(story)
+
+        if len(segments) > 0:
+            vision_output = mil_nce.signatures['video'](tf.constant(tf.cast(segments, dtype=tf.float32)))
+            segment_features = vision_output['video_embedding'].numpy()
+            mixed_5c = vision_output['mixed_5c'].numpy()
+
+            rai.put_tensor(get_6fps_vis_key(story.pk), segment_features)
+            rai.put_tensor(get_6fps_m5c_key(story.pk), mixed_5c)
+
+            if len(sentences) > 0 and (not rai.tensor_exists(get_text_key(story.pk)) and skip_existing):
+                text_output = mil_nce.signatures['text'](tf.constant(sentences))
+                text_features = text_output['text_embedding'].numpy()
+
+                rai.put_tensor(get_text_key(story.pk), text_features)
 
 
 def extract_5fps_milnce_features(story: Story, skip_existing):
@@ -55,11 +79,6 @@ def extract_5fps_milnce_features(story: Story, skip_existing):
         return
 
     extractor = StoryDataExtractor(skip_n=5, window=16)
-
-    net = S3D("./pretrained_weights/s3d_dict.npy", 512)
-    net.load_state_dict(torch.load("./pretrained_weights/s3d_howto100m.pth"))
-
-    net.eval()
 
     with torch.no_grad():
 
@@ -127,7 +146,8 @@ action_map = {
     HEADLINE_ACTION: ('Headline Embedding', extract_headline_embeddings),
     TOPIC_ACTION: ('Topic Embedding', extract_topic_embeddings),
     MIL_NCE_ACTION: ('MIL-NCE', extract_milnce_features),
-    FPS_MIL_NCE_ACTION: ('5FPS-MIL-NCE', extract_5fps_milnce_features)
+    FPS_5_MIL_NCE_ACTION: ('5FPS-MIL-NCE', extract_5fps_milnce_features),
+    FPS_6_MIL_NCE_ACTION: ('6FPS-MIL-NCE', extract_5fps_milnce_features)
 }
 
 

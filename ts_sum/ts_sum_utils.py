@@ -1,10 +1,9 @@
+import glob
 import os
 
-import glob
-
-import torch
 import torchvision
 from tensorboardX import SummaryWriter
+
 
 def get_last_checkpoint(checkpoint_dir):
     all_ckpt = glob.glob(os.path.join(checkpoint_dir, "epoch*.pth.tar"))
@@ -13,6 +12,7 @@ def get_last_checkpoint(checkpoint_dir):
         return all_ckpt[-1]
     else:
         return ""
+
 
 class Logger:
     def __init__(self, log_dir, n_logged_samples=10, summary_writer=SummaryWriter):
@@ -103,6 +103,7 @@ class Logger:
     def flush(self):
         self._summ_writer.flush()
 
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
 
@@ -137,3 +138,52 @@ class AverageMeter(object):
 
     def average(self):
         return self.avg
+
+
+def video_from_summary(video_id, video_frames_dir, video_dir, out_dir, summary):
+    reader = imageio.get_reader(os.path.join(video_dir, video_id + ".mp4"))
+    fps = reader.get_meta_data()["fps"]
+
+    # Save frames and create video
+    os.makedirs(os.path.join(out_dir, video_id), exist_ok=True)
+
+    # Fix issue with '(' in name
+    if "(" in video_id:
+        video_name = "'" + video_id + "'"
+    else:
+        video_name = video_id
+
+    count = 0
+    for idx, score in enumerate(summary):
+        if score == 1:
+            subprocess.call(
+                "cp {} {}".format(
+                    os.path.join(
+                        video_frames_dir, video_name, "{:d}.png".format(idx + 1),
+                    ),
+                    os.path.join(out_dir, video_name, "{:d}.png".format(count + 1)),
+                ),
+                shell=True,
+            )
+            count += 1
+    outfile = os.path.join(out_dir, video_name + ".mp4")
+
+    try:
+        subprocess.call(
+            "ffmpeg -r {} -start_number 1 -i {} -c:v libx264 -crf 23 -pix_fmt yuv420p -y {}".format(
+                str(fps), os.path.join(out_dir, video_name) + "/%d.png", outfile,
+                          ),
+            shell=True,
+        )
+        print("Written ", outfile)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(
+            'command "{}" return with error (code {}): {}'.format(
+                e.cmd, e.returncode, e.output
+            )
+        )
+
+    # Remove frames folder
+    subprocess.call(["rm", "-r", os.path.join(out_dir, video_id)])
+
+    return

@@ -84,6 +84,7 @@ def create_video_data(vao: VAO, skip_existing):
                            time=vao.date.time(),
                            duration=vao.duration,
                            timestamp=vao.date.timestamp(),
+                           frames=[str(frame) for frame in vao.data.frames],
                            shots=shots,
                            stories=stories,
                            transcripts=transcripts)
@@ -120,6 +121,7 @@ def create_video_data(vao: VAO, skip_existing):
                           time=vao.date.time(),
                           duration=vao.duration,
                           timestamp=vao.date.timestamp(),
+                          frames=[str(frame) for frame in vao.data.frames],
                           shots=shots,
                           stories=stories,
                           transcripts=transcripts,

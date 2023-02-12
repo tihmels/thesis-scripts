@@ -1,4 +1,5 @@
 # !/Users/tihmels/miniconda3/envs/thesis-scripts/bin/python -u
+import itertools
 import logging
 import os
 import random
@@ -287,31 +288,40 @@ def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
 
     TopicCluster.find().delete()
 
+    clusters = []
+
     for label, stories in ts15_cluster.items():
         ts100s = ts100_cluster[label]
 
-        TopicCluster(index=label,
-                     keywords=[w[0] for w in top_n_words[label]],
-                     n_ts15=len(stories),
-                     n_ts100=len(ts100s),
-                     ts15s=stories,
-                     ts100s=ts100s).save()
+        cluster = TopicCluster(index=label,
+                               keywords=[w[0] for w in top_n_words[label]],
+                               n_ts15=len(stories),
+                               n_ts100=len(ts100s),
+                               ts15s=stories,
+                               ts100s=ts100s).save()
+
+        clusters.append(cluster)
+
+    cluster_to_table(clusters)
+    cluster_videos_to_table(clusters)
 
     return
 
 
-def cluster_to_table():
-    clusters = TopicCluster.find().sort_by('index').all()
-
+def cluster_videos_to_table(clusters):
     for cluster in clusters:
-        print(f'{cluster.index} & {", ".join(cluster.keywords)} & {len(cluster.ts15s)} & {len(cluster.ts100s)} \\\\')
+        print('\multicolumn{2}{l}{Cluster ' + str(cluster.index) + '} \\\\ \midrule')
+        for ts15, ts100 in itertools.zip_longest(cluster.ts15s, cluster.ts100s,
+                                                 fillvalue=type('', (object,), {"headline": ""})()):
+            print(f'{ts15.headline} & {ts100.headline} \\\\')
+
+
+def cluster_to_table(clusters):
+    for cluster in clusters:
+        print(f'{cluster.index} & {", ".join(cluster.keywords)} & {cluster.n_ts15} & {cluster.n_ts100} \\\\')
 
 
 def main():
-    cluster_to_table()
-
-    return
-
     ts15_stories = Story.find(Story.type == 'ts15').all()
     ts100_stories = Story.find(Story.type == 'ts100').all()
 

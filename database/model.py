@@ -94,6 +94,7 @@ class VideoBaseModel(NodeBaseModel, ABC):
     time: datetime.time
     duration: datetime.time
     timestamp: int = Field(index=True, sortable=True)
+    frames: List[str]
     shots: List[Shot]
     stories: List[Story]
     transcripts: List[Transcript]
@@ -159,6 +160,9 @@ def get_score_key(pk: str):
 RAI_5FPS_M5C_PREFIX = 'tensor:5fps:mil-nce:m5c:'
 RAI_5FPS_VIS_PREFIX = 'tensor:5fps:mil-nce:vis:'
 
+RAI_6FPS_M5C_PREFIX = 'tensor:6fps:mil-nce:m5c:'
+RAI_6FPS_VIS_PREFIX = 'tensor:6fps:mil-nce:vis:'
+
 
 def get_5fps_m5c_key(pk: str):
     return RAI_5FPS_M5C_PREFIX + pk
@@ -166,3 +170,11 @@ def get_5fps_m5c_key(pk: str):
 
 def get_5fps_vis_key(pk: str):
     return RAI_5FPS_VIS_PREFIX + pk
+
+
+def get_6fps_m5c_key(pk: str):
+    return RAI_6FPS_M5C_PREFIX + pk
+
+
+def get_6fps_vis_key(pk: str):
+    return RAI_6FPS_VIS_PREFIX + pk
