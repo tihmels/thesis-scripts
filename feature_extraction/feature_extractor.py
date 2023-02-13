@@ -10,7 +10,8 @@ from redis_om import Migrator
 from common.utils import topic_text, set_tf_loglevel
 from database import rai
 from database.model import MainVideo, ShortVideo, Story, get_vis_key, get_m5c_key, get_headline_key, get_text_key, \
-    get_topic_key, get_5fps_vis_key, get_5fps_m5c_key, get_6fps_vis_key, get_6fps_m5c_key, get_8fps_vis_key
+    get_topic_key, get_6fps_vis_key, get_6fps_m5c_key, get_8fps_vis_key, \
+    get_8fps_m5c_key
 from feature_extraction.StoryDataExtractor import StoryDataExtractor
 
 set_tf_loglevel(logging.FATAL)
@@ -89,8 +90,8 @@ def extract_8fps_milnce_features(story: Story, args):
             segment_features = vision_output['video_embedding'].numpy()
             mixed_5c = vision_output['mixed_5c'].numpy()
 
-            rai.put_tensor(get_5fps_vis_key(story.pk), segment_features)
-            rai.put_tensor(get_5fps_m5c_key(story.pk), mixed_5c)
+            rai.put_tensor(get_8fps_vis_key(story.pk), segment_features)
+            rai.put_tensor(get_8fps_m5c_key(story.pk), mixed_5c)
 
             if len(sentences) > 0 and (not rai.tensor_exists(get_text_key(story.pk)) and args.skip_existing):
                 text_output = mil_nce.signatures['text'](tf.constant(sentences))

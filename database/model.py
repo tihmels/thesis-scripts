@@ -160,8 +160,8 @@ def get_score_key(pk: str):
 RAI_8FPS_M5C_PREFIX = 'tensor:8fps:mil-nce:m5c:'
 RAI_8FPS_VIS_PREFIX = 'tensor:8fps:mil-nce:vis:'
 
-RAI_6FPS_M5C_PREFIX = 'tensor:6fps:mil-nce:m5c:'
-RAI_6FPS_VIS_PREFIX = 'tensor:6fps:mil-nce:vis:'
+RAI_6FPS_M5C_PREFIX = 'tensor:5fps:mil-nce:m5c:'
+RAI_6FPS_VIS_PREFIX = 'tensor:5fps:mil-nce:vis:'
 
 
 def get_8fps_m5c_key(pk: str):

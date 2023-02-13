@@ -12,7 +12,7 @@ import cv2
 from common.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE
 from database.model import Story
 
-Range = namedtuple('Range', ['start', 'end'])
+Range = namedtuple('Range', ['first_frame_idx', 'last_frame_idx'])
 
 
 def topic_text(story: Story):
@@ -40,8 +40,8 @@ def frame_idx_to_sec(idx, fps=25):
 
 
 def range_overlap(r1: Range, r2: Range):
-    latest_start = max(r1.start, r2.start)
-    earliest_end = min(r1.end, r2.end)
+    latest_start = max(r1.first_frame_idx, r2.first_frame_idx)
+    earliest_end = min(r1.last_frame_idx, r2.last_frame_idx)
     delta = (earliest_end - latest_start).total_seconds()
     overlap = max(0, delta)
 
