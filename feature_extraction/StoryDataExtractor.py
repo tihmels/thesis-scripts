@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-from PIL import Image
 
 from common.utils import read_images
 from database.model import Story
@@ -16,9 +15,8 @@ def crop_center_square(frame):
     return frame[start_y:start_y + min_dim, start_x:start_x + min_dim]
 
 
-# Maybe try for optimal resizing: https://github.com/sayakpaul/Learnable-Image-Resizing
 def load_frames(frame_paths, resize=IMAGE_SHAPE):
-    frames = [frame for frame in read_images(frame_paths)]
+    frames = read_images(frame_paths)
     frames = [frame[:224, :] for frame in frames]
     frames = [cv2.resize(frame, resize, interpolation=cv2.INTER_AREA) for frame in frames]
 

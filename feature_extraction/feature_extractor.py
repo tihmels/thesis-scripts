@@ -10,7 +10,7 @@ from redis_om import Migrator
 from common.utils import topic_text, set_tf_loglevel
 from database import rai
 from database.model import MainVideo, ShortVideo, Story, get_vis_key, get_m5c_key, get_headline_key, get_text_key, \
-    get_topic_key, get_5fps_vis_key, get_5fps_m5c_key, get_6fps_vis_key, get_6fps_m5c_key
+    get_topic_key, get_5fps_vis_key, get_5fps_m5c_key, get_6fps_vis_key, get_6fps_m5c_key, get_8fps_vis_key
 from feature_extraction.StoryDataExtractor import StoryDataExtractor
 
 set_tf_loglevel(logging.FATAL)
@@ -20,7 +20,7 @@ import tensorflow_hub as hub
 
 TOPIC_ACTION = 'top'
 MIL_NCE_ACTION = 'mil'
-FPS_5_MIL_NCE_ACTION = 'mil5'
+FPS_8_MIL_NCE_ACTION = 'mil8'
 FPS_6_MIL_NCE_ACTION = 'mil6'
 HEADLINE_ACTION = 'hl'
 
@@ -31,7 +31,7 @@ parser.add_argument('--hl', '--headline', dest='actions', action='append_const',
                     help='Generate sentence embeddings for each story headline and save them to RedisAI')
 parser.add_argument('--mil', dest='actions', action='append_const', const=MIL_NCE_ACTION,
                     help='Generate sentence embeddings for each story sentence and save them to RedisAI')
-parser.add_argument('--mil5', dest='actions', action='append_const', const=FPS_5_MIL_NCE_ACTION,
+parser.add_argument('--mil8', dest='actions', action='append_const', const=FPS_8_MIL_NCE_ACTION,
                     help='Generate sentence embeddings for each story sentence and save them to RedisAI')
 parser.add_argument('--mil6', dest='actions', action='append_const', const=FPS_6_MIL_NCE_ACTION,
                     help='Generate sentence embeddings for each story sentence and save them to RedisAI')
@@ -49,8 +49,8 @@ mil_nce_model = 'https://tfhub.dev/deepmind/mil-nce/s3d/1'
 mil_nce = hub.load(mil_nce_model)
 
 
-def extract_6fps_milnce_features(story: Story, skip_existing):
-    if skip_existing and rai.tensor_exists(get_6fps_vis_key(story.pk)):
+def extract_6fps_milnce_features(story: Story, args):
+    if args.skip_existing and rai.tensor_exists(get_6fps_vis_key(story.pk)):
         return
 
     extractor = StoryDataExtractor(skip_n=4, window=16)
@@ -67,18 +67,18 @@ def extract_6fps_milnce_features(story: Story, skip_existing):
             rai.put_tensor(get_6fps_vis_key(story.pk), segment_features)
             rai.put_tensor(get_6fps_m5c_key(story.pk), mixed_5c)
 
-            if len(sentences) > 0 and (not rai.tensor_exists(get_text_key(story.pk)) and skip_existing):
+            if len(sentences) > 0 and (not rai.tensor_exists(get_text_key(story.pk)) and args.skip_existing):
                 text_output = mil_nce.signatures['text'](tf.constant(sentences))
                 text_features = text_output['text_embedding'].numpy()
 
                 rai.put_tensor(get_text_key(story.pk), text_features)
 
 
-def extract_5fps_milnce_features(story: Story, skip_existing):
-    if skip_existing and rai.tensor_exists(get_5fps_vis_key(story.pk)):
+def extract_8fps_milnce_features(story: Story, args):
+    if args.skip_existing and rai.tensor_exists(get_8fps_vis_key(story.pk)):
         return
 
-    extractor = StoryDataExtractor(skip_n=5, window=16)
+    extractor = StoryDataExtractor(skip_n=3, window=16)
 
     with torch.no_grad():
 
@@ -92,15 +92,15 @@ def extract_5fps_milnce_features(story: Story, skip_existing):
             rai.put_tensor(get_5fps_vis_key(story.pk), segment_features)
             rai.put_tensor(get_5fps_m5c_key(story.pk), mixed_5c)
 
-            if len(sentences) > 0 and (not rai.tensor_exists(get_text_key(story.pk)) and skip_existing):
+            if len(sentences) > 0 and (not rai.tensor_exists(get_text_key(story.pk)) and args.skip_existing):
                 text_output = mil_nce.signatures['text'](tf.constant(sentences))
                 text_features = text_output['text_embedding'].numpy()
 
                 rai.put_tensor(get_text_key(story.pk), text_features)
 
 
-def extract_milnce_features(story: Story, skip_existing):
-    if skip_existing and rai.tensor_exists(get_vis_key(story.pk)):
+def extract_milnce_features(story: Story, args):
+    if args.skip_existing and rai.tensor_exists(get_vis_key(story.pk)):
         return
 
     extractor = StoryDataExtractor()
@@ -117,15 +117,15 @@ def extract_milnce_features(story: Story, skip_existing):
             rai.put_tensor(get_vis_key(story.pk), segment_features)
             rai.put_tensor(get_m5c_key(story.pk), mixed_5c)
 
-            if len(sentences) > 0 and (not rai.tensor_exists(get_text_key(story.pk)) and skip_existing):
+            if len(sentences) > 0 and (not rai.tensor_exists(get_text_key(story.pk)) and args.skip_existing):
                 text_output = mil_nce.signatures['text'](tf.constant(sentences))
                 text_features = text_output['text_embedding'].numpy()
 
                 rai.put_tensor(get_text_key(story.pk), text_features)
 
 
-def extract_topic_embeddings(story: Story, skip_existing):
-    if skip_existing and rai.tensor_exists(get_topic_key(story.pk)):
+def extract_topic_embeddings(story: Story, args):
+    if args.skip_existing and rai.tensor_exists(get_topic_key(story.pk)):
         return
 
     embedding = embedder.encode(topic_text(story), convert_to_numpy=True)
@@ -133,8 +133,8 @@ def extract_topic_embeddings(story: Story, skip_existing):
     rai.put_tensor(get_topic_key(story.pk), embedding)
 
 
-def extract_headline_embeddings(story: Story, skip_existing):
-    if skip_existing and rai.tensor_exists(get_headline_key(story.pk)):
+def extract_headline_embeddings(story: Story, args):
+    if args.skip_existing and rai.tensor_exists(get_headline_key(story.pk)):
         return
 
     embedding = embedder.encode(story.headline, convert_to_numpy=True)
@@ -146,35 +146,27 @@ action_map = {
     HEADLINE_ACTION: ('Headline Embedding', extract_headline_embeddings),
     TOPIC_ACTION: ('Topic Embedding', extract_topic_embeddings),
     MIL_NCE_ACTION: ('MIL-NCE', extract_milnce_features),
-    FPS_5_MIL_NCE_ACTION: ('5FPS-MIL-NCE', extract_5fps_milnce_features),
-    FPS_6_MIL_NCE_ACTION: ('6FPS-MIL-NCE', extract_5fps_milnce_features)
+    FPS_6_MIL_NCE_ACTION: ('6FPS-MIL-NCE', extract_6fps_milnce_features),
+    FPS_8_MIL_NCE_ACTION: ('8FPS-MIL-NCE', extract_8fps_milnce_features)
 }
 
 
-def alive_action(videos, actions, skip_existing):
+def alive_action(videos, actions, args):
     for action in actions:
-
         title, handler = action_map[action]
 
         with alive_bar(len(videos), ctrl_c=False, title=title, length=25, dual_line=True) as bar:
             for video in videos:
-
-                for idx, story in enumerate(video.stories):
+                for story in video.stories:
                     bar.text = f'[{video.Meta.model_key_prefix}] {story.pk}'
-                    handler(story, skip_existing)
+                    handler(story, args)
 
                 bar()
 
 
 def extract_targets(args):
-    ts15 = []
-    ts100 = []
-
-    if args.ts15:
-        ts15 = MainVideo.find().sort_by('timestamp').all()
-
-    if args.ts100:
-        ts100 = ShortVideo.find().sort_by('timestamp').all()
+    ts15 = MainVideo.find().sort_by('timestamp').all() if args.ts15 else []
+    ts100 = ShortVideo.find().sort_by('timestamp').all() if args.ts100 else []
 
     return sorted(ts15 + ts100, key=lambda t: t.timestamp)
 
@@ -185,7 +177,7 @@ def main(args):
     print("Extracting Targets ...")
     targets = extract_targets(args)
 
-    alive_action(targets, actions, args.skip_existing)
+    alive_action(targets, actions, args)
 
     Migrator().run()
 
