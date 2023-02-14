@@ -155,26 +155,3 @@ def get_sum_key(pk: str):
 
 def get_score_key(pk: str):
     return RAI_PSEUDO_SCORE_PREFIX + pk
-
-
-RAI_8FPS_M5C_PREFIX = 'tensor:8fps:mil-nce:m5c:'
-RAI_8FPS_VIS_PREFIX = 'tensor:8fps:mil-nce:vis:'
-
-RAI_6FPS_M5C_PREFIX = 'tensor:5fps:mil-nce:m5c:'
-RAI_6FPS_VIS_PREFIX = 'tensor:5fps:mil-nce:vis:'
-
-
-def get_8fps_m5c_key(pk: str):
-    return RAI_8FPS_M5C_PREFIX + pk
-
-
-def get_8fps_vis_key(pk: str):
-    return RAI_8FPS_VIS_PREFIX + pk
-
-
-def get_6fps_m5c_key(pk: str):
-    return RAI_6FPS_M5C_PREFIX + pk
-
-
-def get_6fps_vis_key(pk: str):
-    return RAI_6FPS_VIS_PREFIX + pk
