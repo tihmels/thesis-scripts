@@ -1,2 +1,35 @@
 Starting training loop with batch size: 8
 Starting training loop with batch size: 8
+Epoch 1, Epoch status: 0.0335, Training loss: 24.7312, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.0839, Training loss: 2.6056, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.1342, Training loss: 2.3844, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.1845, Training loss: 1.7179, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.2348, Training loss: 4.6583, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.2851, Training loss: 2.0535, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.3354, Training loss: 1.0750, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.3857, Training loss: 2.9097, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.4361, Training loss: 3.0178, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.4864, Training loss: 1.9657, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.5367, Training loss: 1.3065, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.5870, Training loss: 2.7555, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.6373, Training loss: 3.4015, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.6876, Training loss: 1.6825, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.7379, Training loss: 2.4901, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.7883, Training loss: 1.4984, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.8386, Training loss: 1.3553, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.8889, Training loss: 2.3007, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.9392, Training loss: 2.2484, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.9895, Training loss: 2.1475, Learning rate: 0.001000
+Epoch 1 	F-Score 0.39053533035932214 	Precision 0.33081761003381555 	Recall 0.4819434000725329 	Loss 1.7993 (2.0619)	
+Epoch 2, Epoch status: 0.0335, Training loss: 0.8663, Learning rate: 0.001000
+Epoch 2, Epoch status: 0.0839, Training loss: 1.3721, Learning rate: 0.001000
+Epoch 2, Epoch status: 0.1342, Training loss: 2.0970, Learning rate: 0.001000
+Epoch 2, Epoch status: 0.1845, Training loss: 3.4253, Learning rate: 0.001000
+Epoch 2, Epoch status: 0.2348, Training loss: 1.2708, Learning rate: 0.001000
+Epoch 2, Epoch status: 0.2851, Training loss: 2.1306, Learning rate: 0.001000
+Epoch 2, Epoch status: 0.3354, Training loss: 1.5473, Learning rate: 0.001000
+Epoch 2, Epoch status: 0.3857, Training loss: 1.6320, Learning rate: 0.001000
+Epoch 2, Epoch status: 0.4361, Training loss: 3.5093, Learning rate: 0.001000
+Epoch 2, Epoch status: 0.4864, Training loss: 3.1136, Learning rate: 0.001000
+Epoch 2, Epoch status: 0.5367, Training loss: 1.9848, Learning rate: 0.001000
+Epoch 2, Epoch status: 0.5870, Training loss: 2.1862, Learning rate: 0.001000

@@ -80,8 +80,8 @@ class VSum(nn.Module):
             space_to_depth=True,
             init="uniform",
             window_len=16,
-            heads=8,
-            enc_layers=6,
+            heads=4,
+            enc_layers=12,
             d_model=512,
             dropout=0.1
     ) -> None:

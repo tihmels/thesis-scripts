@@ -33,7 +33,7 @@ parser = ArgumentParser()
 parser.add_argument(
     "--checkpoint_dir",
     type=str,
-    default="/Users/tihmels/Scripts/thesis-scripts/ts_sum/vsum_checkpoint/exp_model_1_bs_8_lr_0.001_nframes_896_nfps_32_nheads_8_nenc_6_dropout_0.1_finetune_False",
+    default="/Users/tihmels/bin/vsum_checkpoint/exp_model_1_bs_8_lr_0.001_nframes_480_nfps_16_nheads_4_nenc_12_dropout_0.1_finetune_False/epoch0001.pth.tar",
     help="checkpoint model folder",
 )
 parser.add_argument(
@@ -249,7 +249,7 @@ def main(args):
 
     video_summaries = {}
 
-    model = VSum(args.num_class, space_to_depth=True)
+    model = VSum()
     model = model.eval()
 
     if checkpoint_path:
@@ -270,7 +270,7 @@ def main(args):
         for itr, video in enumerate(videos):
             print("Generating summary for: ", video.pk)
 
-            frames = read_images(video.frames)
+            frames = read_images(video.frames[::5])
 
             transform = transforms.Compose(
                 [transforms.ToTensor(), transforms.Resize((224, 224))]
@@ -297,8 +297,8 @@ def main(args):
                 for segment in frames:
                     # batch = segment.unsqueeze(0).cuda() # <---
                     batch = segment.unsqueeze(0)
-                    # _, score = model(batch) # <---
-                    score = torch.rand((1, 1))
+                    _, score = model(batch) # <---
+                    # score = torch.rand((1, 1))
                     segment_scores.append(score.view(-1))
                     bar()
 

@@ -34,12 +34,6 @@ parser.add_argument("--finetune", dest="finetune", action="store_true", help="fi
 parser.add_argument("--video_size", type=int, default=224, help="image size")
 parser.add_argument("--batch_size", type=int, default=16, help="batch size")
 parser.add_argument(
-    "--world-size",
-    default=-1,
-    type=int,
-    help="number of nodes for distributed training",
-)
-parser.add_argument(
     "-e",
     "--evaluate",
     dest="evaluate",
@@ -58,9 +52,6 @@ parser.add_argument(
 )
 parser.add_argument(
     "--pin_memory", dest="pin_memory", action="store_true", help="use pin_memory"
-)
-parser.add_argument(
-    "--num_candidates", type=int, default=1, help="num candidates for MILNCE loss"
 )
 parser.add_argument("--num_thread_reader", type=int, default=5, help="")
 parser.add_argument(
@@ -88,7 +79,7 @@ parser.add_argument(
 parser.add_argument(
     "--lrv",
     "--learning-rate-vsum",
-    default=0.001,
+    default=0.00001,
     type=float,
     metavar="LRV",
     help="initial learning rate",
