@@ -233,7 +233,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
             plt.title(label=f"{story.pk}", fontdict={'fontsize': 12})
 
             save_path = f'/Users/tihmels/Desktop/pseudogen/cluster/{cluster.index}/'
-            create_dir(Path(save_path), rm_if_exist=True)
+            create_dir(Path(save_path))
 
             plt.savefig(f'{save_path}/{story.pk}.jpg', bbox_inches=0)
             plt.close('all')

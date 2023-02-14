@@ -23,14 +23,13 @@ parser.add_argument("--seed", default=1, type=int, help="seed for initializing t
 parser.add_argument("--model_type", "-m", default=1, type=int, help="(1) VSum_Trans (2) VSum_MLP")
 parser.add_argument("--optimizer", type=str, default="adam", choices=['adam', 'sgd'], help="opt algorithm")
 parser.add_argument("--num_class", type=int, default=512, help="upper epoch limit")
-parser.add_argument("--word2vec_path", type=str, default="data/word2vec.pth", help="")
 parser.add_argument("--weight_init", type=str, default="uniform", help="CNN weights inits")
 parser.add_argument("--dropout", "--dropout", default=0.1, type=float, help="Dropout")
-parser.add_argument("--fps", type=int, default=12, help="")
+parser.add_argument("--fps", type=int, default=8, help="")
 parser.add_argument("--heads", "-heads", default=8, type=int, help="number of transformer heads")
 parser.add_argument("--finetune", dest="finetune", action="store_true", help="finetune S3D")
 parser.add_argument("--video_size", type=int, default=224, help="image size")
-parser.add_argument("--batch_size", type=int, default=8, help="batch size")
+parser.add_argument("--batch_size", type=int, default=16, help="batch size")
 parser.add_argument("--rank", default=0, type=int, help="Rank")
 parser.add_argument(
     "--world-size",
@@ -459,8 +458,7 @@ def create_model(args):
     if args.model_type == 1:
         model = VSum(
             args.num_class,
-            space_to_depth=True,
-            word2vec_path=args.word2vec_path,
+            space_to_depth=False,
             init=args.weight_init,
             enc_layers=args.enc_layers,
             heads=args.heads,
@@ -468,7 +466,7 @@ def create_model(args):
     else:
         model = VSum_MLP(
             args.num_class,
-            space_to_depth=True,
+            space_to_depth=False,
             word2vec_path=args.word2vec_path,
             init=args.weight_init,
             dropout=args.dropout)

@@ -77,16 +77,14 @@ class VSum(nn.Module):
     def __init__(
             self,
             num_classes=512,
-            gating=True,
             space_to_depth=False,
-            word2vec_path="",
             init="uniform",
-            token_to_word_path="data/dict.npy",
-            window_len=32,
+            window_len=16,
             heads=8,
             enc_layers=6,
             d_model=512,
             dropout=0.1,
+            word2vec_path="",
     ) -> None:
         super(VSum, self).__init__()
         self.window_len = window_len
