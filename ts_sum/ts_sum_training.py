@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 from ts_sum.evaluate_and_log import evaluate_summary
 from ts_sum.ts_sum_utils import Logger, AverageMeter
-from ts_sum.video_loader import TVSumStoryLoader
+from ts_sum.video_loader import NewsSumStoryLoader
 from ts_sum.vsum import VSum, VSum_MLP
 
 parser = ArgumentParser('Setup RedisAI DB')
@@ -57,20 +57,20 @@ parser.add_argument("--num_thread_reader", type=int, default=10, help="")
 parser.add_argument(
     "--enc_layers",
     "-enc_layers",
-    default=6,
+    default=24,
     type=int,
     help="number of layers in transformer encoder",
 )
 parser.add_argument(
     "--num_frames",
     type=int,
-    default=896,
+    default=480,
     help="number of frames in each video clip",
 )
 parser.add_argument(
     "--num_frames_per_segment",
     type=int,
-    default=32,
+    default=16,
     help="number of frames in each segment",
 )
 parser.add_argument(
@@ -258,7 +258,7 @@ def main(args):
         if "mixed_5" in name and args.finetune:
             param.requires_grad = True
 
-    dataset = TVSumStoryLoader(
+    dataset = NewsSumStoryLoader(
         fps=args.fps,
         num_frames=args.num_frames,
         num_frames_per_segment=args.num_frames_per_segment,

@@ -273,6 +273,9 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         redis_summary = db.List(get_sum_key(story.pk))
         redis_scores = db.List(get_score_key(story.pk))
 
+        redis_summary.clear()
+        redis_scores.clear()
+
         redis_summary.extend(machine_summary.tolist())
         redis_scores.extend(machine_summary_scores.tolist())
 
