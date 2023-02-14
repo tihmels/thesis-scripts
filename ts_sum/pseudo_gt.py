@@ -208,15 +208,16 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
             f"[{idx + 1}/{len(cluster.ts15s)}] Story: {story.headline} "
             f"({story.pk}) {story.video} {story.start} - {story.end}")
 
-        inter_cluster_sim = get_inter_cluster_similarity(shot_features, other_clusters)
+        # inter_cluster_sim = get_inter_cluster_similarity(shot_features, other_clusters)
+        inter_cluster_sim = mean_segment_similarity(shot_features, all_other_features)
 
         intra_cluster_sim = mean_segment_similarity(shot_features, all_segment_features)
 
         ts100_sim = mean_segment_similarity(shot_features, ts100_segment_features)
-        ts100_sim[0] = min(ts100_sim)
 
         segment_scores = ((intra_cluster_sim - inter_cluster_sim) + ts100_sim)
         segment_scores = F.normalize(torch.Tensor(segment_scores), dim=0).numpy()
+        segment_scores[0] = min(segment_scores)
 
         threshold = args.threshold * segment_scores.max()
         n_segments = shot_segments[-1][1] + 1
@@ -230,7 +231,11 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
                     segment_scores)
 
             plt.title(label=f"{story.pk}", fontdict={'fontsize': 12})
-            plt.savefig(f'/Users/tihmels/Desktop/pseudogen/{story.pk}.jpg', bbox_inches=0)
+
+            save_path = f'/Users/tihmels/Desktop/pseudogen/cluster/{cluster.index}/'
+            create_dir(Path(save_path), rm_if_exist=True)
+
+            plt.savefig(f'{save_path}/{story.pk}.jpg', bbox_inches=0)
             plt.close('all')
 
         machine_summary = np.zeros(n_segments)
