@@ -1,15 +1,15 @@
+import os
+import random
+from argparse import ArgumentParser
 from collections import OrderedDict
 
 import numpy as np
-import os
-import random
 import torch
 import torch.nn as nn
 import torch.nn.parallel
 import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
-from argparse import ArgumentParser
 from prettytable import PrettyTable
 from tqdm import tqdm
 
@@ -38,6 +38,13 @@ parser.add_argument(
     help="number of nodes for distributed training",
 )
 parser.add_argument(
+    "-e",
+    "--evaluate",
+    dest="evaluate",
+    action="store_true",
+    help="evaluate model on validation set",
+)
+parser.add_argument(
     "--epochs",
     default=30,
     type=int,
@@ -45,7 +52,7 @@ parser.add_argument(
     help="number of total epochs to run",
 )
 parser.add_argument(
-    "--batch_size_eval", type=int, default=1, help="batch size eval"
+    "--batch_size_eval", type=int, default=8, help="batch size eval"
 )
 parser.add_argument(
     "--pin_memory", dest="pin_memory", action="store_true", help="use pin_memory"
@@ -53,7 +60,7 @@ parser.add_argument(
 parser.add_argument(
     "--num_candidates", type=int, default=1, help="num candidates for MILNCE loss"
 )
-parser.add_argument("--num_thread_reader", type=int, default=10, help="")
+parser.add_argument("--num_thread_reader", type=int, default=5, help="")
 parser.add_argument(
     "--enc_layers",
     "-enc_layers",
@@ -162,47 +169,45 @@ def save_checkpoint(state, checkpoint_dir, epoch, n_ckpt=3):
             os.remove(oldest_ckpt)
 
 
-def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args, dataset_name):
+def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args):
     losses = AverageMeter()
     f_scores = AverageMeter()
     precisions = AverageMeter()
     recalls = AverageMeter()
 
     model.eval()
-    if args.rank == 0:
-        log("Evaluating on {}".format(dataset_name), args)
-        table = PrettyTable()
-        table.title = "Eval result of epoch {}".format(epoch)
-        table.field_names = ["F-score", "Precision", "Recall", "Loss"]
-        table.float_format = "1.3"
+
+    table = PrettyTable()
+    table.title = "Eval result of epoch {}".format(epoch)
+    table.field_names = ["F-score", "Precision", "Recall", "Loss"]
+    table.float_format = "1.3"
 
     with torch.no_grad():
         for idx, data in enumerate(test_loader):
-            labels = data["summary"].view(-1)
-            video = data["video"].float()
-            scores = data["scores"].view(-1)
+            frames = data["video"].float()
+            gt_summary = data["summary"].view(-1)
+            gt_scores = data["scores"].view(-1)
 
-            embedding, score = model(video)
+            embedding, score = model(frames)
 
-            if args.rank == 0:
-                loss = loss_fun(score.view(-1), scores)
+            loss = loss_fun(score.view(-1), gt_scores)
 
-                summary_ids = (
-                    score.detach().cpu().view(-1).topk(int(0.50 * len(labels)))[1]
-                )
+            summary_ids = (
+                score.detach().cpu().view(-1).topk(int(0.50 * len(gt_summary)))[1]
+            )
 
-                summary = np.zeros(len(labels))
-                summary[summary_ids] = 1
+            summary = np.zeros(len(gt_summary), dtype=int)
+            summary[summary_ids] = 1
 
-                f_score, precision, recall = evaluate_summary(
-                    summary, labels.detach().cpu().numpy()
-                )
+            f_score, precision, recall = evaluate_summary(
+                summary, gt_summary.detach().cpu().numpy()
+            )
 
-                loss = loss.mean()
-                losses.update(loss.item(), embedding.shape[0])
-                f_scores.update(f_score, embedding.shape[0])
-                precisions.update(precision, embedding.shape[0])
-                recalls.update(recall, embedding.shape[0])
+            loss = loss.mean()
+            losses.update(loss.item(), embedding.shape[0])
+            f_scores.update(f_score, embedding.shape[0])
+            precisions.update(precision, embedding.shape[0])
+            recalls.update(recall, embedding.shape[0])
 
     loss = losses.avg
     f_score = f_scores.avg
@@ -240,52 +245,7 @@ def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args, dataset_name)
     model.train()
 
 
-def main(args):
-    random.seed(args.seed)
-    torch.manual_seed(args.seed)
-
-    print('Create Model ...')
-    model = create_model(args)
-
-    print('Load pretrained weights ...')
-    if args.pretrain_cnn_path:
-        net_data = torch.load(args.pretrain_cnn_path)
-        model.base_model.load_state_dict(net_data)
-
-    for name, param in model.named_parameters():
-        if "base" in name:
-            param.requires_grad = False
-        if "mixed_5" in name and args.finetune:
-            param.requires_grad = True
-
-    dataset = NewsSumStoryLoader(
-        fps=args.fps,
-        num_frames=args.num_frames,
-        num_frames_per_segment=args.num_frames_per_segment,
-        size=args.video_size,
-    )
-
-    train_size = int(0.9 * len(dataset))
-    test_size = len(dataset) - train_size
-
-    train_set, val_set = torch.utils.data.random_split(dataset, [train_size, test_size])
-
-    train_loader = torch.utils.data.DataLoader(
-        train_set,
-        batch_size=args.batch_size,
-        shuffle=True,
-        drop_last=False,
-        pin_memory=False
-    )
-
-    logger = create_logger(args)
-
-    tb_logdir = os.path.join(args.log_root, args.log_name)
-    if args.rank == 0:
-        os.makedirs(tb_logdir, exist_ok=True)
-
-    criterion_c = nn.MSELoss(reduction="none")
-
+def get_params(model):
     vsum_params = []
     base_params = []
 
@@ -295,54 +255,7 @@ def main(args):
         elif "mixed_5" in name and "base" in name:
             base_params.append(param)
 
-    optimizer = get_optimizer(model, base_params, vsum_params, args)
-
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=300, gamma=1.0)
-    checkpoint_dir = os.path.join(
-        os.path.dirname(__file__), args.checkpoint_dir, args.log_name
-    )
-
-    if args.checkpoint_dir != "" and args.rank == 0:
-        os.makedirs(checkpoint_dir, exist_ok=True)
-
-    total_batch_size = args.batch_size
-
-    log(
-        "Starting training loop for rank: {}, total batch size: {}".format(
-            args.rank, total_batch_size
-        ),
-        args,
-    )
-
-    for epoch in range(args.epochs):
-
-        train(
-            train_loader,
-            model,
-            criterion_c,
-            optimizer,
-            scheduler,
-            epoch,
-            train_set,
-            logger,
-            args,
-        )
-
-        print('Iteration done')
-
-        if args.rank == 0:
-            save_checkpoint(
-                {
-                    "epoch": epoch + 1,
-                    "state_dict": model.state_dict(),
-                    "optimizer": optimizer.state_dict(),
-                    "scheduler": scheduler.state_dict(),
-                },
-                checkpoint_dir,
-                epoch + 1,
-            )
-
-            print('Checkpoint saved!')
+    return base_params, vsum_params
 
 
 def get_optimizer(model, base_params, vsum_params, args):
@@ -436,13 +349,13 @@ def log_state(args, dataset, epoch, idx, optimizer, running_loss, tb_logger, tra
 
 
 def TrainOneBatch(model, opt, scheduler, data, loss_fun):
-    video = data["video"].float()
+    frames = data["video"].float()
     scores = data["scores"].view(-1)
 
     opt.zero_grad()
 
     with torch.set_grad_enabled(True):
-        embedding, score = model(video)
+        embedding, score = model(frames)
         loss = loss_fun(score.view(-1), scores)
 
     gradient = torch.ones((loss.shape[0]), dtype=torch.long)
@@ -472,6 +385,124 @@ def create_model(args):
             dropout=args.dropout)
 
     return model
+
+
+def main(args):
+    random.seed(args.seed)
+    torch.manual_seed(args.seed)
+
+    print('Create Model ...')
+    model = create_model(args)
+
+    print('Load pretrained weights ...')
+    if args.pretrain_cnn_path:
+        net_data = torch.load(args.pretrain_cnn_path)
+        model.base_model.load_state_dict(net_data)
+
+    for name, param in model.named_parameters():
+        if "base" in name:
+            param.requires_grad = False
+        if "mixed_5" in name and args.finetune:
+            param.requires_grad = True
+
+    dataset = NewsSumStoryLoader(
+        fps=args.fps,
+        num_frames=args.num_frames,
+        num_frames_per_segment=args.num_frames_per_segment,
+        size=args.video_size,
+    )
+
+    train_size = int(0.9 * len(dataset))
+    test_size = len(dataset) - train_size
+
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
+
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        drop_last=False,
+        num_workers=args.num_thread_reader,
+        pin_memory=args.pin_memory  # needs to be true if trained on GPU
+    )
+
+    test_loader = torch.utils.data.DataLoader(
+        test_dataset,
+        batch_size=args.batch_size_eval,
+        shuffle=True,
+        drop_last=False,
+        num_workers=args.num_thread_reader,
+        pin_memory=args.pin_memory  # needs to be true if trained on GPU
+    )
+
+    logger = create_logger(args)
+
+    tb_logdir = os.path.join(args.log_root, args.log_name)
+    if args.rank == 0:
+        os.makedirs(tb_logdir, exist_ok=True)
+
+    criterion = nn.MSELoss(reduction="none")
+
+    if args.evaluate:
+        print("starting evaluation ...")
+        evaluate(test_loader, model, -1, logger, criterion, args)
+        return
+
+    base_params, vsum_params = get_params(model)
+
+    optimizer = get_optimizer(model, base_params, vsum_params, args)
+
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=300, gamma=1.0)
+    checkpoint_dir = os.path.join(
+        os.path.dirname(__file__), args.checkpoint_dir, args.log_name
+    )
+
+    if args.checkpoint_dir != "" and args.rank == 0:
+        os.makedirs(checkpoint_dir, exist_ok=True)
+
+    total_batch_size = args.batch_size
+
+    log(
+        "Starting training loop for rank: {}, total batch size: {}".format(
+            args.rank, total_batch_size
+        ),
+        args,
+    )
+
+    for epoch in range(args.epochs):
+
+        if (epoch + 1) % 2 == 0:
+            evaluate(
+                test_loader, model, epoch, logger, criterion, args
+            )
+
+        train(
+            train_loader,
+            model,
+            criterion,
+            optimizer,
+            scheduler,
+            epoch,
+            train_dataset,
+            logger,
+            args,
+        )
+
+        print('Iteration done')
+
+        if args.rank == 0:
+            save_checkpoint(
+                {
+                    "epoch": epoch + 1,
+                    "state_dict": model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "scheduler": scheduler.state_dict(),
+                },
+                checkpoint_dir,
+                epoch + 1,
+            )
+
+            print('Checkpoint saved!')
 
 
 if __name__ == "__main__":

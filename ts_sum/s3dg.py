@@ -1,9 +1,10 @@
 """Contains the definition for Gated Separable 3D network (S3D-G).
 """
 
-import numpy as np
 import os
 import re
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

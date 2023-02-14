@@ -77,20 +77,19 @@ class VSum(nn.Module):
     def __init__(
             self,
             num_classes=512,
-            space_to_depth=False,
+            space_to_depth=True,
             init="uniform",
             window_len=16,
             heads=8,
             enc_layers=6,
             d_model=512,
-            dropout=0.1,
-            word2vec_path="",
+            dropout=0.1
     ) -> None:
         super(VSum, self).__init__()
         self.window_len = window_len
 
         self.base_model = S3D(
-            num_classes, space_to_depth=space_to_depth, word2vec_path=word2vec_path, init=init,
+            num_classes, space_to_depth=space_to_depth, init=init,
         )
 
         self.d_model = d_model
