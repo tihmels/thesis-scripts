@@ -14,9 +14,9 @@ class TVSumStoryLoader(Dataset):
 
     def __init__(
             self,
-            fps=12,
+            fps=8,
             num_frames=832,
-            num_frames_per_segment=32,
+            num_frames_per_segment=16,
             size=224
     ):
         assert isinstance(size, int)
@@ -29,15 +29,6 @@ class TVSumStoryLoader(Dataset):
 
         self.stories = Story.find(Story.type == 'ts15').all()
         self.stories = [story for story in self.stories if db.List(get_sum_key(story.pk))]
-
-        clusters = TopicCluster.find().all()
-        self.clusters = []
-        for story in self.stories:
-            for cluster in clusters:
-                pks = [s.pk for s in cluster.ts15s]
-                if story.pk in pks:
-                    self.clusters.append(cluster.index)
-                    continue
 
         self.summaries = [db.List(get_sum_key(story.pk)).as_list() for story in self.stories]
         self.summaries = [list(map(int, map(float, label))) for label in self.summaries]

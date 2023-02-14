@@ -458,7 +458,7 @@ def create_model(args):
     if args.model_type == 1:
         model = VSum(
             args.num_class,
-            space_to_depth=False,
+            space_to_depth=True,
             init=args.weight_init,
             enc_layers=args.enc_layers,
             heads=args.heads,

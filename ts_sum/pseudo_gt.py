@@ -210,7 +210,6 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
 
         # inter_cluster_sim = get_inter_cluster_similarity(shot_features, other_clusters)
         inter_cluster_sim = mean_segment_similarity(shot_features, all_other_features)
-
         intra_cluster_sim = mean_segment_similarity(shot_features, all_segment_features)
 
         ts100_sim = mean_segment_similarity(shot_features, ts100_segment_features)
