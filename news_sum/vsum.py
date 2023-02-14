@@ -3,7 +3,7 @@ import math
 import torch
 import torch.nn as nn
 
-from ts_sum.s3dg import S3D
+from s3dg import S3D
 
 
 class PositionalEncoding(nn.Module):

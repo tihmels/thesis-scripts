@@ -1,8 +1,0 @@
-Starting training loop for rank: 0, total batch size: 8
-Epoch 1, Epoch status: 0.0335, Training loss: 24.7312, Learning rate: 0.001000
-Epoch 1, Epoch status: 0.0839, Training loss: 2.6056, Learning rate: 0.001000
-Epoch 1, Epoch status: 0.1342, Training loss: 2.3844, Learning rate: 0.001000
-Epoch 1, Epoch status: 0.1845, Training loss: 1.7179, Learning rate: 0.001000
-Epoch 1, Epoch status: 0.2348, Training loss: 4.6583, Learning rate: 0.001000
-Epoch 1, Epoch status: 0.2851, Training loss: 2.0535, Learning rate: 0.001000
-Starting training loop for rank: 0, total batch size: 8

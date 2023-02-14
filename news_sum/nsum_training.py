@@ -1,3 +1,5 @@
+#!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
+
 import os
 import random
 from argparse import ArgumentParser
@@ -13,10 +15,10 @@ import torch.utils.data.distributed
 from prettytable import PrettyTable
 from tqdm import tqdm
 
-from ts_sum.evaluate_and_log import evaluate_summary
-from ts_sum.ts_sum_utils import Logger, AverageMeter
-from ts_sum.video_loader import NewsSumStoryLoader
-from ts_sum.vsum import VSum, VSum_MLP
+from news_sum.eval_and_log import evaluate_summary
+from news_sum.nsum_utils import Logger, AverageMeter
+from news_sum.video_loader import NewsSumStoryLoader
+from news_sum.vsum import VSum, VSum_MLP
 
 parser = ArgumentParser('Setup RedisAI DB')
 parser.add_argument("--seed", default=1, type=int, help="seed for initializing training.")
@@ -24,13 +26,13 @@ parser.add_argument("--model_type", "-m", default=1, type=int, help="(1) VSum_Tr
 parser.add_argument("--optimizer", type=str, default="adam", choices=['adam', 'sgd'], help="opt algorithm")
 parser.add_argument("--num_class", type=int, default=512, help="upper epoch limit")
 parser.add_argument("--weight_init", type=str, default="uniform", help="CNN weights inits")
+parser.add_argument("--base_path", type=str, default="/Users/tihmels/Scripts/thesis-scripts/news_sum/", help="CNN weights inits")
 parser.add_argument("--dropout", "--dropout", default=0.1, type=float, help="Dropout")
 parser.add_argument("--fps", type=int, default=8, help="")
 parser.add_argument("--heads", "-heads", default=8, type=int, help="number of transformer heads")
 parser.add_argument("--finetune", dest="finetune", action="store_true", help="finetune S3D")
 parser.add_argument("--video_size", type=int, default=224, help="image size")
 parser.add_argument("--batch_size", type=int, default=16, help="batch size")
-parser.add_argument("--rank", default=0, type=int, help="Rank")
 parser.add_argument(
     "--world-size",
     default=-1,
@@ -117,7 +119,7 @@ parser.add_argument(
 parser.add_argument(
     "--pretrain_cnn_path",
     type=str,
-    default="/Users/tihmels/Scripts/thesis-scripts/ts_sum/pretrained_weights/s3d_howto100m.pth",
+    default="/Users/tihmels/Scripts/thesis-scripts/news_sum/pretrained_weights/s3d_howto100m.pth",
     help="",
 )
 parser.add_argument("--verbose", type=int, default=1, help="")
@@ -140,8 +142,7 @@ def create_logger(args):
     logdir = os.path.join(args.log_root, args.log_name)
     logger = Logger(logdir)
 
-    if args.rank == 0:
-        os.makedirs(logdir, exist_ok=True)
+    os.makedirs(logdir, exist_ok=True)
 
     return logger
 
@@ -150,7 +151,7 @@ def log(output, args):
     print(output)
     with open(
             os.path.join(
-                os.path.dirname(__file__), "vsum_output_log", args.log_name + ".txt"
+                args.base_path, "vsum_output_log", args.log_name + ".txt"
             ),
             "a",
     ) as f:
@@ -214,33 +215,32 @@ def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args):
     precision = precisions.avg
     recall = recalls.avg
 
-    if args.rank == 0:
-        log(
-            "Epoch {} \t"
-            "F-Score {} \t"
-            "Precision {} \t"
-            "Recall {} \t"
-            "Loss {loss.val:.4f} ({loss.avg:.4f})\t".format(
-                epoch, f_score, precision, recall, loss=losses
-            ),
-            args,
-        )
-        table.add_row([f_score, precision, recall, loss])
-        tqdm.write(str(table))
+    log(
+        "Epoch {} \t"
+        "F-Score {} \t"
+        "Precision {} \t"
+        "Recall {} \t"
+        "Loss {loss.val:.4f} ({loss.avg:.4f})\t".format(
+            epoch, f_score, precision, recall, loss=losses
+        ),
+        args,
+    )
+    table.add_row([f_score, precision, recall, loss])
+    tqdm.write(str(table))
 
-        if tb_logger is not None:
-            # log training data into tensorboard
-            logs = OrderedDict()
-            logs["Val_IterLoss"] = losses.avg
-            logs["F-Score"] = f_scores.avg
-            logs["Precision"] = precisions.avg
-            logs["Recall"] = recalls.avg
+    if tb_logger is not None:
+        # log training data into tensorboard
+        logs = OrderedDict()
+        logs["Val_IterLoss"] = losses.avg
+        logs["F-Score"] = f_scores.avg
+        logs["Precision"] = precisions.avg
+        logs["Recall"] = recalls.avg
 
-            # how many iterations we have validated
-            for key, value in logs.items():
-                tb_logger.log_scalar(value, key, epoch)
+        # how many iterations we have validated
+        for key, value in logs.items():
+            tb_logger.log_scalar(value, key, epoch)
 
-            tb_logger.flush()
+        tb_logger.flush()
 
     model.train()
 
@@ -315,7 +315,7 @@ def train(
 
         running_loss += batch_loss
 
-        if (idx + 1) % args.log_freq == 0 and args.verbose and args.rank == 0:
+        if (idx + 1) % args.log_freq == 0 and args.verbose:
             log_state(args, dataset, epoch, idx, optimizer, running_loss, tb_logger, train_loader)
 
             running_loss = 0.0
@@ -438,8 +438,7 @@ def main(args):
     logger = create_logger(args)
 
     tb_logdir = os.path.join(args.log_root, args.log_name)
-    if args.rank == 0:
-        os.makedirs(tb_logdir, exist_ok=True)
+    os.makedirs(tb_logdir, exist_ok=True)
 
     criterion = nn.MSELoss(reduction="none")
 
@@ -457,24 +456,20 @@ def main(args):
         os.path.dirname(__file__), args.checkpoint_dir, args.log_name
     )
 
-    if args.checkpoint_dir != "" and args.rank == 0:
+    if args.checkpoint_dir != "":
         os.makedirs(checkpoint_dir, exist_ok=True)
 
     total_batch_size = args.batch_size
 
     log(
-        "Starting training loop for rank: {}, total batch size: {}".format(
-            args.rank, total_batch_size
-        ),
-        args,
+        "Starting training loop with batch size: {}".format(
+            total_batch_size), args,
     )
 
     for epoch in range(args.epochs):
 
         if (epoch + 1) % 2 == 0:
-            evaluate(
-                test_loader, model, epoch, logger, criterion, args
-            )
+            evaluate(test_loader, model, epoch, logger, criterion, args)
 
         train(
             train_loader,
@@ -490,19 +485,18 @@ def main(args):
 
         print('Iteration done')
 
-        if args.rank == 0:
-            save_checkpoint(
-                {
-                    "epoch": epoch + 1,
-                    "state_dict": model.state_dict(),
-                    "optimizer": optimizer.state_dict(),
-                    "scheduler": scheduler.state_dict(),
-                },
-                checkpoint_dir,
-                epoch + 1,
-            )
+        save_checkpoint(
+            {
+                "epoch": epoch + 1,
+                "state_dict": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "scheduler": scheduler.state_dict(),
+            },
+            checkpoint_dir,
+            epoch + 1,
+        )
 
-            print('Checkpoint saved!')
+        print('Checkpoint saved!')
 
 
 if __name__ == "__main__":

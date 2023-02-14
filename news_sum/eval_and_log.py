@@ -7,7 +7,7 @@ import numpy as np
 from prettytable import PrettyTable
 from tqdm import tqdm
 
-from ts_sum.ts_sum_utils import AverageMeter
+from nsum_utils import AverageMeter
 
 sys.path.append("../")
 

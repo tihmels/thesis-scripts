@@ -1,3 +1,5 @@
+#!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
+
 import math
 import os
 from argparse import ArgumentParser
@@ -19,10 +21,10 @@ from common.VAO import VAO
 from common.utils import read_images, Range, flatten, create_dir
 from database import db, rai
 from database.model import MainVideo, get_sum_key, get_score_key
-from ts_sum.evaluate_and_log import evaluate_summary
-from ts_sum.knapsack import knapsack_ortools
-from ts_sum.ts_sum_utils import get_last_checkpoint, Logger, AverageMeter
-from ts_sum.vsum import VSum
+from news_sum.eval_and_log import evaluate_summary
+from news_sum.knapsack import knapsack_ortools
+from news_sum.vsum import VSum
+from news_sum.nsum_utils import AverageMeter, get_last_checkpoint, Logger
 
 matplotlib.use('TkAgg')
 
