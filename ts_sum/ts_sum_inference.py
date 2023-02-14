@@ -247,7 +247,7 @@ def main(args):
 
     video_summaries = {}
 
-    model = VSum(space_to_depth=True, window_len=args.window_len, word2vec_path=args.word2vec_path)
+    model = VSum(args.num_class, space_to_depth=True)
     model = model.eval()
 
     if checkpoint_path:
@@ -268,7 +268,7 @@ def main(args):
         for itr, video in enumerate(videos):
             print("Generating summary for: ", video.pk)
 
-            frames = read_images(video.frames[::5])
+            frames = read_images(video.frames)
 
             transform = transforms.Compose(
                 [transforms.ToTensor(), transforms.Resize((224, 224))]
