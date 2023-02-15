@@ -1,0 +1,13 @@
+Starting training loop with batch size: 4
+Starting training loop with batch size: 4
+Starting training loop with batch size: 4
+Epoch 1, Epoch status: 0.0168, Training loss: 22.6538, Learning rate: 0.001000
+Starting training loop with batch size: 4
+Starting training loop with batch size: 4
+Starting training loop with batch size: 4
+Starting training loop with batch size: 4
+Starting training loop with batch size: 4
+Epoch 1, Epoch status: 0.0168, Training loss: 31.2837, Learning rate: 0.001000
+Starting training loop with batch size: 4
+Epoch 1, Epoch status: 0.0168, Training loss: 22.6538, Learning rate: 0.001000
+Epoch 1, Epoch status: 0.0419, Training loss: 3.0099, Learning rate: 0.001000

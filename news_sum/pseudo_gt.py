@@ -47,16 +47,16 @@ def score_per_seg(segments, scores):
     return [[seg_score] * (seg[1] - seg[0] + 1) for seg_score, seg in zip(scores, segments)]
 
 
-def segment_idx_to_frame_idx(story_start_idx, segment_idx, fps=8, window=16):
+def segment_idx_to_frame_idx(offset, segment_idx, fps=8, window=16):
     skip_n = math.floor(25 / fps)
 
-    return story_start_idx + (segment_idx * skip_n * window)
+    return offset + (segment_idx * skip_n * window)
 
 
-def segment_to_frame_range(story_start_idx, first_segment_idx: int, last_segment_idx: int = None, fps=8, window=16):
+def segment_to_frame_range(offset, first_segment_idx: int, last_segment_idx: int = None, fps=8, window=16):
     last_segment_idx = last_segment_idx + 1 if last_segment_idx else first_segment_idx + 1
-    return Range(segment_idx_to_frame_idx(story_start_idx, first_segment_idx, fps, window),
-                 segment_idx_to_frame_idx(story_start_idx, last_segment_idx, fps, window))
+    return Range(segment_idx_to_frame_idx(offset, first_segment_idx, fps, window),
+                 segment_idx_to_frame_idx(offset, last_segment_idx, fps, window))
 
 
 def mean_segment_similarity(segment_features, other_segment_features, mean_co=None):
@@ -64,15 +64,6 @@ def mean_segment_similarity(segment_features, other_segment_features, mean_co=No
 
     similarity_matrix = np.sort(similarity_matrix, axis=1)
     segment_similarity = similarity_matrix[:, -mean_co:].mean(axis=1) if mean_co else similarity_matrix.mean(axis=1)
-
-    return segment_similarity
-
-
-def mean_segment_similarity_matmul(segment_features, other_segment_features, mean_co=None):
-    segment_similarity = np.matmul(segment_features, other_segment_features.T)
-
-    segment_similarity = np.sort(segment_similarity, axis=1)
-    segment_similarity = segment_similarity[:, -mean_co:].mean(axis=1) if mean_co else segment_similarity.mean(axis=1)
 
     return segment_similarity
 
@@ -85,9 +76,9 @@ def get_inter_cluster_similarity_matmul(segment_features, other_clusters, mean_c
     for story in other_stories:
         _, features = extract_shot_features(story, 8, 16)
 
-        segment_similarity = mean_segment_similarity_matmul(segment_features,
-                                                            np.stack(features),
-                                                            mean_co=mean_co)
+        segment_similarity = mean_segment_similarity(segment_features,
+                                                     np.stack(features),
+                                                     mean_co=mean_co)
 
         segment_similarities.append(segment_similarity)
 
@@ -208,10 +199,8 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
             f"[{idx + 1}/{len(cluster.ts15s)}] Story: {story.headline} "
             f"({story.pk}) {story.video} {story.start} - {story.end}")
 
-        # inter_cluster_sim = get_inter_cluster_similarity(shot_features, other_clusters)
         inter_cluster_sim = mean_segment_similarity(shot_features, all_other_features)
         intra_cluster_sim = mean_segment_similarity(shot_features, all_segment_features)
-
         ts100_sim = mean_segment_similarity(shot_features, ts100_segment_features)
 
         segment_scores = ((intra_cluster_sim - inter_cluster_sim) + ts100_sim)

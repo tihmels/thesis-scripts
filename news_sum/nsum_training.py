@@ -79,11 +79,20 @@ parser.add_argument(
 parser.add_argument(
     "--lrv",
     "--learning-rate-vsum",
-    default=0.00001,
+    default=0.001,
     type=float,
     metavar="LRV",
     help="initial learning rate",
     dest="lrv",
+)
+parser.add_argument(
+    "--lrs",
+    "--learning-rate-s3d",
+    default=0.0001,
+    type=float,
+    metavar="LRS",
+    help="initial learning rate",
+    dest="lrs",
 )
 parser.add_argument(
     "--weight_decay",
@@ -339,20 +348,28 @@ def log_state(args, dataset, epoch, idx, optimizer, running_loss, tb_logger, tra
         tb_logger.flush()
 
 
-def TrainOneBatch(model, opt, scheduler, data, loss_fun):
+def TrainOneBatch(model, optimizer, scheduler, data, loss_fun):
     frames = data["video"].float()
     scores = data["scores"].view(-1)
 
-    opt.zero_grad()
+    print(f'Learning rate: {scheduler.get_last_lr()}')
+
+    optimizer.zero_grad()
 
     with torch.set_grad_enabled(True):
         embedding, score = model(frames)
         loss = loss_fun(score.view(-1), scores)
+        print(f'Frame Shape: {frames.shape}')
+        print(f'Score Shape: {score.shape}')
+        print(f'Predicted Scores: {score.view(-1)[::10]}')
+        print(f'GT Scores: {scores[::10]}')
+        print(f'Loss: {loss[:10]}')
+        print()
 
     gradient = torch.ones((loss.shape[0]), dtype=torch.long)
     loss.backward(gradient=gradient)
     loss = loss.mean()
-    opt.step()
+    optimizer.step()
     scheduler.step()
 
     return loss.item()
@@ -431,7 +448,7 @@ def main(args):
     tb_logdir = os.path.join(args.log_root, args.log_name)
     os.makedirs(tb_logdir, exist_ok=True)
 
-    criterion = nn.MSELoss(reduction="none")
+    criterion = nn.MSELoss(reduction='none')
 
     if args.evaluate:
         print("starting evaluation ...")
@@ -442,7 +459,7 @@ def main(args):
 
     optimizer = get_optimizer(model, base_params, vsum_params, args)
 
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=300, gamma=1.0)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
     checkpoint_dir = os.path.join(
         os.path.dirname(__file__), args.checkpoint_dir, args.log_name
     )

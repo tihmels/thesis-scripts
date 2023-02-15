@@ -33,3 +33,4 @@ Epoch 2, Epoch status: 0.4361, Training loss: 3.5093, Learning rate: 0.001000
 Epoch 2, Epoch status: 0.4864, Training loss: 3.1136, Learning rate: 0.001000
 Epoch 2, Epoch status: 0.5367, Training loss: 1.9848, Learning rate: 0.001000
 Epoch 2, Epoch status: 0.5870, Training loss: 2.1862, Learning rate: 0.001000
+Starting training loop with batch size: 8

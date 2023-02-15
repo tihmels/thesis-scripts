@@ -1,0 +1,1 @@
+Starting training loop with batch size: 4
