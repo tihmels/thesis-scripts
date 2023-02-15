@@ -359,12 +359,9 @@ def TrainOneBatch(model, optimizer, scheduler, data, loss_fun):
     with torch.set_grad_enabled(True):
         embedding, score = model(frames)
         loss = loss_fun(score.view(-1), scores)
-        print(f'Frame Shape: {frames.shape}')
-        print(f'Score Shape: {score.shape}')
         print(f'Predicted Scores: {score.view(-1)[::10]}')
         print(f'GT Scores: {scores[::10]}')
         print(f'Loss: {loss[:10]}')
-        print()
 
     gradient = torch.ones((loss.shape[0]), dtype=torch.long)
     loss.backward(gradient=gradient)

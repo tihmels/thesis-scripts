@@ -14,3 +14,10 @@ Epoch 1, Epoch status: 0.5870, Training loss: 2.7212, Learning rate: 0.000010
 Epoch 1, Epoch status: 0.6373, Training loss: 3.4093, Learning rate: 0.000010
 Epoch 1, Epoch status: 0.6876, Training loss: 1.6789, Learning rate: 0.000010
 Epoch 1, Epoch status: 0.7379, Training loss: 2.5397, Learning rate: 0.000010
+Starting training loop with batch size: 8
+Epoch 1, Epoch status: 0.0335, Training loss: 0.2334, Learning rate: 0.000010
+Epoch 1, Epoch status: 0.0839, Training loss: 0.1425, Learning rate: 0.000010
+Epoch 1, Epoch status: 0.1342, Training loss: 0.0891, Learning rate: 0.000010
+Epoch 1, Epoch status: 0.1845, Training loss: 0.1113, Learning rate: 0.000010
+Epoch 1, Epoch status: 0.2348, Training loss: 0.0704, Learning rate: 0.000010
+Epoch 1, Epoch status: 0.2851, Training loss: 0.0700, Learning rate: 0.000010
