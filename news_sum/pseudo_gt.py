@@ -203,7 +203,9 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         intra_cluster_sim = mean_segment_similarity(shot_features, all_segment_features)
         ts100_sim = mean_segment_similarity(shot_features, ts100_segment_features)
 
-        segment_scores = ((intra_cluster_sim - inter_cluster_sim) + ts100_sim)
+        topic_relevance_score = intra_cluster_sim - inter_cluster_sim
+
+        segment_scores = topic_relevance_score + ts100_sim
         segment_scores = F.normalize(torch.Tensor(segment_scores), dim=0).numpy()
         segment_scores[0] = min(segment_scores)
 
@@ -218,7 +220,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
                     ts100_sim,
                     segment_scores)
 
-            plt.title(label=f"{story.pk}", fontdict={'fontsize': 12})
+            plt.title(label=f"{story.pk}", fontdict={'fontsize': 14})
 
             save_path = f'/Users/tihmels/Desktop/pseudogen/cluster/{cluster.index}/'
             create_dir(Path(save_path))

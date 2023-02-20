@@ -37,16 +37,11 @@ class Shot(EmbeddedBaseModel, ABC):
     first_frame_idx: int
     last_frame_idx: int
     duration: datetime.time
-    transcript_de: str
-    transcript_en: str
+    transcripts: List[Transcript]
     keyframe: str
 
 
-class MainShot(Shot):
-    type: str
-
-
-class ShortShot(Shot):
+class BannerShot(Shot):
     banner: Banner
 
 
@@ -57,13 +52,12 @@ class Story(EmbeddedBaseModel):
     first_frame_idx: int
     last_frame_idx: int
     timestamp: int
-    start: datetime.time
-    end: datetime.time
+    start_time: datetime.time
+    end_time: datetime.time
     duration: datetime.time
     frames: List[str]
     shots: List[Shot]
-    sentences_de: List[str]
-    sentences_en: List[str]
+    sentences: List[str]
 
     class Meta:
         model_key_prefix = 'story'

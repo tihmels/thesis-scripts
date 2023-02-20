@@ -23,8 +23,8 @@ from database import db, rai
 from database.model import MainVideo, get_sum_key, get_score_key
 from news_sum.eval_and_log import evaluate_summary
 from news_sum.knapsack import knapsack_ortools
-from news_sum.vsum import VSum
 from news_sum.nsum_utils import AverageMeter, get_last_checkpoint, Logger
+from news_sum.vsum import VSum
 
 matplotlib.use('TkAgg')
 
@@ -33,7 +33,7 @@ parser = ArgumentParser()
 parser.add_argument(
     "--checkpoint_dir",
     type=str,
-    default="/Users/tihmels/bin/vsum_checkpoint/exp_model_1_bs_8_lr_0.001_nframes_480_nfps_16_nheads_4_nenc_12_dropout_0.1_finetune_False/epoch0001.pth.tar",
+    default="/Users/tihmels/bin/vsum_checkpoint/exp_model_1_bs_8_lr_1e-05_nframes_480_nfps_16_nheads_4_nenc_12_dropout_0.1_finetune_False/epoch0001.pth.tar",
     help="checkpoint model folder",
 )
 parser.add_argument(
@@ -79,9 +79,10 @@ def visualize_picks(shots, frame_scores, picks):
     plt.xlabel("Frame")
     plt.ylabel("Score")
 
-    y_min = 0
+    y_min = min(frame_scores)
     y_max = max(frame_scores)
-    y_max = y_max + y_max * 0.1
+    y_min = y_min - (y_max - y_min) * 0.1
+    y_max = y_max + (y_max - y_min) * 0.1
 
     x_range = list(range(len(frame_scores)))
 
@@ -97,7 +98,6 @@ def visualize_picks(shots, frame_scores, picks):
         plt.fill_between(shot_range, y_min, y_max, color='b', alpha=.1)
 
     plt.xticks(range(0, len(frame_scores), 1000))
-    plt.show()
 
 
 def log_summaries(
@@ -222,12 +222,20 @@ def seg_idx_to_frame_range(seg_idx, window_len=16):
 
 
 def range_overlap(r1: Range, r2: Range):
-    latest_start = max(r1.start, r2.start)
-    earliest_end = min(r1.end, r2.end)
+    latest_start = max(r1.first_frame_idx, r2.first_frame_idx)
+    earliest_end = min(r1.last_frame_idx, r2.last_frame_idx)
     delta = earliest_end - latest_start
     overlap = max(0, delta)
 
     return overlap
+
+
+def build_video(video, binary_frame_summary, frames, path):
+    summary_frames = [frame for idx, frame in enumerate(frames[:len(binary_frame_summary)]) if
+                      binary_frame_summary[idx]]
+    summary_frames = torch.tensor(summary_frames)
+
+    io.write_video(str(Path(path, f'{video.pk}-SUM.mp4')), summary_frames, 25)
 
 
 def main(args):
@@ -270,31 +278,31 @@ def main(args):
         for itr, video in enumerate(videos):
             print("Generating summary for: ", video.pk)
 
-            frames = read_images(video.frames[::5])
+            frames = read_images(video.frames)
 
             transform = transforms.Compose(
                 [transforms.ToTensor(), transforms.Resize((224, 224))]
             )
 
-            frames = torch.stack([transform(frame) for frame in frames])
+            tensors = torch.stack([transform(frame) for frame in frames])
 
             window_len = args.window_len
 
-            extra_frames = window_len - (len(frames) % window_len)
-            frames = torch.cat((frames, frames[-extra_frames:]), dim=0)
+            extra_frames = window_len - (len(tensors) % window_len)
+            tensors = torch.cat((tensors, tensors[-extra_frames:]), dim=0)
 
-            n_segments = int(frames.shape[0] / window_len)
+            n_segments = int(tensors.shape[0] / window_len)
 
             # [B, C, H, W] -> [B, T, C, H, W]
-            frames = frames.view(n_segments, window_len, 3, 224, 224)
+            tensors = tensors.view(n_segments, window_len, 3, 224, 224)
 
             # [B, T, C, H, W] -> [B, C, T, H, W]
-            frames = frames.permute(0, 2, 1, 3, 4)
+            tensors = tensors.permute(0, 2, 1, 3, 4)
 
             segment_scores = []
 
             with alive_bar(n_segments, ctrl_c=False, title=f'{video.pk}', length=35) as bar:
-                for segment in frames:
+                for segment in tensors:
                     # batch = segment.unsqueeze(0).cuda() # <---
                     batch = segment.unsqueeze(0)
                     _, score = model(batch) # <---
@@ -309,13 +317,14 @@ def main(args):
             shot_scores = calc_shot_scores(segment_scores, shots, window_len)
 
             shot_n_frames = [(shot.last_frame_idx - shot.first_frame_idx) + 1 for shot in shots]
-            capacity = int(math.floor(len(video.frames) * args.proportion))
+            capacity = int(math.floor(len(frames) * args.proportion))
 
             shot_picks = knapsack_ortools(shot_scores, shot_n_frames, capacity)
 
             shot_score_frames = flatten([repeat(shot_scores[idx], shot_n_frames[idx]) for idx in range(len(shots))])
 
             visualize_picks(shots, shot_score_frames, shot_picks)
+            plt.savefig('/Users/tihmels/Desktop/picks.jpg', bbox_inches=0)
 
             binary_frame_summary = flatten([
                 list(repeat(1 if idx in shot_picks else 0, shot_n_frames[idx])) for idx, shot in enumerate(shots)])
@@ -325,6 +334,8 @@ def main(args):
             video_summaries[video.pk]["shot_picks"] = shot_picks
             video_summaries[video.pk]["segment_scores"] = segment_scores
             video_summaries[video.pk]["machine_summary"] = binary_frame_summary
+
+            build_video(video, binary_frame_summary, frames, Path('/Users/tihmels/Desktop/'))
 
         # Calculate scores and log videos
         log_summaries(
@@ -337,6 +348,7 @@ def main(args):
 
 def calc_shot_scores(segment_scores, shots, window_len):
     shot_scores = []
+    segment_scores = segment_scores.cpu().detach().numpy().squeeze()
 
     for shot in shots:
         shot_range = Range(shot.first_frame_idx, shot.last_frame_idx)
@@ -347,13 +359,12 @@ def calc_shot_scores(segment_scores, shots, window_len):
         total_score = 0
 
         for seg_idx in segment_idxs:
-            score = segment_scores[seg_idx].cpu().detach().numpy()
+            score = segment_scores[seg_idx]
             score_per_frame = score / window_len
 
             n_frames_overlap = range_overlap(shot_range, seg_idx_to_frame_range(seg_idx))
             total_score += score_per_frame * n_frames_overlap
 
-        # shot_scores.append(total_score)
         shot_scores.append(total_score / (shot.last_frame_idx - shot.first_frame_idx))
 
     return shot_scores

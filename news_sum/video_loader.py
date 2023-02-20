@@ -1,5 +1,4 @@
 import math
-import os
 import random
 
 import numpy as np
@@ -7,9 +6,9 @@ import torch
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 
-from common.utils import read_images, flatten
-from database import db, rai
-from database.model import Story, MainVideo, get_sum_key, get_score_key
+from common.utils import read_images
+from database import db
+from database.model import Story, get_sum_key, get_score_key
 
 
 class NewsSumStoryLoader(Dataset):

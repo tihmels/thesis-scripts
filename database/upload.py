@@ -3,28 +3,18 @@ import argparse
 from datetime import timedelta
 from pathlib import Path
 
-from libretranslatepy import LibreTranslateAPI
 from redis_om import Migrator
 
-from common.VAO import get_date_time, VAO, get_text
+from common.VAO import get_date_time, VAO, get_data_dir
 from common.utils import frame_idx_to_time, frame_idx_to_sec
 from database import db
-from database.model import Banner, Story, ShortVideo, ShortShot, MainShot, Transcript, MainVideo, VideoRef
+from database.model import Banner, Story, ShortVideo, Transcript, MainVideo, VideoRef, BannerShot, Shot
 
 parser = argparse.ArgumentParser('Uploads filesystem data to a Redis instance')
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help="Tagesschau video file(s)")
 parser.add_argument('--reset', action='store_true')
 parser.add_argument('--overwrite', action='store_false', dest='skip_existing')
 args = parser.parse_args()
-
-lt = LibreTranslateAPI("http://127.0.0.1:5005")
-
-
-def trans(text):
-    if text:
-        return lt.translate(text, 'de', 'en')
-    else:
-        return ""
 
 
 def get_story_pk(video_pk: str, story_idx: int):
@@ -40,6 +30,8 @@ def create_video_data(vao: VAO, skip_existing):
         if db.hash_exists(prefix + pk):
             return
 
+    root_dir = vao.path.parent.parent
+
     transcripts = [Transcript(from_time=transcript.start,
                               to_time=transcript.end,
                               text=transcript.text.strip()) for transcript in vao.data.transcripts]
@@ -52,76 +44,72 @@ def create_video_data(vao: VAO, skip_existing):
         banners = [Banner(headline=banner.headline, subheadline=banner.subline, confidence=banner.confidence)
                    for banner in vao.data.banners]
 
-        shots = [ShortShot(first_frame_idx=shot.first_frame_idx,
-                           last_frame_idx=shot.last_frame_idx,
-                           duration=frame_idx_to_time(shot.last_frame_idx - shot.first_frame_idx),
-                           keyframe=str(vao.data.keyframes[idx]),
-                           transcript_de=get_text(vao.data.get_shot_transcripts(idx)),
-                           transcript_en=trans(get_text(vao.data.get_shot_transcripts(idx))),
-                           banner=banner) for idx, (shot, banner) in enumerate(zip(vao.data.shots, banners))]
+        shots = [BannerShot(first_frame_idx=shot.first_frame_idx,
+                            last_frame_idx=shot.last_frame_idx,
+                            duration=frame_idx_to_time(shot.last_frame_idx - shot.first_frame_idx),
+                            keyframe=str(vao.data.keyframes[idx].relative_to(root_dir)),
+                            transcripts=[transcripts[tidx] for tidx in vao.data.get_shot_transcripts(idx)],
+                            banner=banner) for idx, (shot, banner) in enumerate(zip(vao.data.shots, banners))]
 
         stories = [Story(pk=get_story_pk(pk, idx),
                          headline=story.headline,
-                         video=str(vao.path),
+                         video=str(vao.path.relative_to(root_dir)),
                          type='ts100',
                          first_frame_idx=story.first_frame_idx,
                          last_frame_idx=story.last_frame_idx,
-                         start=frame_idx_to_time(story.first_frame_idx),
-                         end=frame_idx_to_time(story.last_frame_idx),
+                         start_time=frame_idx_to_time(story.first_frame_idx),
+                         end_time=frame_idx_to_time(story.last_frame_idx),
                          timestamp=(vao.date + timedelta(seconds=frame_idx_to_sec(story.first_frame_idx))).timestamp(),
                          duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx).replace(
                              microsecond=0),
-                         frames=[str(frame) for frame in vao.data.frames[story.first_frame_idx:story.last_frame_idx]],
+                         frames=[str(frame.relative_to(root_dir)) for frame in
+                                 vao.data.frames[story.first_frame_idx:story.last_frame_idx + 1]],
                          shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx + 1)],
-                         sentences_de=vao.data.get_story_sentences(idx),
-                         sentences_en=[trans(sent) for sent in
-                                       vao.data.get_story_sentences(idx)]).save() for
+                         sentences=vao.data.get_story_sentences(idx)).save() for
                    idx, story in enumerate(vao.data.stories)]
 
         video = ShortVideo(pk=pk,
-                           path=str(vao.path),
+                           path=str(vao.path.relative_to(root_dir)),
                            date=vao.date.date(),
                            time=vao.date.time(),
                            duration=vao.duration,
                            timestamp=vao.date.timestamp(),
-                           frames=[str(frame) for frame in vao.data.frames],
+                           frames=[str(frame.relative_to(root_dir)) for frame in vao.data.frames],
                            shots=shots,
                            stories=stories,
                            transcripts=transcripts)
     else:
-        shots = [MainShot(first_frame_idx=shot.first_frame_idx,
-                          last_frame_idx=shot.last_frame_idx,
-                          duration=frame_idx_to_time(shot.last_frame_idx - shot.first_frame_idx),
-                          keyframe=str(vao.data.keyframes[idx]),
-                          transcript_de=get_text(vao.data.get_shot_transcripts(idx)),
-                          transcript_en=trans(get_text(vao.data.get_shot_transcripts(idx))),
-                          type=shot.type) for idx, shot in enumerate(vao.data.shots)]
+        shots = [Shot(first_frame_idx=shot.first_frame_idx,
+                      last_frame_idx=shot.last_frame_idx,
+                      duration=frame_idx_to_time(shot.last_frame_idx - shot.first_frame_idx),
+                      keyframe=str(vao.data.keyframes[idx].relative_to(root_dir)),
+                      transcripts=[transcripts[tidx] for tidx in vao.data.get_shot_transcripts(idx)])
+                 for idx, shot in enumerate(vao.data.shots)]
 
         stories = [Story(pk=get_story_pk(pk, idx),
                          headline=vao.data.topics[story.ref_idx],
-                         video=str(vao.path),
+                         video=str(vao.path.relative_to(root_dir)),
                          type='ts15',
                          first_frame_idx=story.first_frame_idx,
                          last_frame_idx=story.last_frame_idx,
-                         start=frame_idx_to_time(story.first_frame_idx),
-                         end=frame_idx_to_time(story.last_frame_idx),
+                         start_time=frame_idx_to_time(story.first_frame_idx),
+                         end_time=frame_idx_to_time(story.last_frame_idx),
                          timestamp=(vao.date + timedelta(seconds=frame_idx_to_sec(story.first_frame_idx))).timestamp(),
                          duration=frame_idx_to_time(story.last_frame_idx - story.first_frame_idx)
                          .replace(microsecond=0),
-                         frames=[str(frame) for frame in vao.data.frames[story.first_frame_idx:story.last_frame_idx]],
+                         frames=[str(frame.relative_to(root_dir)) for frame in
+                                 vao.data.frames[story.first_frame_idx:story.last_frame_idx]],
                          shots=[shots[idx] for idx in range(story.first_shot_idx, story.last_shot_idx + 1)],
-                         sentences_de=vao.data.get_story_sentences(idx),
-                         sentences_en=[trans(sent) for sent in
-                                       vao.data.get_story_sentences(idx)]).save()
+                         sentences=vao.data.get_story_sentences(idx)).save()
                    for idx, story in enumerate(vao.data.stories)]
 
         video = MainVideo(pk=pk,
-                          path=str(vao.path),
+                          path=str(vao.path.relative_to(root_dir)),
                           date=vao.date.date(),
                           time=vao.date.time(),
                           duration=vao.duration,
                           timestamp=vao.date.timestamp(),
-                          frames=[str(frame) for frame in vao.data.frames],
+                          frames=[str(frame.relative_to(root_dir)) for frame in vao.data.frames],
                           shots=shots,
                           stories=stories,
                           transcripts=transcripts,

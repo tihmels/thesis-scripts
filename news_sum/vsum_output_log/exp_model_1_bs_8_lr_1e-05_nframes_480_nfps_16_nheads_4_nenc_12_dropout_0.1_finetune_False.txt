@@ -21,3 +21,17 @@ Epoch 1, Epoch status: 0.1342, Training loss: 0.0891, Learning rate: 0.000010
 Epoch 1, Epoch status: 0.1845, Training loss: 0.1113, Learning rate: 0.000010
 Epoch 1, Epoch status: 0.2348, Training loss: 0.0704, Learning rate: 0.000010
 Epoch 1, Epoch status: 0.2851, Training loss: 0.0700, Learning rate: 0.000010
+Epoch 1, Epoch status: 0.3354, Training loss: 0.0372, Learning rate: 0.000010
+Epoch 1, Epoch status: 0.3857, Training loss: 0.0577, Learning rate: 0.000010
+Epoch 1, Epoch status: 0.4361, Training loss: 0.0654, Learning rate: 0.000010
+Epoch 1, Epoch status: 0.4864, Training loss: 0.0399, Learning rate: 0.000001
+Epoch 1, Epoch status: 0.5367, Training loss: 0.0366, Learning rate: 0.000001
+Epoch 1, Epoch status: 0.5870, Training loss: 0.0504, Learning rate: 0.000001
+Epoch 1, Epoch status: 0.6373, Training loss: 0.0566, Learning rate: 0.000001
+Epoch 1, Epoch status: 0.6876, Training loss: 0.0375, Learning rate: 0.000001
+Epoch 1, Epoch status: 0.7379, Training loss: 0.0474, Learning rate: 0.000001
+Epoch 1, Epoch status: 0.7883, Training loss: 0.0376, Learning rate: 0.000001
+Epoch 1, Epoch status: 0.8386, Training loss: 0.0352, Learning rate: 0.000001
+Epoch 1, Epoch status: 0.8889, Training loss: 0.0430, Learning rate: 0.000001
+Epoch 1, Epoch status: 0.9392, Training loss: 0.0416, Learning rate: 0.000001
+Epoch 1, Epoch status: 0.9895, Training loss: 0.0427, Learning rate: 0.000000

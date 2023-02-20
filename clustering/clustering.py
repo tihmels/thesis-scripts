@@ -319,6 +319,7 @@ def cluster_videos_to_table(clusters):
 def cluster_to_table(clusters):
     for cluster in clusters:
         print(f'{cluster.index} & {", ".join(cluster.keywords)} & {cluster.n_ts15} & {cluster.n_ts100} \\\\')
+    print(f'& & {sum([cluster.n_ts15 for cluster in clusters])} & {sum([cluster.n_ts100 for cluster in clusters])}')
 
 
 def main():

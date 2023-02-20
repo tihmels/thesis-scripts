@@ -179,7 +179,7 @@ class VAO:
                 from_time, to_time = frame_idx_to_time(shot.first_frame_idx), frame_idx_to_time(shot.last_frame_idx)
                 from_time, to_time = time_to_datetime(from_time), time_to_datetime(to_time)
 
-                shot_trans = [trans for trans in self.transcripts if
+                shot_trans = [idx for idx, trans in enumerate(self.transcripts) if
                               range_overlap(Range(from_time, to_time),
                                             Range(time_to_datetime(trans.start), time_to_datetime(trans.end))) >=
                               0.6 * (time_to_datetime(trans.end) - time_to_datetime(trans.start)).total_seconds()]
@@ -191,9 +191,9 @@ class VAO:
         def get_story_sentences(self, story_idx) -> [str]:
             story = self.stories[story_idx]
 
-            transcripts = self.get_shot_transcripts(story.first_shot_idx, story.last_shot_idx)
+            idxs = self.get_shot_transcripts(story.first_shot_idx, story.last_shot_idx)
 
-            text = ' '.join([transcript.text.strip() for transcript in transcripts])
+            text = ' '.join([self.transcripts[idx].text.strip() for idx in idxs]).strip()
             sentences = nltk.sent_tokenize(text, language='german')
 
             return sentences
