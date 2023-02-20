@@ -2,6 +2,7 @@
 
 import os
 import random
+import sys
 from argparse import ArgumentParser
 from collections import OrderedDict
 
@@ -507,4 +508,5 @@ def main(args):
 if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
+    sys.exit()
     main(args)
