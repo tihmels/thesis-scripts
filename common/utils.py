@@ -52,8 +52,12 @@ def sec_to_time(seconds: int):
     return (datetime.min + timedelta(seconds=seconds)).time()
 
 
-def read_images(img_paths: [Path], cvt_color=cv2.COLOR_BGR2RGB, resize=None):
-    images = [cv2.imread(str(img)) for img in img_paths]
+def read_images(img_paths: [Path], base_path="", cvt_color=cv2.COLOR_BGR2RGB, resize=None):
+    if base_path:
+        images = [cv2.imread(str(Path(base_path, img))) for img in img_paths]
+    else:
+        images = [cv2.imread(str(img)) for img in img_paths]
+
     images = [cv2.cvtColor(img, cvt_color) for img in images]
 
     if resize:

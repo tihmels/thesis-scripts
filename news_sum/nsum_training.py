@@ -2,7 +2,6 @@
 
 import os
 import random
-import sys
 from argparse import ArgumentParser
 from collections import OrderedDict
 
@@ -27,7 +26,8 @@ parser.add_argument("--model_type", "-m", default=1, type=int, help="(1) VSum_Tr
 parser.add_argument("--optimizer", type=str, default="adam", choices=['adam', 'sgd'], help="opt algorithm")
 parser.add_argument("--num_class", type=int, default=512, help="upper epoch limit")
 parser.add_argument("--weight_init", type=str, default="uniform", help="CNN weights inits")
-parser.add_argument("--base_path", type=str, default="/Users/tihmels/Scripts/thesis-scripts/news_sum/", help="CNN weights inits")
+parser.add_argument("--dataset_path", type=str, default="/Users/tihmels/TS/")
+parser.add_argument("--out_path", type=str, default="/Users/tihmels/Scripts/thesis-scripts/news_sum/out")
 parser.add_argument("--dropout", "--dropout", default=0.1, type=float, help="Dropout")
 parser.add_argument("--fps", type=int, default=8, help="")
 parser.add_argument("--heads", "-heads", default=8, type=int, help="number of transformer heads")
@@ -152,7 +152,7 @@ def log(output, args):
     print(output)
     with open(
             os.path.join(
-                args.base_path, "vsum_output_log", args.log_name + ".txt"
+                args.out_path, "vsum_output_log", args.log_name + ".txt"
             ),
             "a",
     ) as f:
@@ -401,9 +401,8 @@ def main(args):
     model = create_model(args)
 
     print('Load pretrained weights ...')
-    if args.pretrain_cnn_path:
-        net_data = torch.load(args.pretrain_cnn_path)
-        model.base_model.load_state_dict(net_data)
+    net_data = torch.load(args.pretrain_cnn_path)
+    model.base_model.load_state_dict(net_data)
 
     for name, param in model.named_parameters():
         if "base" in name:
@@ -412,6 +411,7 @@ def main(args):
             param.requires_grad = True
 
     dataset = NewsSumStoryLoader(
+        dataset_path=args.dataset_path,
         fps=args.fps,
         num_frames=args.num_frames,
         num_frames_per_segment=args.num_frames_per_segment,
@@ -459,7 +459,7 @@ def main(args):
 
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
     checkpoint_dir = os.path.join(
-        os.path.dirname(__file__), args.checkpoint_dir, args.log_name
+        args.out_path, args.checkpoint_dir, args.log_name
     )
 
     if args.checkpoint_dir != "":
@@ -507,6 +507,4 @@ def main(args):
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    print(args)
-    sys.exit()
     main(args)
