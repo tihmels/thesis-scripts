@@ -16,10 +16,10 @@ import torch.utils.data.distributed
 from prettytable import PrettyTable
 from tqdm import tqdm
 
-from news_sum.eval_and_log import evaluate_summary
-from news_sum.nsum_utils import Logger, AverageMeter
-from news_sum.video_loader import NewsSumStoryLoader
-from news_sum.vsum import VSum, VSum_MLP
+from eval_and_log import evaluate_summary
+from nsum_utils import Logger, AverageMeter
+from video_loader import NewsSumStoryLoader
+from vsum import VSum, VSum_MLP
 
 parser = ArgumentParser('Setup RedisAI DB')
 parser.add_argument("--seed", default=1, type=int, help="seed for initializing training.")
