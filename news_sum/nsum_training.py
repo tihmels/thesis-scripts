@@ -2,6 +2,7 @@
 
 import os
 import random
+import sys
 from argparse import ArgumentParser
 from collections import OrderedDict
 
@@ -31,6 +32,7 @@ parser.add_argument("--out_path", type=str, default="/Users/tihmels/Scripts/thes
 parser.add_argument("--dropout", "--dropout", default=0.1, type=float, help="Dropout")
 parser.add_argument("--fps", type=int, default=8, help="")
 parser.add_argument("--heads", "-heads", default=8, type=int, help="number of transformer heads")
+parser.add_argument("--cuda", dest="cuda", action="store_true", help="use CUDA")
 parser.add_argument("--finetune", dest="finetune", action="store_true", help="finetune S3D")
 parser.add_argument("--video_size", type=int, default=224, help="image size")
 parser.add_argument("--batch_size", type=int, default=16, help="batch size")
@@ -186,9 +188,14 @@ def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args):
 
     with torch.no_grad():
         for idx, data in enumerate(test_loader):
-            frames = data["video"].float()
-            gt_summary = data["summary"].view(-1)
-            gt_scores = data["scores"].view(-1)
+            if args.cuda:
+                frames = data["video"].cuda().float()
+                gt_summary = data["summary"].cuda().view(-1)
+                gt_scores = data["scores"].cuda().view(-1)
+            else:
+                frames = data["video"].float()
+                gt_summary = data["summary"].view(-1)
+                gt_scores = data["scores"].view(-1)
 
             embedding, score = model(frames)
 
@@ -311,7 +318,7 @@ def train(
     for idx, batch in enumerate(train_loader):
 
         batch_loss = TrainOneBatch(
-            model, optimizer, scheduler, batch, criterion
+            model, optimizer, scheduler, batch, criterion, args
         )
 
         running_loss += batch_loss
@@ -349,9 +356,13 @@ def log_state(args, dataset, epoch, idx, optimizer, running_loss, tb_logger, tra
         tb_logger.flush()
 
 
-def TrainOneBatch(model, optimizer, scheduler, data, loss_fun):
-    frames = data["video"].float()
-    scores = data["scores"].view(-1)
+def TrainOneBatch(model, optimizer, scheduler, data, loss_fun, args):
+    if args.cuda:
+        frames = data["video"].float().cuda(args.gpu, non_blocking=args.pin_memory)
+        scores = data["scores"].cuda(args.gpu, non_blocking=args.pin_memory).view(-1)
+    else:
+        frames = data["video"].float()
+        scores = data["scores"].view(-1)
 
     print(f'Learning rate: {scheduler.get_last_lr()}')
 
@@ -364,7 +375,11 @@ def TrainOneBatch(model, optimizer, scheduler, data, loss_fun):
         print(f'GT Scores: {scores[::10]}')
         print(f'Loss: {loss[:10]}')
 
-    gradient = torch.ones((loss.shape[0]), dtype=torch.long)
+    if args.cuda:
+        gradient = torch.ones((loss.shape[0]), dtype=torch.long).cuda(args.gpu, non_blocking=args.pin_memory)
+    else:
+        gradient = torch.ones((loss.shape[0]), dtype=torch.long)
+
     loss.backward(gradient=gradient)
     loss = loss.mean()
     optimizer.step()
@@ -394,11 +409,23 @@ def create_model(args):
 
 
 def main(args):
+    if args.verbose:
+        print(args)
+        print(f'CUDA available {torch.cuda.is_available()}')
+        print(f'Number of GPUs: {torch.cuda.device_count()}')
+
+    sys.exit()
+
     random.seed(args.seed)
     torch.manual_seed(args.seed)
 
     print('Create Model ...')
     model = create_model(args)
+
+    if args.cuda:
+        device = torch.device("cuda:0")
+        torch.cuda.set_device(device)
+        model = model.cude(device)
 
     print('Load pretrained weights ...')
     net_data = torch.load(args.pretrain_cnn_path)
