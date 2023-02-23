@@ -49,12 +49,12 @@ parser.add_argument(
     help="number of total epochs to run",
 )
 parser.add_argument(
-    "--batch_size_eval", type=int, default=8, help="batch size eval"
+    "--batch_size_eval", type=int, default=16, help="batch size eval"
 )
 parser.add_argument(
     "--pin_memory", dest="pin_memory", action="store_true", help="use pin_memory"
 )
-parser.add_argument("--num_thread_reader", type=int, default=5, help="")
+parser.add_argument("--num_thread_reader", type=int, default=10, help="")
 parser.add_argument(
     "--enc_layers",
     "-enc_layers",

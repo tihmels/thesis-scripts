@@ -1,19 +1,20 @@
 #!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
+import operator
+import re
+import textwrap
+from argparse import ArgumentParser
+from pathlib import Path
+
 import matplotlib
 import numpy as np
-import operator
 import pandas as pd
-import re
-import spacy
 import seaborn as sns
-import textwrap
+import spacy
 from HanTa import HanoverTagger as ht
 from PIL import Image
-from argparse import ArgumentParser
 from fuzzywuzzy import fuzz
 from matplotlib import pyplot as plt, patches
 from nltk.corpus import stopwords
-from pathlib import Path
 from pytesseract import pytesseract, Output
 from sklearn.feature_extraction.text import CountVectorizer
 
@@ -146,18 +147,25 @@ def assign_topics_to_shots(topics, shots, transcripts, texts):
         argmax.append(np.argmax(row) + lower_bound)
         values.append(np.max(row))
 
+    # show_token_heatmap(argmax, dt_matrix, topics)
+
+    to_shot_idx = np.vectorize(lambda dt_idx: list(shots.keys())[dt_idx])
+    shot_idxs = to_shot_idx(argmax)
+
+    return {topic_idx: shot_idx for idx, (topic_idx, shot_idx) in enumerate(zip(topics, shot_idxs)) if
+            (values[idx] > 0 and all(pre_shot_idx < shot_idx for pre_shot_idx in shot_idxs[:idx]))}
+
+
+def show_token_heatmap(argmax, dt_matrix, topics):
     ax = sns.heatmap(dt_matrix[:, :100], cmap='Blues', yticklabels=list(topics.values()),
                      cbar_kws={'label': 'Vocabulary hits', 'shrink': 0.8})
-
     ax.xaxis.tick_top()
     ax.xaxis.set_label_position('top')
     cbar = ax.collections[0].colorbar
-
     cbar.set_ticks([])
     wrap_labels(ax, 38)
     ax.set(xlabel='Shots')
     plt.subplots_adjust(left=0.2, right=0.98)
-
     for aidx, amax in enumerate(argmax):
         ax.add_patch(
             patches.Rectangle(
@@ -169,23 +177,15 @@ def assign_topics_to_shots(topics, shots, transcripts, texts):
                 lw=0.5
             ))
 
-    plt.show()
 
-    to_shot_idx = np.vectorize(lambda dt_idx: list(shots.keys())[dt_idx])
-    shot_idxs = to_shot_idx(argmax)
+def get_shot_transcripts(vao: VAO, shots):
+    transcripts = vao.data.transcripts
 
-    return {topic_idx: shot_idx for idx, (topic_idx, shot_idx) in enumerate(zip(topics, shot_idxs)) if
-            (values[idx] > 0 and all(pre_shot_idx < shot_idx for pre_shot_idx in shot_idxs[:idx]))}
-
-
-def get_shot_transcripts(vao: VAO, anchor_shots, max_shots=1):
+    shot_transcript_idxs = {idx: vao.data.get_shot_transcripts(idx) for idx in shots}
     return {
-        idx: get_text(vao.data.get_shot_transcripts(idx,
-                                                    min(next(
-                                                        (next_idx - 1 for next_idx in anchor_shots.keys() if
-                                                         next_idx > idx),
-                                                        idx), idx + max_shots, vao.n_shots)))
-        for idx in anchor_shots}
+        shot_idx: get_text([transcripts[idx] for idx in trans_idxs]) for shot_idx, trans_idxs in
+        shot_transcript_idxs.items()
+    }
 
 
 def confidence_text(ocr_data, threshold=80):
@@ -422,7 +422,7 @@ def main(args):
                 [topic for idx, topic in enumerate(vao.data.topics[:topics_cutoff_idx]) if
                  idx not in assigned_topics_idxs])
 
-        df.to_csv(get_story_file(vao), index=False)
+        # df.to_csv(get_story_file(vao), index=False)
 
     print(f'{n_total - len(unassigned_topics)} / {n_total} topics could be assigned.')
     print(f'unassigned topics are: ${unassigned_topics}')
