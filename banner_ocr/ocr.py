@@ -35,13 +35,11 @@ def binarize_frame(frame, is_nightly):
 
     if is_nightly:
         binary = frame > 205
-        # binary = skimage.morphology.binary_dilation(binary, footprint=skimage.morphology.diamond(1))
         return binary
     else:
         thresh = skimage.filters.thresholding.threshold_li(frame)
         thresh = 165
         binary = frame < thresh
-        # binary = skimage.morphology.binary_erosion(binary, footprint=skimage.morphology.diamond(1))
         return binary
 
 
@@ -63,16 +61,16 @@ def extract_caption_data_from_frame(frame: Path, resize_factor, is_nightly, cust
     area = (54, 168, width, 225) if is_nightly else (60, 224, width, 253)
 
     frame = crop_frame(frame, area)
-    frame.save('/Users/tihmels/Desktop/out/2_area.jpg')
+    # frame.save('/Users/tihmels/Desktop/out/2_area.jpg')
 
     frame = sharpen_frame(frame, 2)
-    frame.save('/Users/tihmels/Desktop/out/3_sharpened.jpg')
+    # frame.save('/Users/tihmels/Desktop/out/3_sharpened.jpg')
 
     frame = resize_frame(frame, resize_factor)
-    frame.save('/Users/tihmels/Desktop/out/4_resized.jpg')
+    # frame.save('/Users/tihmels/Desktop/out/4_resized.jpg')
 
     frame = binarize_frame(frame, is_nightly)
-    Image.fromarray(frame).save('/Users/tihmels/Desktop/out/5_binarized.jpg')
+    # Image.fromarray(frame).save('/Users/tihmels/Desktop/out/5_binarized.jpg')
 
     caption_data = pytesseract.image_to_data(frame, output_type=Output.DICT, lang='deu',
                                              config=custom_oem_psm_config)
@@ -176,7 +174,9 @@ def main(args):
                 headline = ' '.join(headline).strip()
                 subline = ' '.join([sub for subline in sublines for sub in subline]).strip()
 
-                captions.append((headline, subline, int(np.rint(np.max(confidences) - (np.std(confidences))))))
+                overall_confidence = int(np.rint(np.max(confidences) - (np.std(confidences))))
+
+                captions.append((headline, subline, overall_confidence))
 
                 bar()
 

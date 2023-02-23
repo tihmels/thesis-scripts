@@ -422,7 +422,7 @@ def main(args):
                 [topic for idx, topic in enumerate(vao.data.topics[:topics_cutoff_idx]) if
                  idx not in assigned_topics_idxs])
 
-        # df.to_csv(get_story_file(vao), index=False)
+        df.to_csv(get_story_file(vao), index=False)
 
     print(f'{n_total - len(unassigned_topics)} / {n_total} topics could be assigned.')
     print(f'unassigned topics are: ${unassigned_topics}')
