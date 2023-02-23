@@ -414,8 +414,6 @@ def main(args):
         print(f'CUDA available {torch.cuda.is_available()}')
         print(f'Number of GPUs: {torch.cuda.device_count()}')
 
-    sys.exit()
-
     random.seed(args.seed)
     torch.manual_seed(args.seed)
 
