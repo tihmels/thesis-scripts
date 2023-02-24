@@ -295,16 +295,18 @@ def is_named_entity_only(text):
 
 
 def preprocess_captions(captions):
-    if is_named_entity_only(captions[0].text):  # check if first banner text is anchor name
+    if is_named_entity_only(captions[0].text) or captions[0].confidence < 0 or captions[
+        0].text == '':  # check if first banner text is anchor name
         captions.pop(0)
 
     # the last shot in a news story is often very short and the banner disappears early,
     # which is why the banner text is not captured by OCR.
     # we fix this by assuming that this shot belongs to the previous caption.
     for idx, cd in captions.items():
-        if (not cd.text.strip() or cd.confidence < 70) and idx - 1 in captions:
-            predecessor = captions[idx - 1]
-            captions[idx] = predecessor
+        if idx - 1 in captions and idx + 1 in captions:
+            if (not cd.text.strip() or cd.confidence < 65) and captions[idx + 1].confidence > 80:
+                predecessor = captions[idx - 1]
+                captions[idx] = predecessor
 
 
 def get_story_indices_by_captions(captions):

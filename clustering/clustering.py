@@ -21,7 +21,7 @@ from tqdm import trange
 
 from common.utils import set_tf_loglevel, topic_text
 from database import rai
-from database.model import TopicCluster, Story, get_headline_key, get_topic_key
+from database.model import TopicCluster, Story, get_topic_key
 
 set_tf_loglevel(logging.FATAL)
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
@@ -215,7 +215,7 @@ max_evals = 150
 def visualize_clusters(top_n_words, shape=(5, 4)):
     top_n_words.pop(-1)
 
-    fig, axes = plt.subplots(nrows=shape[0], ncols=shape[1], figsize=(10, 25), dpi=120)
+    fig, axes = plt.subplots(nrows=shape[0], ncols=shape[1], figsize=(10, 25), dpi=105)
 
     for ax in axes.flatten():
         ax.set_axis_off()
@@ -242,38 +242,24 @@ def visualize_clusters(top_n_words, shape=(5, 4)):
 
         # ax.set_title(f'Topic {idx + 1}')
         ax.title.set_size(10)
+        # ax.set_xticks([], [])
 
     fig.tight_layout()
-    plt.show()
-
-    print()
 
 
 def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
     ts15_texts = [topic_text(story) for story in ts15_stories]
     ts15_texts_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts15_stories]
 
-    ts100_texts = [topic_text(story) for story in ts100_stories]
     ts100_texts_tensors = [rai.get_tensor(get_topic_key(story.pk)) for story in ts100_stories]
 
-    mapper, cluster, n = generate_clusters(ts15_texts_tensors, n_neighbors=15, n_components=5, min_cluster_size=10,
-                                           min_samples=10, random_state=42)
+    mapper, cluster, n = generate_clusters(ts15_texts_tensors, n_neighbors=13, n_components=5, min_cluster_size=10, random_state=42)
 
     print(n[-1])
     ts15_cluster = defaultdict(list)
     for story, label in zip(ts15_stories, cluster.labels_):
         if label != -1:
             ts15_cluster[label].append(story)
-
-    ts100_embeddings = mapper.transform(ts100_texts_tensors)
-
-    labels, strengths = hdbscan.approximate_predict(cluster, ts100_embeddings)
-    data = [(story, label) for idx, (story, label) in enumerate(zip(ts100_stories, labels)) if strengths[idx] > 0.8]
-
-    ts100_cluster = defaultdict(list)
-    for story, label in data:
-        if label != -1:
-            ts100_cluster[label].append(story)
 
     docs_df = pd.DataFrame(ts15_texts, columns=["Doc"])
     docs_df['Topic'] = cluster.labels_
@@ -285,6 +271,17 @@ def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
     top_n_words = extract_top_n_words_per_topic(tf_idf, count, docs_per_topic_agg, n=5)
 
     # visualize_clusters(top_n_words, shape=(10, 2))
+    # plt.show()
+
+    ts100_embeddings = mapper.transform(ts100_texts_tensors)
+
+    labels, strengths = hdbscan.approximate_predict(cluster, ts100_embeddings)
+    data = [(story, label) for idx, (story, label) in enumerate(zip(ts100_stories, labels)) if strengths[idx] > 0.8]
+
+    ts100_cluster = defaultdict(list)
+    for story, label in data:
+        if label != -1:
+            ts100_cluster[label].append(story)
 
     TopicCluster.find().delete()
 
@@ -303,7 +300,7 @@ def process_stories(ts15_stories: [Story], ts100_stories: [Story]):
         clusters.append(cluster)
 
     cluster_to_table(clusters)
-    cluster_videos_to_table(clusters)
+    # cluster_videos_to_table(clusters)
 
     return
 
@@ -317,6 +314,7 @@ def cluster_videos_to_table(clusters):
 
 
 def cluster_to_table(clusters):
+    clusters = sorted(clusters, key=lambda c: c.index)
     for cluster in clusters:
         print(f'{cluster.index} & {", ".join(cluster.keywords)} & {cluster.n_ts15} & {cluster.n_ts100} \\\\')
     print(f'& & {sum([cluster.n_ts15 for cluster in clusters])} & {sum([cluster.n_ts100 for cluster in clusters])}')
@@ -326,8 +324,8 @@ def main():
     ts15_stories = Story.find(Story.type == 'ts15').all()
     ts100_stories = Story.find(Story.type == 'ts100').all()
 
-    ts15_stories = [story for story in ts15_stories if rai.tensor_exists(get_headline_key(story.pk))]
-    ts100_stories = [story for story in ts100_stories if rai.tensor_exists(get_headline_key(story.pk))]
+    ts15_stories = [story for story in ts15_stories if rai.tensor_exists(get_topic_key(story.pk))]
+    ts100_stories = [story for story in ts100_stories if rai.tensor_exists(get_topic_key(story.pk))]
 
     assert len(ts15_stories) > 0, 'No suitable stories have been found.'
 

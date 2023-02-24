@@ -10,8 +10,7 @@ from sentence_transformers import SentenceTransformer
 
 from common.utils import topic_text, set_tf_loglevel
 from database import rai
-from database.model import MainVideo, ShortVideo, Story, get_vis_key, get_m5c_key, get_headline_key, get_text_key, \
-    get_topic_key
+from database.model import MainVideo, ShortVideo, Story, get_vis_key, get_m5c_key, get_headline_key, get_topic_key
 from feature_extraction.StoryDataExtractor import StoryDataExtractor
 
 set_tf_loglevel(logging.FATAL)
@@ -61,11 +60,11 @@ def extract_milnce_features(story: Story, args):
             rai.put_tensor(get_vis_key(story.pk), segment_features)
             rai.put_tensor(get_m5c_key(story.pk), mixed_5c)
 
-            if len(sentences) > 0 and (not rai.tensor_exists(get_text_key(story.pk)) and args.skip_existing):
-                text_output = mil_nce.signatures['text'](tf.constant(sentences))
-                text_features = text_output['text_embedding'].numpy()
+            # if len(sentences) > 0 and (not rai.tensor_exists(get_text_key(story.pk)) and args.skip_existing):
+            #    text_output = mil_nce.signatures['text'](tf.constant(sentences))
+            #    text_features = text_output['text_embedding'].numpy()
 
-                rai.put_tensor(get_text_key(story.pk), text_features)
+            #    rai.put_tensor(get_text_key(story.pk), text_features)
 
 
 def extract_topic_embeddings(story: Story, args):

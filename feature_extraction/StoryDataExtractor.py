@@ -15,8 +15,8 @@ def crop_center_square(frame):
     return frame[start_y:start_y + min_dim, start_x:start_x + min_dim]
 
 
-def load_frames(frame_paths, type, resize=IMAGE_SHAPE):
-    frames = read_images(frame_paths)
+def load_frames(frame_paths, type, base_path, resize=IMAGE_SHAPE):
+    frames = read_images(frame_paths, base_path=base_path)
 
     if type == 'ts100':
         frames = [frame[:224, :] for frame in frames]
@@ -27,12 +27,13 @@ def load_frames(frame_paths, type, resize=IMAGE_SHAPE):
 
 
 class StoryDataExtractor:
-    def __init__(self, skip_n=2, window=32):
+    def __init__(self, skip_n=3, window=16, base_path='/Users/tihmels/TS'):
         self.skip_n = skip_n
         self.window = window
+        self.base_path = base_path
 
     def extract_data(self, story: Story):
-        frames = load_frames(story.frames[::self.skip_n], story.type)
+        frames = load_frames(story.frames[::self.skip_n], story.type, self.base_path)
 
         window_len = self.window
 
@@ -47,4 +48,4 @@ class StoryDataExtractor:
 
         segments = np.reshape(frames, (n_segments, window_len, frames.shape[1], frames.shape[2], 3))
 
-        return segments, story.sentences_en
+        return segments, story.sentences

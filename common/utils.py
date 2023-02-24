@@ -16,7 +16,7 @@ Range = namedtuple('Range', ['first_frame_idx', 'last_frame_idx'])
 
 
 def topic_text(story: Story):
-    return f'{story.headline}. {" ".join(story.sentences_de[:5])}'
+    return f'{story.headline}. {" ".join(story.sentences[:5])}'
 
 
 def crop_center_square(frame):

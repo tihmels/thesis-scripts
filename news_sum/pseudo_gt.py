@@ -28,7 +28,7 @@ parser.add_argument('--save_fig', action='store_true')
 parser.add_argument(
     "-th",
     "--threshold",
-    default=0.8,
+    default=0.6,
     type=float,
     help="cut off threshold",
 )
@@ -66,44 +66,6 @@ def mean_segment_similarity(segment_features, other_segment_features, mean_co=No
     segment_similarity = similarity_matrix[:, -mean_co:].mean(axis=1) if mean_co else similarity_matrix.mean(axis=1)
 
     return segment_similarity
-
-
-def get_inter_cluster_similarity_matmul(segment_features, other_clusters, mean_co=None):
-    segment_similarities = []
-
-    other_stories = flatten([cluster.ts15s for cluster in other_clusters])
-
-    for story in other_stories:
-        _, features = extract_shot_features(story, 8, 16)
-
-        segment_similarity = mean_segment_similarity(segment_features,
-                                                     np.stack(features),
-                                                     mean_co=mean_co)
-
-        segment_similarities.append(segment_similarity)
-
-    segment_similarities = np.stack(segment_similarities, axis=1)
-
-    return segment_similarities.mean(axis=1)
-
-
-def get_inter_cluster_similarity(segment_features, other_clusters, mean_co=None):
-    segment_similarities = []
-
-    other_stories = flatten([cluster.ts15s for cluster in other_clusters])
-
-    for story in other_stories:
-        _, features = extract_shot_features(story, args.fps, args.window)
-
-        segment_similarity = mean_segment_similarity(segment_features,
-                                                     np.stack(features),
-                                                     mean_co=mean_co)
-
-        segment_similarities.append(segment_similarity)
-
-    segment_similarities = np.stack(segment_similarities, axis=1)
-
-    return segment_similarities.mean(axis=1)
 
 
 def extract_shot_features(story: Story, fps, window):
@@ -159,27 +121,27 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
     print(f'{len(ts15_stories)} ts15')
     print(f'{len(ts100_stories)} ts100', end='\n\n')
 
-    segment_features_per_story = []
-    segments_per_story = []
-    all_segment_features = []
+    shot_features_per_story = []
+    shots_per_story = []
+    all_shot_features = []
 
     for story in ts15_stories:
-        segments, features = extract_shot_features(story, args.fps, args.window)
+        shots, features = extract_shot_features(story, args.fps, args.window)
 
-        segment_features_per_story.append(torch.stack(features))
-        segments_per_story.append(segments)
-        all_segment_features.extend(features)
+        shot_features_per_story.append(torch.stack(features))
+        shots_per_story.append(shots)
+        all_shot_features.extend(features)
 
-    all_segment_features = torch.stack(all_segment_features)
+    all_shot_features = torch.stack(all_shot_features)
 
-    ts100_segment_features = []
+    ts100_shot_features = []
 
     for story in ts100_stories:
         _, features = extract_shot_features(story, args.fps, args.window)
 
-        ts100_segment_features.extend(features)
+        ts100_shot_features.extend(features)
 
-    ts100_segment_features = torch.stack(ts100_segment_features)
+    ts100_shot_features = torch.stack(ts100_shot_features)
 
     all_other_features = []
 
@@ -191,17 +153,19 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
 
     all_other_features = torch.stack(all_other_features)
 
-    for idx, (shot_segments, shot_features) in enumerate(zip(segments_per_story, segment_features_per_story)):
+    for idx, (shot_segments, shot_features) in enumerate(zip(shots_per_story, shot_features_per_story)):
 
         story = ts15_stories[idx]
 
         print(
             f"[{idx + 1}/{len(cluster.ts15s)}] Story: {story.headline} "
-            f"({story.pk}) {story.video} {story.start} - {story.end}")
+            f"({story.pk}) {story.video} {story.start_time} - {story.end_time}")
 
-        inter_cluster_sim = mean_segment_similarity(shot_features, all_other_features)
-        intra_cluster_sim = mean_segment_similarity(shot_features, all_segment_features)
-        ts100_sim = mean_segment_similarity(shot_features, ts100_segment_features)
+        cutoff = int(len(ts15_stories) / 2)
+
+        intra_cluster_sim = mean_segment_similarity(shot_features, all_shot_features, mean_co=cutoff)
+        inter_cluster_sim = mean_segment_similarity(shot_features, all_other_features, mean_co=cutoff)
+        ts100_sim = mean_segment_similarity(shot_features, ts100_shot_features, mean_co=cutoff)
 
         topic_relevance_score = intra_cluster_sim - inter_cluster_sim
 
@@ -209,7 +173,9 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         segment_scores = F.normalize(torch.Tensor(segment_scores), dim=0).numpy()
         segment_scores[0] = min(segment_scores)
 
-        threshold = args.threshold * segment_scores.max()
+        score_range = segment_scores.max() - segment_scores.min()
+        threshold = segment_scores.min() + args.threshold * score_range
+
         n_segments = shot_segments[-1][1] + 1
 
         if args.save_fig:
@@ -324,8 +290,8 @@ def plot_it(segments,
 
     ax.plot(x, y_inter, color='r', linewidth=0.5, label='Inter-cluster similarity')
     ax.plot(x, y_intra, color='g', linewidth=0.5, label='Intra-cluster similarity')
-    ax.plot(x, y_ts100, color='c', linewidth=0.5, label='ts100 similarity')
-    ax.plot(x, y_final, color='b', linewidth=0.8, label="Final score")
+    ax.plot(x, y_ts100, color='y', linewidth=0.5, label='Summary fitness')
+    ax.plot(x, y_final, color='b', linewidth=0.8, label="Importance score")
 
     ax.legend()
     plt.xticks(range(0, n_segments, 5))
@@ -338,8 +304,7 @@ def main(args):
     if args.index:
         clusters = [TopicCluster.find(TopicCluster.index == index).first() for index in args.index]
     else:
-        clusters = TopicCluster.find().all()
-        random.shuffle(clusters)
+        clusters = TopicCluster.find().sort_by('index').all()
 
     for cluster in clusters:
         print(f'----- Cluster {cluster.index} -----')
