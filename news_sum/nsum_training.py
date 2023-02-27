@@ -21,8 +21,7 @@ from nsum_utils import Logger, AverageMeter
 from video_loader import NewsSumStoryLoader
 from vsum import VSum, VSum_MLP
 
-import os
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:256"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 
 parser = ArgumentParser('Setup RedisAI DB')
 parser.add_argument("--seed", default=1, type=int, help="seed for initializing training.")
@@ -432,7 +431,7 @@ def create_model(args):
 def main(args):
     if args.verbose:
         print(args)
-        print(f'CUDA available {torch.cuda.is_available()}')
+        print(f'CUDA available: {torch.cuda.is_available()}')
         print(f'Number of GPUs: {torch.cuda.device_count()}')
 
     random.seed(args.seed)
@@ -440,11 +439,6 @@ def main(args):
 
     print('Create Model ...')
     model = create_model(args)
-
-    if args.cuda:
-        device = torch.device("cuda:0")
-        torch.cuda.set_device(device)
-        model = model.cuda(device)
 
     print('Load pretrained weights ...')
     net_data = torch.load(args.pretrain_cnn_path)
@@ -455,6 +449,11 @@ def main(args):
             param.requires_grad = False
         if "mixed_5" in name and args.finetune:
             param.requires_grad = True
+
+    if args.cuda:
+        # device = torch.device("cuda:0")
+        torch.cuda.set_device(args.gpu)
+        model = model.cuda(args.gpu)
 
     dataset = NewsSumStoryLoader(
         dataset_path=args.dataset_path,
@@ -517,8 +516,6 @@ def main(args):
         "Starting training loop with batch size: {}".format(
             total_batch_size), args,
     )
-
-    print(torch.cuda.memory_summary(device=None, abbreviated=False))
 
     for epoch in range(args.epochs):
 
