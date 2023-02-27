@@ -391,7 +391,7 @@ def TrainOneBatch(model, optimizer, scheduler, data, loss_fun, args):
         print(f'Loss: {loss[:10]}')
 
     if args.cuda:
-        gradient = torch.ones((loss.shape[0]), dtype=torch.long).cuda(args.gpu, non_blocking=args.pin_memory)
+        gradient = torch.ones((loss.shape[0]), dtype=torch.half).cuda(args.gpu, non_blocking=args.pin_memory)
     else:
         gradient = torch.ones((loss.shape[0]), dtype=torch.long)
 
