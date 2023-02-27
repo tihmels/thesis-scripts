@@ -21,7 +21,8 @@ from nsum_utils import Logger, AverageMeter
 from video_loader import NewsSumStoryLoader
 from vsum import VSum, VSum_MLP
 
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:64"
+import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 
 parser = ArgumentParser('Setup RedisAI DB')
 parser.add_argument("--seed", default=1, type=int, help="seed for initializing training.")
@@ -326,9 +327,14 @@ def train(
 
     for idx, batch in enumerate(train_loader):
 
+        print('Before TrainOneBatch')
+        print(torch.cuda.memory_summary(device=None, abbreviated=False))
+
         batch_loss = TrainOneBatch(
             model, optimizer, scheduler, batch, criterion, args
         )
+
+        print('After TrainOneBatch')
 
         running_loss += batch_loss
 
@@ -384,21 +390,18 @@ def TrainOneBatch(model, optimizer, scheduler, data, loss_fun, args):
     optimizer.zero_grad()
 
     with torch.set_grad_enabled(True):
-        embedding, score = model(frames.half())
-        loss = loss_fun(score.view(-1).half(), scores.half())
-        loss = loss.half()
+        embedding, score = model(frames)
+        loss = loss_fun(score.view(-1), scores)
         print(f'Predicted Scores: {score.view(-1)[::10]}')
         print(f'GT Scores: {scores[::10]}')
         print(f'Loss: {loss[:10]}')
 
     if args.cuda:
-        gradient = torch.ones((loss.shape[0]), dtype=torch.half).cuda(args.gpu, non_blocking=args.pin_memory)
+        gradient = torch.ones((loss.shape[0]), dtype=torch.long).cuda(args.gpu, non_blocking=args.pin_memory)
     else:
         gradient = torch.ones((loss.shape[0]), dtype=torch.long)
 
-    print(gradient.dtype)
-    print(loss.dtype)
-    loss.backward(gradient=gradient.half())
+    loss.backward(gradient=gradient)
     loss = loss.mean()
     optimizer.step()
     scheduler.step()
@@ -437,7 +440,6 @@ def main(args):
 
     print('Create Model ...')
     model = create_model(args)
-    model.half()
 
     print('Load pretrained weights ...')
     net_data = torch.load(args.pretrain_cnn_path)
@@ -450,8 +452,9 @@ def main(args):
             param.requires_grad = True
 
     if args.cuda:
-        torch.cuda.set_device(args.gpu)
-        model = model.cuda(args.gpu)
+        device = torch.device("cuda:0")
+        torch.cuda.set_device(device)
+        model = model.cuda(device)
 
     dataset = NewsSumStoryLoader(
         dataset_path=args.dataset_path,
