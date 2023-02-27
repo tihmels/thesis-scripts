@@ -324,9 +324,14 @@ def train(
 
     for idx, batch in enumerate(train_loader):
 
+        print('Before TrainOneBatch')
+        print(torch.cuda.memory_summary(device=None, abbreviated=False))
+
         batch_loss = TrainOneBatch(
             model, optimizer, scheduler, batch, criterion, args
         )
+
+        print('After TrainOneBatch')
 
         running_loss += batch_loss
 
@@ -509,6 +514,8 @@ def main(args):
         "Starting training loop with batch size: {}".format(
             total_batch_size), args,
     )
+
+    print(torch.cuda.memory_summary(device=None, abbreviated=False))
 
     for epoch in range(args.epochs):
 
