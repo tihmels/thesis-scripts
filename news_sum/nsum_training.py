@@ -53,6 +53,7 @@ parser.add_argument(
 parser.add_argument(
     "--batch_size_eval", type=int, default=16, help="batch size eval"
 )
+parser.add_argument("--gpu", default=None, type=int, help="GPU id to use.")
 parser.add_argument(
     "--pin_memory", dest="pin_memory", action="store_true", help="use pin_memory"
 )
