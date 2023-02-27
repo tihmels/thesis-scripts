@@ -24,6 +24,8 @@ from vsum import VSum, VSum_MLP
 import os
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 
+torch.cuda.empty_cache()
+
 parser = ArgumentParser('Setup RedisAI DB')
 parser.add_argument("--seed", default=1, type=int, help="seed for initializing training.")
 parser.add_argument("--model_type", "-m", default=1, type=int, help="(1) VSum_Trans (2) VSum_MLP")
