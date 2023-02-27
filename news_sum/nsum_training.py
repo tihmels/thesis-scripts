@@ -5,6 +5,8 @@ import random
 import time
 from argparse import ArgumentParser
 from collections import OrderedDict
+from datetime import timedelta
+from timeit import default_timer as timer
 
 import numpy as np
 import torch
@@ -21,7 +23,6 @@ from nsum_utils import Logger, AverageMeter
 from video_loader import NewsSumStoryLoader
 from vsum import VSum, VSum_MLP
 
-import os
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 
 parser = ArgumentParser('Setup RedisAI DB')
@@ -382,14 +383,14 @@ def TrainOneBatch(model, optimizer, scheduler, data, loss_fun, args):
 
     print(f'Learning rate: {scheduler.get_last_lr()}')
 
-    optimizer.zero_grad()
+    optimizer.zero_grad(set_to_none=True)
 
     with torch.set_grad_enabled(True):
         embedding, score = model(frames)
         loss = loss_fun(score.view(-1), scores)
-        print(f'Predicted Scores: {score.view(-1)[::10]}')
-        print(f'GT Scores: {scores[::10]}')
-        print(f'Loss: {loss[:10]}')
+        print(f'Predicted Scores: {score.view(-1).detach().cpu().numpy()[::10]}')
+        print(f'GT Scores: {scores.detach().cpu().numpy()[::10]}')
+        print(f'Loss: {loss.detach().cpu().numpy()[:10]}')
 
     if args.cuda:
         gradient = torch.ones((loss.shape[0]), dtype=torch.long).cuda(args.gpu, non_blocking=args.pin_memory)
@@ -518,6 +519,8 @@ def main(args):
         if (epoch + 1) % 2 == 0:
             evaluate(test_loader, model, epoch, logger, criterion, args)
 
+        start = timer()
+
         train(
             train_loader,
             model,
@@ -530,7 +533,10 @@ def main(args):
             args,
         )
 
-        print('Iteration done')
+        print('Epoch done')
+
+        end = timer()
+        print(f'Elapsed Time: {str(timedelta(seconds=end - start))}')
 
         save_checkpoint(
             {
