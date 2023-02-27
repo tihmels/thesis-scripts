@@ -2,7 +2,7 @@
 
 import os
 import random
-import sys
+import time
 from argparse import ArgumentParser
 from collections import OrderedDict
 
@@ -20,11 +20,6 @@ from eval_and_log import evaluate_summary
 from nsum_utils import Logger, AverageMeter
 from video_loader import NewsSumStoryLoader
 from vsum import VSum, VSum_MLP
-
-import os
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
-
-torch.cuda.empty_cache()
 
 parser = ArgumentParser('Setup RedisAI DB')
 parser.add_argument("--seed", default=1, type=int, help="seed for initializing training.")
@@ -132,6 +127,11 @@ parser.add_argument(
     help="",
 )
 parser.add_argument("--verbose", type=int, default=1, help="")
+
+import gc
+
+torch.cuda.empty_cache()
+gc.collect()
 
 
 def create_logger(args):
@@ -320,6 +320,7 @@ def train(
         args,
 ):
     running_loss = 0.0
+    s = time.time()
 
     for idx, batch in enumerate(train_loader):
 
@@ -330,20 +331,26 @@ def train(
         running_loss += batch_loss
 
         if (idx + 1) % args.log_freq == 0 and args.verbose:
-            log_state(args, dataset, epoch, idx, optimizer, running_loss, tb_logger, train_loader)
+            d = time.time() - s
+
+            log_state(args, dataset, epoch, d, idx, optimizer, running_loss, tb_logger, train_loader)
 
             running_loss = 0.0
 
+            s = time.time()
 
-def log_state(args, dataset, epoch, idx, optimizer, running_loss, tb_logger, train_loader):
+
+def log_state(args, dataset, epoch, dtime, idx, optimizer, running_loss, tb_logger, train_loader):
     if args.finetune:
         current_lr = optimizer.param_groups[1]["lr"]
     else:
         current_lr = optimizer.param_groups[0]["lr"]
+
     log(
-        "Epoch %d, Epoch status: %.4f, Training loss: %.4f, Learning rate: %.6f"
+        "Epoch %d, Elapsed Time: %.3f, Epoch status: %.4f, Training loss: %.4f, Learning rate: %.6f"
         % (
             epoch + 1,
+            dtime,
             args.batch_size * 1 * float(idx) / len(dataset),
             running_loss / args.log_freq,
             current_lr,
