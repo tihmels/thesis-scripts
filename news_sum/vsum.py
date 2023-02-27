@@ -91,6 +91,7 @@ class VSum(nn.Module):
         self.base_model = S3D(
             num_classes, space_to_depth=space_to_depth, init=init,
         )
+        self.base_model.half()
 
         self.d_model = d_model
         self.pos_enc = PositionalEncoding(self.d_model, dropout)
