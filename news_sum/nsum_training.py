@@ -341,8 +341,6 @@ def train(
 
             running_loss = 0.0
 
-            s = time.time()
-
 
 def log_state(args, dataset, epoch, dtime, idx, optimizer, running_loss, tb_logger, train_loader):
     if args.finetune:
@@ -351,10 +349,10 @@ def log_state(args, dataset, epoch, dtime, idx, optimizer, running_loss, tb_logg
         current_lr = optimizer.param_groups[0]["lr"]
 
     log(
-        "Epoch %d, Elapsed Time: %.3f, Epoch status: %.4f, Training loss: %.4f, Learning rate: %.6f"
+        "Epoch %d, Elapsed Time: %s, Epoch status: %.4f, Training loss: %.4f, Learning rate: %.6f"
         % (
             epoch + 1,
-            dtime,
+            str(timedelta(seconds=dtime)),
             args.batch_size * 1 * float(idx) / len(dataset),
             running_loss / args.log_freq,
             current_lr,
