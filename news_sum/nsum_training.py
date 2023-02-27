@@ -21,7 +21,7 @@ from nsum_utils import Logger, AverageMeter
 from video_loader import NewsSumStoryLoader
 from vsum import VSum, VSum_MLP
 
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
 
 parser = ArgumentParser('Setup RedisAI DB')
 parser.add_argument("--seed", default=1, type=int, help="seed for initializing training.")
@@ -451,7 +451,6 @@ def main(args):
             param.requires_grad = True
 
     if args.cuda:
-        # device = torch.device("cuda:0")
         torch.cuda.set_device(args.gpu)
         model = model.cuda(args.gpu)
 
