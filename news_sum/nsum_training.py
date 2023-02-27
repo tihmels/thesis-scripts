@@ -396,6 +396,8 @@ def TrainOneBatch(model, optimizer, scheduler, data, loss_fun, args):
     else:
         gradient = torch.ones((loss.shape[0]), dtype=torch.long)
 
+    print(gradient.dtype)
+    print(loss.dtype)
     loss.backward(gradient=gradient.half())
     loss = loss.mean()
     optimizer.step()
