@@ -23,8 +23,6 @@ from nsum_utils import Logger, AverageMeter
 from video_loader import NewsSumStoryLoader
 from vsum import VSum, VSum_MLP
 
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
-
 parser = ArgumentParser('Setup RedisAI DB')
 parser.add_argument("--seed", default=1, type=int, help="seed for initializing training.")
 parser.add_argument("--model_type", "-m", default=1, type=int, help="(1) VSum_Trans (2) VSum_MLP")
@@ -131,11 +129,6 @@ parser.add_argument(
     help="",
 )
 parser.add_argument("--verbose", type=int, default=1, help="")
-
-import gc
-
-torch.cuda.empty_cache()
-gc.collect()
 
 
 def create_logger(args):
@@ -386,8 +379,8 @@ def TrainOneBatch(model, optimizer, scheduler, data, loss_fun, args):
     with torch.set_grad_enabled(True):
         embedding, score = model(frames)
         loss = loss_fun(score.view(-1), scores)
-        print(f'Predicted Scores: {score.view(-1).detach().cpu().numpy()[::10]}')
-        print(f'GT Scores: {scores.detach().cpu().numpy()[::10]}')
+        print(f'Predicted Scores: {score.view(-1).detach().cpu().numpy()[::20]}')
+        print(f'GT Scores: {scores.detach().cpu().numpy()[::20]}')
         print(f'Loss: {loss.detach().cpu().numpy()[:10]}')
 
     if args.cuda:
