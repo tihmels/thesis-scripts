@@ -21,7 +21,7 @@ from nsum_utils import Logger, AverageMeter
 from video_loader import NewsSumStoryLoader
 from vsum import VSum, VSum_MLP
 
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:64"
 
 parser = ArgumentParser('Setup RedisAI DB')
 parser.add_argument("--seed", default=1, type=int, help="seed for initializing training.")
@@ -439,6 +439,7 @@ def main(args):
 
     print('Create Model ...')
     model = create_model(args)
+    model.half()
 
     print('Load pretrained weights ...')
     net_data = torch.load(args.pretrain_cnn_path)
