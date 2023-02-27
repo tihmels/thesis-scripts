@@ -326,14 +326,9 @@ def train(
 
     for idx, batch in enumerate(train_loader):
 
-        print('Before TrainOneBatch')
-        print(torch.cuda.memory_summary(device=None, abbreviated=False))
-
         batch_loss = TrainOneBatch(
             model, optimizer, scheduler, batch, criterion, args
         )
-
-        print('After TrainOneBatch')
 
         running_loss += batch_loss
 
@@ -389,7 +384,7 @@ def TrainOneBatch(model, optimizer, scheduler, data, loss_fun, args):
     optimizer.zero_grad()
 
     with torch.set_grad_enabled(True):
-        embedding, score = model(frames)
+        embedding, score = model(frames.half())
         loss = loss_fun(score.view(-1), scores)
         print(f'Predicted Scores: {score.view(-1)[::10]}')
         print(f'GT Scores: {scores[::10]}')
