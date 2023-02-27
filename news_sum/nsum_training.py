@@ -423,7 +423,7 @@ def main(args):
     if args.cuda:
         device = torch.device("cuda:0")
         torch.cuda.set_device(device)
-        model = model.cude(device)
+        model = model.cuda(device)
 
     print('Load pretrained weights ...')
     net_data = torch.load(args.pretrain_cnn_path)
