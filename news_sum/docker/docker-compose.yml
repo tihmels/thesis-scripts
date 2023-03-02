@@ -1,0 +1,16 @@
+version: '3'
+services:
+  redis:
+    build: ./redis
+    container_name: 'redis-stack'
+    volumes:
+      - ./redis/entrypoint.sh:/entrypoint.sh
+      - ./redis/redis-stack.conf:/opt/redis-stack/etc/redis-stack.conf
+      - ./redis/dump.rdb:/data/dump.rdb
+    ports:
+      - "6379:6379"
+  code:
+    build: ./newssum
+    container_name: 'newssum'
+
+
