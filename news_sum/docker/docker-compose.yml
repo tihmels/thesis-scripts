@@ -1,16 +1,23 @@
-version: '3'
+version: '3.8'
 services:
   redis:
     build: ./redis
     container_name: 'redis-stack'
+    restart: always
     volumes:
       - ./redis/entrypoint.sh:/entrypoint.sh
-      - ./redis/redis-stack.conf:/opt/redis-stack/etc/redis-stack.conf
+      - ./redis/redis-stack-server.conf:/opt/redis-stack/etc/redis-stack.conf
       - ./redis/dump.rdb:/data/dump.rdb
     ports:
       - "6379:6379"
-  code:
+  newssum:
     build: ./newssum
     container_name: 'newssum'
+    tty: true
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=host.docker.internal
+      - REDIS_PORT=6379
 
 

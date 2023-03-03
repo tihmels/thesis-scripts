@@ -1,8 +1,10 @@
-from walrus import *
-from smartredis import Client
+import os
 
-host = 'host.docker.internal'
-port = 6379
+from smartredis import Client
+from walrus import *
+
+host = os.getenv('REDIS_HOST', default='localhost')
+port = os.getenv('REDIS_PORT', default=6379)
 
 db = Database(host=host, port=port, db=0, decode_responses=True)
 rai = Client(address=f'{host}:{port}')

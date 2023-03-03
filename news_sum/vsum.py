@@ -83,13 +83,14 @@ class VSum(nn.Module):
             heads=4,
             enc_layers=12,
             d_model=512,
-            dropout=0.1
+            dropout=0.1,
+            token_to_word_path='data/dict.npy',
     ) -> None:
         super(VSum, self).__init__()
         self.window_len = window_len
 
         self.base_model = S3D(
-            num_classes, space_to_depth=space_to_depth, init=init,
+            num_classes, space_to_depth=space_to_depth, init=init, token_to_word_path=token_to_word_path
         )
 
         self.d_model = d_model

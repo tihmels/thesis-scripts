@@ -128,6 +128,12 @@ parser.add_argument(
     default="/Users/tihmels/Scripts/thesis-scripts/news_sum/pretrained_weights/s3d_howto100m.pth",
     help="",
 )
+parser.add_argument(
+    "--token_to_word_path",
+    type=str,
+    default="/Users/tihmels/Scripts/thesis-scripts/news_sum/pretrained_weights/s3d_dict.npy",
+    help="",
+)
 parser.add_argument("--verbose", type=int, default=1, help="")
 
 
@@ -404,7 +410,8 @@ def create_model(args):
             init=args.weight_init,
             enc_layers=args.enc_layers,
             heads=args.heads,
-            dropout=args.dropout)
+            dropout=args.dropout,
+            token_to_word_path=args.token_to_word_path)
     else:
         model = VSum_MLP(
             args.num_class,
