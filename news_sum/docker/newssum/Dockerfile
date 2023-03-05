@@ -4,6 +4,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends  \
     build-essential \
     git \
     wget \
+    python3-opencv \
+    ffmpeg libsm6 libxext6 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /home
@@ -17,5 +19,6 @@ RUN git clone https://github.com/tihmels/thesis-scripts.git
 COPY requirements.txt .
 RUN pip3 install -r requirements.txt --no-cache-dir
 
-RUN mkdir out && mkdir TS
+RUN mkdir out && mkdir TS && mkdir out/vsum_output_log && mkdir out/vsum_tboard_log
 
+WORKDIR /home/thesis-scripts/news_sum/
