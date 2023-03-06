@@ -1,3 +1,4 @@
+version: '3.8'
 redis:
   volumes:
     - ./redis/redis-stack-server.conf:/opt/redis-stack/etc/redis-stack.conf
