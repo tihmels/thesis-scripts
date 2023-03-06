@@ -5,7 +5,6 @@ services:
       - ./redis/redis-stack-server.conf:/opt/redis-stack/etc/redis-stack.conf
       - /home/ma-newssum/redis/dump.rdb:/data/dump.rdb
   newssum:
-    tty: true
     command: [ "python3", "-u", "nsum_training.py",
                "--token_to_word_path", "/home/s3d/dict.npy",
                "--pretrain_cnn_path", "/home/s3d/s3d_howto100m.pth",
@@ -22,6 +21,7 @@ services:
                "--finetune"]
     volumes:
       - /home/ma-newssum/TS/:/home/TS/
+      - /home/ma-newssum/out/:/home/out
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
