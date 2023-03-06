@@ -169,7 +169,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
             f"[{idx + 1}/{len(cluster.ts15s)}] Story: {story.headline} "
             f"({story.pk}) {story.video} {story.start_time} - {story.end_time}")
 
-        cutoff = 5
+        cutoff = 4
 
         intra_cluster_sim = mean_segment_similarity(shot_features, all_shot_features, mean_co=cutoff)
         inter_cluster_sim = mean_segment_similarity(shot_features, all_other_features, mean_co=cutoff)
