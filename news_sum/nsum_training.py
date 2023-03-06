@@ -38,6 +38,17 @@ parser.add_argument("--cuda", dest="cuda", action="store_true", help="use CUDA")
 parser.add_argument("--finetune", dest="finetune", action="store_true", help="finetune S3D")
 parser.add_argument("--video_size", type=int, default=224, help="image size")
 parser.add_argument("--batch_size", type=int, default=16, help="batch size")
+parser.add_argument("--ngpus", default=0, type=int, help="Number of available gpus")
+parser.add_argument("--gpu", default=None, type=int, help="GPU id to use.")
+parser.add_argument("--rank", default=0, type=int, help="Rank.")
+parser.add_argument(
+    "--multiprocessing-distributed",
+    action="store_true",
+    help="Use multi-processing distributed training to launch "
+         "N processes per node, which has N GPUs. This is the "
+         "fastest way to use PyTorch for either single node or "
+         "multi node data parallel training",
+)
 parser.add_argument(
     "-e",
     "--evaluate",

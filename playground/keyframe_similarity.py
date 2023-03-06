@@ -1,13 +1,13 @@
-import sys
-
 import random
+import sys
+from pathlib import Path
 
 import imagehash as imagehash
 import numpy as np
 from PIL import Image
 
-from common.utils import flatten
-from database.model import MainVideo, Story
+from common.utils import flatten, read_images
+from database.model import Story
 
 
 def chunker(seq, size):
@@ -18,11 +18,11 @@ def main():
     ts15_stories = Story.find(Story.type == 'ts15').all()
 
     shots = flatten([ts15.shots for ts15 in ts15_stories])
-    keyframes = [shot.keyframe for shot in random.sample(shots, 3000)]
+    keyframes = [shot.keyframe for shot in random.sample(shots, 10000)]
     hashes = []
 
     for frames in chunker(keyframes, 50):
-        images = [Image.open(frame) for frame in frames]
+        images = [Image.open(Path('/Users/tihmels/TS/', frame)) for frame in frames]
         hashes.extend([imagehash.dhash(frame, hash_size=16) for frame in images])
 
         for image in images:
@@ -41,7 +41,7 @@ def main():
     lowest_scores = args[:100]
 
     for idx, kf in enumerate(lowest_scores):
-        image = Image.open(keyframes[kf])
+        image = Image.open(Path('/Users/tihmels/TS/', keyframes[kf]))
         image.save(f'/Users/tihmels/Desktop/similar/{idx:02}.jpg')
         image.close()
 

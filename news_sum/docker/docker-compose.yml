@@ -27,7 +27,7 @@ services:
                "--fps", "8", "--num_frames", "480",
                "--lrv", "0.001", "--lrs", "0.0001",
                "--log_freq", "5",
-               "--finetune", "--pin_memory" ]
+               "--finetune"]
     volumes:
       - /Users/tihmels/TS/:/home/TS/
     depends_on:

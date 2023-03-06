@@ -9,6 +9,7 @@ from pathlib import Path
 from shutil import copy
 
 import matplotlib
+import numpy as np
 import torch
 import torchvision.io as io
 from alive_progress import alive_bar
@@ -33,7 +34,7 @@ parser = ArgumentParser()
 parser.add_argument(
     "--checkpoint_dir",
     type=str,
-    default="/Users/tihmels/bin/vsum_checkpoint/exp_model_1_bs_8_lr_1e-05_nframes_480_nfps_16_nheads_4_nenc_12_dropout_0.1_finetune_False/epoch0001.pth.tar",
+    default="/Users/tihmels/Scripts/thesis-scripts/news_sum/vsum_checkpoint/epoch0015.pth.tar",
     help="checkpoint model folder",
 )
 parser.add_argument(
@@ -71,7 +72,7 @@ parser.add_argument(
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help='Tagesschau video file(s)')
 
 
-def visualize_picks(shots, frame_scores, picks):
+def visualize_picks(shots, frame_scores, picks, minmax=10):
     plt.figure(figsize=(25, 12))
 
     plt.title("Frame Scores", fontsize=10)
@@ -96,6 +97,15 @@ def visualize_picks(shots, frame_scores, picks):
         shot_range = range(shot.first_frame_idx, shot.last_frame_idx)
 
         plt.fill_between(shot_range, y_min, y_max, color='b', alpha=.1)
+
+    maximums = np.argpartition(frame_scores, -minmax)[-minmax:]
+    maximums = maximums[np.argsort(frame_scores[maximums])][::-1]
+    minimums = np.argpartition(frame_scores, minmax)[:minmax]
+    minimums = minimums[np.argsort(frame_scores[minimums])]
+
+
+
+
 
     plt.xticks(range(0, len(frame_scores), 1000))
 
@@ -257,7 +267,7 @@ def main(args):
 
     video_summaries = {}
 
-    model = VSum()
+    model = VSum(heads=8, enc_layers=24)
     model = model.eval()
 
     if checkpoint_path:
@@ -278,7 +288,7 @@ def main(args):
         for itr, video in enumerate(videos):
             print("Generating summary for: ", video.pk)
 
-            frames = read_images(video.frames)
+            frames = read_images(video.frames[::3], base_path='/Users/tihmels/TS')
 
             transform = transforms.Compose(
                 [transforms.ToTensor(), transforms.Resize((224, 224))]
