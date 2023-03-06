@@ -13,7 +13,7 @@ RUN python3 -m pip install --ignore-installed regex &&  \
 FROM redis/redis-stack-server
 COPY --from=0 /home/RedisAI/bin/linux-x64-release/install-cpu/redisai.so /opt/redis-stack/lib/redisai.so
 
-ENTRYPOINT ["/opt/redis-stack/bin/redis-stack-server"]
+ENV PATH="${PATH}:/opt/redis-stack/bin/"
 
-
-
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["redis-stack-server", "--dir", "/data"]
