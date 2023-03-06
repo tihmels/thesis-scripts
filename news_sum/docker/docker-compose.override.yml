@@ -21,5 +21,8 @@ services:
                "--finetune"]
     volumes:
       - /home/ma-newssum/TS/ts15/:/home/TS/
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
 
 
