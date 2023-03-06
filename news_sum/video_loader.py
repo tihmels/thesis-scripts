@@ -12,11 +12,9 @@ from database.model import Story, get_sum_key, get_score_key
 
 
 class NewsSumStoryLoader(Dataset):
-    """TVSum_DataLoader Video loader."""
-
     def __init__(
             self,
-            dataset_path,
+            base_path,
             fps=8,
             num_frames=480,
             num_frames_per_segment=16,
@@ -24,10 +22,9 @@ class NewsSumStoryLoader(Dataset):
     ):
         assert isinstance(size, int)
 
-        self.dataset_path = dataset_path
+        self.base_path = base_path
         self.fps = fps
         self.num_frames = num_frames
-        self.num_sec = self.num_frames / float(self.fps)
         self.num_frames_per_segment = num_frames_per_segment
         self.n_segments = int(self.num_frames / self.num_frames_per_segment)
         self.size = size
@@ -58,13 +55,12 @@ class NewsSumStoryLoader(Dataset):
     def __getitem__(self, idx):
         story = self.stories[idx]
 
-        print(f'Loading Story: {story.pk} ...')
-
         summary = torch.LongTensor(self.summaries[idx])
         scores = torch.FloatTensor(self.scores[idx])
-        # scores = torch.FloatTensor(self.scores[idx]) / 0.1
 
         n_story_segments = len(summary)
+
+        print(f'Loading Story: {story.pk} ({n_story_segments}) ...')
 
         first_segment_idx = random.randint(0, int(max(0, n_story_segments - self.n_segments)))
         last_segment_idx = min(n_story_segments, first_segment_idx + self.n_segments)
@@ -72,9 +68,9 @@ class NewsSumStoryLoader(Dataset):
         skip_n = math.floor(25 / self.fps)
 
         first_frame_idx = first_segment_idx * skip_n * self.num_frames_per_segment
-        last_frame_idx = min(last_segment_idx * skip_n * self.num_frames_per_segment, len(story.frames) - 1)
+        last_frame_idx = last_segment_idx * skip_n * self.num_frames_per_segment
 
-        frames = read_images(story.frames[first_frame_idx:last_frame_idx:3], base_path=self.dataset_path)
+        frames = read_images(story.frames[first_frame_idx:last_frame_idx:skip_n], base_path=self.base_path)
 
         summary = summary[first_segment_idx:last_segment_idx]
         scores = scores[first_segment_idx:last_segment_idx]
@@ -107,6 +103,6 @@ class NewsSumStoryLoader(Dataset):
             )
             video = torch.cat((video, zeros), axis=1)
 
-        video = video[:, :self.num_frames]
+        assert video.shape[1] / self.num_frames_per_segment == self.n_segments
 
         return {"pk": story.pk, "video": video, "summary": summary, "scores": scores}

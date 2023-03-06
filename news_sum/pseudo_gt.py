@@ -17,7 +17,7 @@ matplotlib.use('TkAgg')
 
 from common.utils import read_images, create_dir, flatten, Range
 from database import rai, db
-from database.model import TopicCluster, Story, get_sum_key, get_score_key, get_vis_key
+from database.model import TopicCluster, Story, get_sum_key, get_score_key, get_vis_key, get_m5c_key
 
 parser = argparse.ArgumentParser('Pseudo Summary Generation')
 parser.add_argument('--index', type=int, nargs='*', help="Generate pseudo summary for cluster index")
@@ -26,6 +26,7 @@ parser.add_argument('--window', type=int, default=16)
 parser.add_argument('--base_path', type=lambda p: Path(p).absolute(), default='/Users/tihmels/TS/')
 parser.add_argument('--pseudo_video_dir', type=str, default='')
 parser.add_argument('--save_fig', action='store_true')
+parser.add_argument('--save_kf', action='store_true')
 parser.add_argument('--shuffle', action='store_true')
 parser.add_argument(
     "-th",
@@ -75,6 +76,7 @@ def extract_shot_features(story: Story, fps, window):
     shot_segments = [(0, 0)]
 
     segment_features = torch.tensor(rai.get_tensor(get_vis_key(story.pk)))
+    #segment_features = torch.tensor(rai.get_tensor(get_m5c_key(story.pk)))
 
     shots = [Range(story.first_frame_idx, story.last_frame_idx) for story in story.shots]
 
@@ -114,10 +116,14 @@ def extract_shot_features(story: Story, fps, window):
 
 
 def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args):
+    # ts15_stories = [story for story in cluster.ts15s if
+    #                 rai.tensor_exists(get_vis_key(story.pk)) and len(story.shots) > 4]
+    # ts100_stories = [story for story in cluster.ts100s if
+    #                  rai.tensor_exists(get_vis_key(story.pk))]
     ts15_stories = [story for story in cluster.ts15s if
-                    rai.tensor_exists(get_vis_key(story.pk)) and len(story.shots) > 4]
+                    rai.tensor_exists(get_m5c_key(story.pk)) and len(story.shots) > 4]
     ts100_stories = [story for story in cluster.ts100s if
-                     rai.tensor_exists(get_vis_key(story.pk))]
+                     rai.tensor_exists(get_m5c_key(story.pk))]
 
     print(f'Keywords: {cluster.keywords[:5]}')
     print(f'{len(ts15_stories)} ts15')
@@ -163,7 +169,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
             f"[{idx + 1}/{len(cluster.ts15s)}] Story: {story.headline} "
             f"({story.pk}) {story.video} {story.start_time} - {story.end_time}")
 
-        cutoff = 4
+        cutoff = 5
 
         intra_cluster_sim = mean_segment_similarity(shot_features, all_shot_features, mean_co=cutoff)
         inter_cluster_sim = mean_segment_similarity(shot_features, all_other_features, mean_co=cutoff)
@@ -203,7 +209,6 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         random_video_bool = random.random() < 0.25 and args.pseudo_video_dir
 
         summary_video = []
-        negative_frames = []
 
         for segment, score in zip(shot_segments, segment_scores):
             start, end = segment
@@ -219,19 +224,12 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
                         frames = np.array(read_images(frames, base_path=args.base_path))
                         summary_video.append(torch.tensor(frames))
 
-                elif random_video_bool:
-                    from_idx, to_idx = segment_to_frame_range(0, start, end)
-                    keyframe = story.frames[int((from_idx + to_idx) / 2)]
-                    negative_frames.append(keyframe)
-
         if random_video_bool and len(summary_video) > 0:
             summary_video = torch.cat(summary_video, dim=0)
 
             pseudo_video_dir = Path(args.pseudo_video_dir, 'videos', str(cluster.index))
-            negative_frame_dir = Path(args.pseudo_video_dir, 'videos', str(cluster.index), story.pk)
 
             create_dir(pseudo_video_dir)
-            create_dir(negative_frame_dir)
 
             io.write_video(
                 os.path.join(str(pseudo_video_dir), f'{story.pk}.mp4'),
@@ -239,8 +237,11 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
                 25,
             )
 
-            for frame in negative_frames:
-                copy(Path(args.base_path, frame), negative_frame_dir)
+        if args.save_kf:
+            data_dir = Path(args.pseudo_video_dir, 'summaries', str(cluster.index), story.pk)
+            create_dir(data_dir)
+
+
 
         redis_summary = db.List(get_sum_key(story.pk))
         redis_scores = db.List(get_score_key(story.pk))

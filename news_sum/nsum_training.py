@@ -70,7 +70,7 @@ parser.add_argument(
 parser.add_argument(
     "--num_frames",
     type=int,
-    default=480,
+    default=240,
     help="number of frames in each video clip",
 )
 parser.add_argument(
@@ -451,7 +451,7 @@ def main(args):
         model = model.cuda(device)
 
     dataset = NewsSumStoryLoader(
-        dataset_path=args.dataset_path,
+        base_path=args.dataset_path,
         fps=args.fps,
         num_frames=args.num_frames,
         num_frames_per_segment=args.num_frames_per_segment,
