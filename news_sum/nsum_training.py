@@ -6,6 +6,7 @@ import time
 from argparse import ArgumentParser
 from collections import OrderedDict
 from datetime import timedelta
+from pathlib import Path
 from timeit import default_timer as timer
 
 import numpy as np
@@ -18,6 +19,7 @@ import torch.utils.data.distributed
 from prettytable import PrettyTable
 from tqdm import tqdm
 
+from common.utils import create_dir
 from eval_and_log import evaluate_summary
 from nsum_utils import Logger, AverageMeter
 from video_loader import NewsSumStoryLoader
@@ -31,6 +33,7 @@ parser.add_argument("--num_class", type=int, default=512, help="upper epoch limi
 parser.add_argument("--weight_init", type=str, default="uniform", help="CNN weights inits")
 parser.add_argument("--dataset_path", type=str, default="/Users/tihmels/TS/")
 parser.add_argument("--out_path", type=str, default="/Users/tihmels/Scripts/thesis-scripts/news_sum/out")
+parser.add_argument("--log_root_vsum", type=str, default="vsum_output_log")
 parser.add_argument("--dropout", "--dropout", default=0.1, type=float, help="Dropout")
 parser.add_argument("--fps", type=int, default=8, help="")
 parser.add_argument("--heads", "-heads", default=8, type=int, help="number of transformer heads")
@@ -125,7 +128,7 @@ parser.add_argument(
     help="checkpoint model folder",
 )
 parser.add_argument(
-    "--log_root", type=str, default="vsum_tboard_log", help="log dir root"
+    "--log_root_tboard", type=str, default="vsum_tboard_log", help="log dir root"
 )
 parser.add_argument(
     "--log_name",
@@ -161,10 +164,8 @@ def create_logger(args):
         args.finetune,
     )
 
-    logdir = os.path.join(args.log_root, args.log_name)
+    logdir = os.path.join(args.out_path, args.log_root_tboard, args.log_name)
     logger = Logger(logdir)
-
-    os.makedirs(logdir, exist_ok=True)
 
     return logger
 
@@ -173,7 +174,7 @@ def log(output, args):
     print(output)
     with open(
             os.path.join(
-                args.out_path, "vsum_output_log", args.log_name + ".txt"
+                args.out_path, args.log_root_vsum, args.log_name + ".txt"
             ),
             "a",
     ) as f:
@@ -425,8 +426,7 @@ def create_model(args):
     else:
         model = VSum_MLP(
             args.num_class,
-            space_to_depth=False,
-            word2vec_path=args.word2vec_path,
+            space_to_depth=True,
             init=args.weight_init,
             dropout=args.dropout)
 
@@ -493,8 +493,7 @@ def main(args):
 
     logger = create_logger(args)
 
-    tb_logdir = os.path.join(args.log_root, args.log_name)
-    os.makedirs(tb_logdir, exist_ok=True)
+    create_dir(Path(args.out_path, args.log_root_tboard))
 
     criterion = nn.MSELoss(reduction='none')
 
@@ -512,10 +511,11 @@ def main(args):
         args.out_path, args.checkpoint_dir, args.log_name
     )
 
-    if args.checkpoint_dir != "":
-        os.makedirs(checkpoint_dir, exist_ok=True)
+    create_dir(Path(args.out_path, args.checkpoint_dir))
 
     total_batch_size = args.batch_size
+
+    create_dir(Path(args.out_path, args.log_root_vsum))
 
     log(
         "Starting training loop with batch size: {}".format(

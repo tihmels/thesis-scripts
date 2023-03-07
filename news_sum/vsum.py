@@ -83,7 +83,7 @@ class VSum(nn.Module):
             heads=4,
             enc_layers=12,
             d_model=512,
-            dropout=0.1,
+            dropout=0.5,
             token_to_word_path='data/dict.npy',
     ) -> None:
         super(VSum, self).__init__()
@@ -102,6 +102,7 @@ class VSum(nn.Module):
         self.transformer_encoder = nn.TransformerEncoder(
             encoder_layers, num_layers=enc_layers
         )
+
         self.fc = nn.Linear(self.d_model, 1)
 
     def forward(self, video):

@@ -176,14 +176,14 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
             f"({story.pk}) {story.video} {story.start_time} - {story.end_time}")
 
         intra_cluster_sim = mean_segment_similarity(shot_features, all_shot_features,
-                                                    mean_co=int(len(shot_features_per_story) / 2))
+                                                    mean_co=int(len(shot_features_per_story) / 3))
         inter_cluster_sim = mean_segment_similarity(shot_features, all_other_features)
         summary_fitness = mean_segment_similarity(shot_features, ts100_shot_features,
-                                                  mean_co=int(len(ts100_stories) / 2))
+                                                  mean_co=int(len(ts100_stories) / 3))
 
         topic_relevance_score = intra_cluster_sim - inter_cluster_sim
 
-        shot_scores = topic_relevance_score + summary_fitness
+        shot_scores = (topic_relevance_score + summary_fitness) / 2
         shot_scores = norm(shot_scores)
 
         shot_scores[0] = min(shot_scores)
@@ -251,9 +251,11 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
 
             selected = [idx for idx, score in enumerate(shot_scores) if score >= threshold]
 
-            maximums = np.argpartition(shot_scores, -5)[-5:]
+            co = min(len(shot_scores) - 1, 5)
+
+            maximums = np.argpartition(shot_scores, -co)[-co:]
             maximums = maximums[np.argsort(shot_scores[maximums])][::-1]
-            minimums = np.argpartition(shot_scores, 5)[:5]
+            minimums = np.argpartition(shot_scores, co)[:co]
             minimums = minimums[np.argsort(shot_scores[minimums])]
 
             copy_keyframes(shot_segments, selected, story.frames, selected_path)
