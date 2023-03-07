@@ -41,6 +41,8 @@ parser.add_argument("--cuda", dest="cuda", action="store_true", help="use CUDA")
 parser.add_argument("--finetune", dest="finetune", action="store_true", help="finetune S3D")
 parser.add_argument("--video_size", type=int, default=224, help="image size")
 parser.add_argument("--batch_size", type=int, default=16, help="batch size")
+parser.add_argument("--step_size", type=int, default=30, help="scheduler step size")
+parser.add_argument("--gamma", type=float, default=0.1, help="scheduler gamma")
 parser.add_argument("--ngpus", default=0, type=int, help="Number of available gpus")
 parser.add_argument("--gpu", default=None, type=int, help="GPU id to use.")
 parser.add_argument("--rank", default=0, type=int, help="Rank.")
@@ -506,7 +508,7 @@ def main(args):
 
     optimizer = get_optimizer(model, base_params, vsum_params, args)
 
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
     checkpoint_dir = Path(args.out_path, args.checkpoint_dir, args.log_name)
 
     create_dir(checkpoint_dir)
