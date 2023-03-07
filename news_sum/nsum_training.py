@@ -370,10 +370,11 @@ def log_state(args, dataset, epoch, dtime, idx, optimizer, running_loss, tb_logg
         current_lr = optimizer.param_groups[0]["lr"]
 
     log(
-        "Epoch %d, Elapsed Time: %s, Epoch status: %.4f, Training loss: %.4f, Learning rate: %.6f"
+        "Epoch %d, Elapsed Time: %s, Batch: %s, Epoch status: %.4f,  Training loss: %.4f, Learning rate: %.6f"
         % (
             epoch + 1,
             str(timedelta(seconds=dtime)),
+            f'{idx + 1}/{str(np.ceil(len(dataset) / args.batch_size))}',
             args.batch_size * 1 * float(idx) / len(dataset),
             running_loss / args.log_freq,
             current_lr,
