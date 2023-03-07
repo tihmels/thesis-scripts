@@ -95,7 +95,7 @@ parser.add_argument(
     help="number of frames in each segment",
 )
 parser.add_argument(
-    "--log_freq", type=int, default=3, help="Information display frequence"
+    "--log_freq", type=int, default=1, help="Information display frequence"
 )
 parser.add_argument(
     "--lrv",
@@ -374,7 +374,7 @@ def log_state(args, dataset, epoch, dtime, idx, optimizer, running_loss, tb_logg
         % (
             epoch + 1,
             str(timedelta(seconds=dtime)),
-            f'{idx + 1}/{str(np.ceil(len(dataset) / args.batch_size))}',
+            f'{idx + 1}/{str(int(np.ceil(len(dataset) / args.batch_size)))}',
             args.batch_size * 1 * float(idx) / len(dataset),
             running_loss / args.log_freq,
             current_lr,
