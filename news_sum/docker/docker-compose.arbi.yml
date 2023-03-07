@@ -2,7 +2,6 @@ version: '3.8'
 services:
   redis:
     volumes:
-      - ./redis/redis-stack-server.conf:/opt/redis-stack/etc/redis-stack.conf
       - /home/ma-newssum/redis/dump.rdb:/data/dump.rdb
   newssum:
     command: [ "python3", "-u", "nsum_training.py",

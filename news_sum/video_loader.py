@@ -60,7 +60,7 @@ class NewsSumStoryLoader(Dataset):
 
         n_story_segments = len(summary)
 
-        print(f'Loading Story: {story.pk} ({n_story_segments}) ...')
+        print(f'Loading Story: {story.pk} ', end='')
 
         first_segment_idx = random.randint(0, int(max(0, n_story_segments - self.n_segments)))
         last_segment_idx = min(n_story_segments, first_segment_idx + self.n_segments)

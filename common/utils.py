@@ -83,6 +83,8 @@ def create_dir(path: Path, rm_if_exist=False):
 
     path.mkdir(parents=True, exist_ok=False if rm_if_exist else True)
 
+    return path
+
 
 def time_to_datetime(time):
     return datetime(2000, 1, 1, time.hour, time.minute, time.second)

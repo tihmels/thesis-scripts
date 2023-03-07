@@ -9,7 +9,6 @@ from shutil import copy
 import matplotlib
 import numpy as np
 import torch
-import torch.nn.functional as F
 import torchvision.io as io
 from matplotlib import pyplot as plt
 
@@ -35,6 +34,10 @@ parser.add_argument(
     type=float,
     help="cut off threshold",
 )
+
+
+def norm(arr, axis=0):
+    return arr / np.linalg.norm(arr, axis=axis)
 
 
 def range_overlap(r1: Range, r2: Range):
@@ -76,7 +79,7 @@ def extract_shot_features(story: Story, fps, window):
     shot_segments = [(0, 0)]
 
     segment_features = torch.tensor(rai.get_tensor(get_vis_key(story.pk)))
-    #segment_features = torch.tensor(rai.get_tensor(get_m5c_key(story.pk)))
+    # segment_features = F.normalize(torch.Tensor(segment_features), dim=1)
 
     shots = [Range(story.first_frame_idx, story.last_frame_idx) for story in story.shots]
 
@@ -141,6 +144,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         all_shot_features.extend(features)
 
     all_shot_features = torch.stack(all_shot_features)
+    # all_shot_features = F.normalize(all_shot_features, dim=1)
 
     ts100_shot_features = []
 
@@ -150,6 +154,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         ts100_shot_features.extend(features)
 
     ts100_shot_features = torch.stack(ts100_shot_features)
+    # ts100_shot_features = F.normalize(ts100_shot_features, dim=1)
 
     all_other_features = []
 
@@ -160,6 +165,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         all_other_features.extend(features)
 
     all_other_features = torch.stack(all_other_features)
+    # all_other_features = F.normalize(all_other_features, dim=1)
 
     for idx, (shot_segments, shot_features) in enumerate(zip(shots_per_story, shot_features_per_story)):
 
@@ -169,21 +175,20 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
             f"[{idx + 1}/{len(cluster.ts15s)}] Story: {story.headline} "
             f"({story.pk}) {story.video} {story.start_time} - {story.end_time}")
 
-        cutoff = 4
-
-        intra_cluster_sim = mean_segment_similarity(shot_features, all_shot_features, mean_co=cutoff)
-        inter_cluster_sim = mean_segment_similarity(shot_features, all_other_features, mean_co=cutoff)
-        summary_fitness = mean_segment_similarity(shot_features, ts100_shot_features, mean_co=cutoff)
+        intra_cluster_sim = mean_segment_similarity(shot_features, all_shot_features,
+                                                    mean_co=int(len(shot_features_per_story) / 2))
+        inter_cluster_sim = mean_segment_similarity(shot_features, all_other_features)
+        summary_fitness = mean_segment_similarity(shot_features, ts100_shot_features,
+                                                  mean_co=int(len(ts100_stories) / 2))
 
         topic_relevance_score = intra_cluster_sim - inter_cluster_sim
 
-        segment_scores = topic_relevance_score + summary_fitness
-        segment_scores = F.normalize(torch.Tensor(segment_scores), dim=0).numpy()
+        shot_scores = topic_relevance_score + summary_fitness
+        shot_scores = norm(shot_scores)
 
-        segment_scores[0] = min(segment_scores)
+        shot_scores[0] = min(shot_scores)
 
-        score_range = segment_scores.max() - segment_scores.min()
-        threshold = segment_scores.min() + args.threshold * score_range
+        threshold = shot_scores.min() + args.threshold * np.ptp(shot_scores)
 
         n_segments = shot_segments[-1][1] + 1
 
@@ -193,7 +198,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
                     inter_cluster_sim,
                     intra_cluster_sim,
                     summary_fitness,
-                    segment_scores)
+                    shot_scores)
 
             plt.title(label=f"{story.pk}", fontdict={'fontsize': 14})
 
@@ -210,7 +215,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
 
         summary_video = []
 
-        for segment, score in zip(shot_segments, segment_scores):
+        for segment, score in zip(shot_segments, shot_scores):
             start, end = segment
 
             if end >= start:
@@ -238,10 +243,22 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
             )
 
         if args.save_kf:
-            data_dir = Path(args.pseudo_video_dir, 'summaries', str(cluster.index), story.pk)
-            create_dir(data_dir)
+            data_dir = Path('/Users/tihmels/Desktop/pseudogen/summaries/', str(cluster.index), story.pk)
 
+            selected_path = create_dir(Path(data_dir, 'selected'), rm_if_exist=True)
+            highest_path = create_dir(Path(data_dir, 'maximums'), rm_if_exist=True)
+            lowest_path = create_dir(Path(data_dir, 'minimums'), rm_if_exist=True)
 
+            selected = [idx for idx, score in enumerate(shot_scores) if score >= threshold]
+
+            maximums = np.argpartition(shot_scores, -5)[-5:]
+            maximums = maximums[np.argsort(shot_scores[maximums])][::-1]
+            minimums = np.argpartition(shot_scores, 5)[:5]
+            minimums = minimums[np.argsort(shot_scores[minimums])]
+
+            copy_keyframes(shot_segments, selected, story.frames, selected_path)
+            copy_keyframes(shot_segments, maximums, story.frames, highest_path)
+            copy_keyframes(shot_segments, minimums, story.frames, lowest_path)
 
         redis_summary = db.List(get_sum_key(story.pk))
         redis_scores = db.List(get_score_key(story.pk))
@@ -253,14 +270,12 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         redis_scores.extend(machine_summary_scores.tolist())
 
 
-def copy_keyframes(shot_segments, story, path="/Users/tihmels/Desktop/keyframes/"):
-    keyframe_folder = Path(path)
-    create_dir(keyframe_folder, rm_if_exist=True)
-    for seg_idx, segment in enumerate(shot_segments):
-        frame_range = segment_to_frame_range(0, segment[0], segment[1], fps=8, window=16)
-        seg_frame = story.frames[int((frame_range[0] + frame_range[1]) / 2)]
+def copy_keyframes(shots, indices, frames, path):
+    for shot in np.array(shots)[indices]:
+        frame_range = segment_to_frame_range(0, shot[0], shot[1], fps=8, window=16)
+        seg_frame = Path('/Users/tihmels/TS/', frames[int((frame_range[0] + frame_range[1]) / 2)])
 
-        copy(seg_frame, Path(keyframe_folder, f'S{seg_idx}.jpg'))
+        copy(seg_frame, Path(path, f'S{shot[0]}-{shot[1]}.jpg'))
 
 
 def plot_it(segments,

@@ -34,7 +34,7 @@ parser = ArgumentParser()
 parser.add_argument(
     "--checkpoint_dir",
     type=str,
-    default="/Users/tihmels/Scripts/thesis-scripts/news_sum/vsum_checkpoint/epoch0015.pth.tar",
+    default="/Users/tihmels/Scripts/thesis-scripts/news_sum/vsum_checkpoint/exp_model_1_bs_16_lr_1e-05_nframes_480_nfps_16_nheads_8_nenc_24_dropout_0.1_finetune_False_epoch11.pth.tar",
     help="checkpoint model folder",
 )
 parser.add_argument(
