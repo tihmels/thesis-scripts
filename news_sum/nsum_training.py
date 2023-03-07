@@ -7,6 +7,7 @@ from argparse import ArgumentParser
 from collections import OrderedDict
 from datetime import timedelta
 from pathlib import Path
+from shutil import rmtree
 from timeit import default_timer as timer
 
 import numpy as np
@@ -19,7 +20,6 @@ import torch.utils.data.distributed
 from prettytable import PrettyTable
 from tqdm import tqdm
 
-from common.utils import create_dir
 from eval_and_log import evaluate_summary
 from nsum_utils import Logger, AverageMeter
 from video_loader import NewsSumStoryLoader
@@ -150,6 +150,15 @@ parser.add_argument(
     help="",
 )
 parser.add_argument("--verbose", type=int, default=1, help="")
+
+
+def create_dir(path: Path, rm_if_exist=False):
+    if path.is_dir() and rm_if_exist:
+        rmtree(path)
+
+    path.mkdir(parents=True, exist_ok=False if rm_if_exist else True)
+
+    return path
 
 
 def create_logger(args):
