@@ -287,17 +287,17 @@ def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args):
         ),
         args,
     )
+
     log(
         "ALTERNATIVE"
-        "Epoch {} \t"
         "F-Score {} \t"
         "Precision {} \t"
-        "Recall {} \t"
-        "Loss {loss.val:.4f} ({loss.avg:.4f})\t".format(
-            epoch, f_score_, precision_, recall_, loss=losses
+        "Recall {} \t".format(
+            f_score_, precision_, recall_,
         ),
         args,
     )
+
     table.add_row([f_score, precision, recall, loss])
     tqdm.write(str(table))
 
