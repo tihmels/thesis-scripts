@@ -65,7 +65,7 @@ def segment_to_frame_range(offset, first_segment_idx: int, last_segment_idx: int
                  segment_idx_to_frame_idx(offset, last_segment_idx, fps, window))
 
 
-def mean_segment_similarity(segment_features, other_segment_features, mean_co=None):
+def mean_segment_similarity(segment_features, other_segment_features, mean_co: int = None):
     similarity_matrix = np.matmul(segment_features, other_segment_features.T)
 
     similarity_matrix = np.sort(similarity_matrix, axis=1)
@@ -175,13 +175,16 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
             f"[{idx + 1}/{len(cluster.ts15s)}] Story: {story.headline} "
             f"({story.pk}) {story.video} {story.start_time} - {story.end_time}")
 
-        intra_cluster_sim = mean_segment_similarity(shot_features, all_shot_features,
-                                                    mean_co=int(len(shot_features_per_story) / 3))
-        inter_cluster_sim = mean_segment_similarity(shot_features, all_other_features)
-        summary_fitness = mean_segment_similarity(shot_features, ts100_shot_features,
-                                                  mean_co=int(len(ts100_stories) / 3))
+        intra_co = int(len(ts15_stories) / 2)
+        inter_co = int(len(other_stories) / 4)
+        sum_co = int(len(ts100_stories) / 2)
+
+        intra_cluster_sim = mean_segment_similarity(shot_features, all_shot_features, mean_co=intra_co)
+        inter_cluster_sim = mean_segment_similarity(shot_features, all_other_features, mean_co=inter_co)
+        summary_fitness = mean_segment_similarity(shot_features, ts100_shot_features, mean_co=sum_co)
 
         topic_relevance_score = intra_cluster_sim - inter_cluster_sim
+        topic_relevance_score = np.where(topic_relevance_score < 0, 0, topic_relevance_score)
 
         shot_scores = (topic_relevance_score + summary_fitness) / 2
         shot_scores = norm(shot_scores)
@@ -274,8 +277,10 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
 
 def copy_keyframes(shots, indices, frames, path):
     for shot in np.array(shots)[indices]:
-        frame_range = segment_to_frame_range(0, shot[0], shot[1], fps=8, window=16)
-        seg_frame = Path('/Users/tihmels/TS/', frames[int((frame_range[0] + frame_range[1]) / 2)])
+        ffi, lfi = segment_to_frame_range(0, shot[0], shot[1], fps=8, window=16)
+        cfi = int((ffi + lfi) / 2)
+
+        seg_frame = Path('/Users/tihmels/TS/', frames[min(cfi, len(frames) - 1)])
 
         copy(seg_frame, Path(path, f'S{shot[0]}-{shot[1]}.jpg'))
 
