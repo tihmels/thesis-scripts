@@ -115,7 +115,7 @@ def random_search(embeddings, space, num_evals):
 
 def bayesian_search(embeddings, space, label_lower, label_upper, max_evals=100):
     """
-    Perform bayseian search on hyperopt hyperparameter space to minimize objective function
+    Perform bayesian search on hyperopt hyperparameter space to minimize objective function
     """
 
     trials = Trials()
