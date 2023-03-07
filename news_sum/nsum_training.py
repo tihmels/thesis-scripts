@@ -210,6 +210,10 @@ def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args):
     precisions = AverageMeter()
     recalls = AverageMeter()
 
+    f_scores_ = AverageMeter()
+    precisions_ = AverageMeter()
+    recalls_ = AverageMeter()
+
     model.eval()
 
     table = PrettyTable()
@@ -236,11 +240,22 @@ def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args):
                 score.detach().cpu().view(-1).topk(int(0.50 * len(gt_summary)))[1]
             )
 
+            summary_ids_ = (
+                score.detach().cpu().view(-1).topk(int(torch.count_nonzero(gt_summary == 1)))[1]
+            )
+
             summary = np.zeros(len(gt_summary), dtype=int)
             summary[summary_ids] = 1
 
+            summary_ = np.zeros(len(gt_summary), dtype=int)
+            summary_[summary_ids_] = 1
+
             f_score, precision, recall = evaluate_summary(
                 summary, gt_summary.detach().cpu().numpy()
+            )
+
+            f_score_, precision_, recall_ = evaluate_summary(
+                summary_, gt_summary.detach().cpu().numpy()
             )
 
             loss = loss.mean()
@@ -249,10 +264,18 @@ def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args):
             precisions.update(precision, embedding.shape[0])
             recalls.update(recall, embedding.shape[0])
 
+            f_scores_.update(f_score_, embedding.shape[0])
+            precisions_.update(precision_, embedding.shape[0])
+            recalls_.update(recall_, embedding.shape[0])
+
     loss = losses.avg
     f_score = f_scores.avg
     precision = precisions.avg
     recall = recalls.avg
+
+    f_score_ = f_scores_.avg
+    precision_ = precisions_.avg
+    recall_ = recalls_.avg
 
     log(
         "Epoch {} \t"
@@ -261,6 +284,17 @@ def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args):
         "Recall {} \t"
         "Loss {loss.val:.4f} ({loss.avg:.4f})\t".format(
             epoch, f_score, precision, recall, loss=losses
+        ),
+        args,
+    )
+    log(
+        "ALTERNATIVE"
+        "Epoch {} \t"
+        "F-Score {} \t"
+        "Precision {} \t"
+        "Recall {} \t"
+        "Loss {loss.val:.4f} ({loss.avg:.4f})\t".format(
+            epoch, f_score_, precision_, recall_, loss=losses
         ),
         args,
     )
