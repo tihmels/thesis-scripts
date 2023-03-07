@@ -507,11 +507,9 @@ def main(args):
     optimizer = get_optimizer(model, base_params, vsum_params, args)
 
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
-    checkpoint_dir = os.path.join(
-        args.out_path, args.checkpoint_dir, args.log_name
-    )
+    checkpoint_dir = Path(args.out_path, args.checkpoint_dir, args.log_name)
 
-    create_dir(Path(args.out_path, args.checkpoint_dir))
+    create_dir(checkpoint_dir)
 
     total_batch_size = args.batch_size
 
