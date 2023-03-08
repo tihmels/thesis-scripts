@@ -2,6 +2,8 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python,intellij+all
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,intellij+all
 
+dump.rdb
+
 ### Intellij+all ###
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
 # Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
@@ -295,7 +297,10 @@ shot_classifier_model/**/*.hdf5
 
 subtitle_xml_downloader/subtitles/**
 
+docker/**
+
 **/**/*.pt
 **/**/*.pth
 **/**/*.npy
 **/**/*.bin
+**/**/*.pth.tar
