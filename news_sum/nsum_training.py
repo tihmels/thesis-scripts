@@ -1,23 +1,23 @@
 #!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
+from collections import OrderedDict
 
+import glob
+import numpy as np
 import os
 import random
 import time
-from argparse import ArgumentParser
-from collections import OrderedDict
-from datetime import timedelta
-from pathlib import Path
-from shutil import rmtree
-from timeit import default_timer as timer
-
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.parallel
 import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
+from argparse import ArgumentParser
+from datetime import timedelta
+from pathlib import Path
 from prettytable import PrettyTable
+from shutil import rmtree
+from timeit import default_timer as timer
 from tqdm import tqdm
 
 from eval_and_log import evaluate_summary
@@ -435,7 +435,7 @@ def TrainOneBatch(model, optimizer, scheduler, data, loss_fun, args):
         frames = data["video"].float()
         scores = data["scores"].view(-1)
 
-    print(f'Learning rate: {scheduler.get_last_lr()}')
+    print(f'Learning rate: {scheduler.get_last_lr()[::-1]}')
 
     optimizer.zero_grad(set_to_none=True)
 
@@ -458,6 +458,15 @@ def TrainOneBatch(model, optimizer, scheduler, data, loss_fun, args):
     scheduler.step()
 
     return loss.item()
+
+
+def get_last_checkpoint(checkpoint_dir):
+    all_ckpt = glob.glob(os.path.join(checkpoint_dir, "epoch*.pth.tar"))
+    if all_ckpt:
+        all_ckpt = sorted(all_ckpt)
+        return all_ckpt[-1]
+    else:
+        return ""
 
 
 def create_model(args):
@@ -557,6 +566,24 @@ def main(args):
     checkpoint_dir = Path(args.out_path, args.checkpoint_dir, args.log_name)
 
     create_dir(checkpoint_dir)
+
+    if args.resume:
+        checkpoint_path = get_last_checkpoint(checkpoint_dir)
+        if checkpoint_path:
+            log("=> loading checkpoint '{}'".format(checkpoint_path), args)
+            checkpoint = torch.load(checkpoint_path)
+            args.start_epoch = checkpoint["epoch"]
+            model.load_state_dict(checkpoint["state_dict"])
+            optimizer.load_state_dict(checkpoint["optimizer"])
+            scheduler.load_state_dict(checkpoint["scheduler"])
+            log(
+                "=> loaded checkpoint '{}' (epoch {})".format(
+                    checkpoint_path, checkpoint["epoch"]
+                ),
+                args,
+            )
+        else:
+            log("=> no checkpoint found at '{}'".format(args.resume), args)
 
     total_batch_size = args.batch_size
 
