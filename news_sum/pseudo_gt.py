@@ -1,22 +1,21 @@
 import argparse
 import math
+import matplotlib
+import numpy as np
 import os
 import random
 import sys
-from pathlib import Path
-from shutil import copy
-
-import matplotlib
-import numpy as np
 import torch
 import torchvision.io as io
 from matplotlib import pyplot as plt
+from pathlib import Path
+from shutil import copy
 
 matplotlib.use('TkAgg')
 
 from common.utils import read_images, create_dir, flatten, Range
 from database import rai, db
-from database.model import TopicCluster, Story, get_sum_key, get_score_key, get_vis_key, get_m5c_key
+from database.model import TopicCluster, Story, get_sum_key, get_score_key, get_vis_key
 
 parser = argparse.ArgumentParser('Pseudo Summary Generation')
 parser.add_argument('--index', type=int, nargs='*', help="Generate pseudo summary for cluster index")
@@ -79,7 +78,6 @@ def extract_shot_features(story: Story, fps, window):
     shot_segments = [(0, 0)]
 
     segment_features = torch.tensor(rai.get_tensor(get_vis_key(story.pk)))
-    # segment_features = F.normalize(torch.Tensor(segment_features), dim=1)
 
     shots = [Range(story.first_frame_idx, story.last_frame_idx) for story in story.shots]
 
@@ -119,14 +117,10 @@ def extract_shot_features(story: Story, fps, window):
 
 
 def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args):
-    # ts15_stories = [story for story in cluster.ts15s if
-    #                 rai.tensor_exists(get_vis_key(story.pk)) and len(story.shots) > 4]
-    # ts100_stories = [story for story in cluster.ts100s if
-    #                  rai.tensor_exists(get_vis_key(story.pk))]
     ts15_stories = [story for story in cluster.ts15s if
-                    rai.tensor_exists(get_m5c_key(story.pk)) and len(story.shots) > 4]
+                    rai.tensor_exists(get_vis_key(story.pk)) and len(story.shots) > 4]
     ts100_stories = [story for story in cluster.ts100s if
-                     rai.tensor_exists(get_m5c_key(story.pk))]
+                     rai.tensor_exists(get_vis_key(story.pk))]
 
     print(f'Keywords: {cluster.keywords[:5]}')
     print(f'{len(ts15_stories)} ts15')
@@ -144,7 +138,6 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         all_shot_features.extend(features)
 
     all_shot_features = torch.stack(all_shot_features)
-    # all_shot_features = F.normalize(all_shot_features, dim=1)
 
     ts100_shot_features = []
 
@@ -154,7 +147,6 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         ts100_shot_features.extend(features)
 
     ts100_shot_features = torch.stack(ts100_shot_features)
-    # ts100_shot_features = F.normalize(ts100_shot_features, dim=1)
 
     all_other_features = []
 
@@ -165,7 +157,6 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         all_other_features.extend(features)
 
     all_other_features = torch.stack(all_other_features)
-    # all_other_features = F.normalize(all_other_features, dim=1)
 
     for idx, (shot_segments, shot_features) in enumerate(zip(shots_per_story, shot_features_per_story)):
 
@@ -175,16 +166,19 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
             f"[{idx + 1}/{len(cluster.ts15s)}] Story: {story.headline} "
             f"({story.pk}) {story.video} {story.start_time} - {story.end_time}")
 
-        intra_co = int(len(ts15_stories) / 2)
-        inter_co = int(len(other_stories) / 4)
-        sum_co = int(len(ts100_stories) / 2)
+        intra_co = int(len(all_shot_features) * 0.2)
+        inter_co = intra_co
+        sum_co = int(len(ts100_shot_features) * 0.2)
 
         intra_cluster_sim = mean_segment_similarity(shot_features, all_shot_features, mean_co=intra_co)
         inter_cluster_sim = mean_segment_similarity(shot_features, all_other_features, mean_co=inter_co)
         summary_fitness = mean_segment_similarity(shot_features, ts100_shot_features, mean_co=sum_co)
 
+        intra_cluster_sim = norm(intra_cluster_sim)
+        inter_cluster_sim = norm(inter_cluster_sim)
+        summary_fitness = norm(summary_fitness)
+
         topic_relevance_score = intra_cluster_sim - inter_cluster_sim
-        topic_relevance_score = np.where(topic_relevance_score < 0, 0, topic_relevance_score)
 
         shot_scores = (topic_relevance_score + summary_fitness) / 2
         shot_scores = norm(shot_scores)
