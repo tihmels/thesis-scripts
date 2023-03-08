@@ -289,7 +289,7 @@ def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args):
     )
 
     log(
-        "ALTERNATIVE"
+        "ALTERNATIVE\n"
         "F-Score {} \t"
         "Precision {} \t"
         "Recall {} \t".format(
