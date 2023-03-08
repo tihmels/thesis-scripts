@@ -210,10 +210,6 @@ def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args):
     precisions = AverageMeter()
     recalls = AverageMeter()
 
-    f_scores_ = AverageMeter()
-    precisions_ = AverageMeter()
-    recalls_ = AverageMeter()
-
     model.eval()
 
     table = PrettyTable()
@@ -240,22 +236,11 @@ def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args):
                 score.detach().cpu().view(-1).topk(int(0.50 * len(gt_summary)))[1]
             )
 
-            summary_ids_ = (
-                score.detach().cpu().view(-1).topk(int(torch.count_nonzero(gt_summary == 1)))[1]
-            )
-
             summary = np.zeros(len(gt_summary), dtype=int)
             summary[summary_ids] = 1
 
-            summary_ = np.zeros(len(gt_summary), dtype=int)
-            summary_[summary_ids_] = 1
-
             f_score, precision, recall = evaluate_summary(
                 summary, gt_summary.detach().cpu().numpy()
-            )
-
-            f_score_, precision_, recall_ = evaluate_summary(
-                summary_, gt_summary.detach().cpu().numpy()
             )
 
             loss = loss.mean()
@@ -264,18 +249,10 @@ def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args):
             precisions.update(precision, embedding.shape[0])
             recalls.update(recall, embedding.shape[0])
 
-            f_scores_.update(f_score_, embedding.shape[0])
-            precisions_.update(precision_, embedding.shape[0])
-            recalls_.update(recall_, embedding.shape[0])
-
     loss = losses.avg
     f_score = f_scores.avg
     precision = precisions.avg
     recall = recalls.avg
-
-    f_score_ = f_scores_.avg
-    precision_ = precisions_.avg
-    recall_ = recalls_.avg
 
     log(
         "Epoch {} \t"
@@ -284,16 +261,6 @@ def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args):
         "Recall {} \t"
         "Loss {loss.val:.4f} ({loss.avg:.4f})\t".format(
             epoch, f_score, precision, recall, loss=losses
-        ),
-        args,
-    )
-
-    log(
-        "ALTERNATIVE\n"
-        "F-Score {} \t"
-        "Precision {} \t"
-        "Recall {} \t".format(
-            f_score_, precision_, recall_,
         ),
         args,
     )
@@ -437,7 +404,7 @@ def TrainOneBatch(model, optimizer, scheduler, data, loss_fun, args):
 
     print(f'Learning rate: {scheduler.get_last_lr()[::-1]}')
 
-    optimizer.zero_grad(set_to_none=True)
+    optimizer.zero_grad()
 
     with torch.set_grad_enabled(True):
         embedding, score = model(frames)
@@ -501,7 +468,7 @@ def main(args):
     print('Create Model ...')
     model = create_model(args)
 
-    print('Load pretrained weights ...')
+    print('Load pretrained S3D weights ...')
     net_data = torch.load(args.pretrain_cnn_path)
     model.base_model.load_state_dict(net_data)
 
@@ -535,7 +502,7 @@ def main(args):
         shuffle=True,
         drop_last=False,
         num_workers=args.num_thread_reader,
-        pin_memory=args.pin_memory  # needs to be true if trained on GPU
+        pin_memory=args.pin_memory
     )
 
     test_loader = torch.utils.data.DataLoader(
@@ -544,7 +511,7 @@ def main(args):
         shuffle=True,
         drop_last=False,
         num_workers=args.num_thread_reader,
-        pin_memory=args.pin_memory  # needs to be true if trained on GPU
+        pin_memory=args.pin_memory
     )
 
     logger = create_logger(args)
@@ -567,31 +534,13 @@ def main(args):
 
     create_dir(checkpoint_dir)
 
-    if args.resume:
-        checkpoint_path = get_last_checkpoint(checkpoint_dir)
-        if checkpoint_path:
-            log("=> loading checkpoint '{}'".format(checkpoint_path), args)
-            checkpoint = torch.load(checkpoint_path)
-            args.start_epoch = checkpoint["epoch"]
-            model.load_state_dict(checkpoint["state_dict"])
-            optimizer.load_state_dict(checkpoint["optimizer"])
-            scheduler.load_state_dict(checkpoint["scheduler"])
-            log(
-                "=> loaded checkpoint '{}' (epoch {})".format(
-                    checkpoint_path, checkpoint["epoch"]
-                ),
-                args,
-            )
-        else:
-            log("=> no checkpoint found at '{}'".format(args.resume), args)
-
-    total_batch_size = args.batch_size
+    check_resume(args, checkpoint_dir, model, optimizer, scheduler)
 
     create_dir(Path(args.out_path, args.log_root_vsum))
 
     log(
         "Starting training loop with batch size: {}".format(
-            total_batch_size), args,
+            args.batch_size), args,
     )
 
     for epoch in range(args.epochs):
@@ -613,10 +562,9 @@ def main(args):
             args,
         )
 
-        print('Epoch done')
-
         end = timer()
-        print(f'Elapsed Time: {str(timedelta(seconds=end - start))}')
+
+        print(f'Epoch completed in {str(timedelta(seconds=end - start))}')
 
         save_checkpoint(
             {
@@ -630,6 +578,26 @@ def main(args):
         )
 
         print('Checkpoint saved!')
+
+
+def check_resume(args, checkpoint_dir, model, optimizer, scheduler):
+    if args.resume:
+        checkpoint_path = get_last_checkpoint(checkpoint_dir)
+        if checkpoint_path:
+            log("=> loading checkpoint '{}'".format(checkpoint_path), args)
+            checkpoint = torch.load(checkpoint_path)
+            args.start_epoch = checkpoint["epoch"]
+            model.load_state_dict(checkpoint["state_dict"])
+            optimizer.load_state_dict(checkpoint["optimizer"])
+            scheduler.load_state_dict(checkpoint["scheduler"])
+            log(
+                "=> loaded checkpoint '{}' (epoch {})".format(
+                    checkpoint_path, checkpoint["epoch"]
+                ),
+                args,
+            )
+        else:
+            log("=> no checkpoint found at '{}'".format(args.resume), args)
 
 
 if __name__ == "__main__":
