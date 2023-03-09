@@ -19,7 +19,7 @@ services:
                "--num_frames_per_segment", "16",
                "--fps", "8", "--num_frames", "480",
                "--step_size", "150", "--gamma", "0.1",
-               "--log_freq", "3", "log_name", "nsum",
+               "--log_freq", "3", "--log_name", "nsum",
                "--finetune"]
     volumes:
       - /home/ma-newssum/TS/:/home/TS/
