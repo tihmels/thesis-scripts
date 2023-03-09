@@ -11,15 +11,15 @@ services:
                "--out_path", "/home/out",
                "--dataset_path", "/home/TS",
                "--num_thread_reader", "0",
-               "--epochs", "10",
+               "--epochs", "12",
                "--batch_size", "8", "--batch_size_eval", "8",
-               "--heads", "4", "--enc_layers", "8",
-               "--lrv", "0.001", "--lrs", "0.0001",
+               "--heads", "8", "--enc_layers", "12",
+               "--lrv", "0.005", "--lrs", "0.0001",
                "--weight_decay", "0.00001", "--dropout", "0.1",
                "--num_frames_per_segment", "16",
                "--fps", "8", "--num_frames", "480",
-               "--step_size", "150", "--gamma", "0.1",
-               "--log_freq", "4", "--log_name", "nsum"]
+               "--step_size", "144", "--gamma", "0.1",
+               "--log_freq", "5", "--log_name", "nsum"]
     volumes:
       - /home/ma-newssum/TS/:/home/TS/
       - /home/ma-newssum/out/:/home/out

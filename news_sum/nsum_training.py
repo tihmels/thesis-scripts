@@ -17,6 +17,7 @@ from datetime import timedelta
 from pathlib import Path
 from prettytable import PrettyTable
 from shutil import rmtree
+from tensorboardX import SummaryWriter
 from timeit import default_timer as timer
 from tqdm import tqdm
 
@@ -371,6 +372,8 @@ def log_state(args, dataset, epoch, dtime, idx, optimizer, running_loss, tb_logg
     else:
         current_lr = optimizer.param_groups[0]["lr"]
 
+    training_loss = running_loss / args.log_freq
+
     log(
         "Epoch %d, Elapsed Time: %s, Batch: %s, Epoch status: %.4f,  Training loss: %.4f, Learning rate: %.6f"
         % (
@@ -378,7 +381,7 @@ def log_state(args, dataset, epoch, dtime, idx, optimizer, running_loss, tb_logg
             str(timedelta(seconds=dtime)),
             f'{idx + 1}/{str(int(np.ceil(len(dataset) / args.batch_size)))}',
             args.batch_size * 1 * float(idx) / len(dataset),
-            running_loss / args.log_freq,
+            training_loss,
             current_lr,
         ),
         args,
@@ -386,7 +389,7 @@ def log_state(args, dataset, epoch, dtime, idx, optimizer, running_loss, tb_logg
     # log training data into tensorboard
     if tb_logger is not None:
         logs = OrderedDict()
-        logs["Training loss"] = running_loss / args.log_freq
+        logs["Training loss"] = training_loss
         logs["Learning rate"] = current_lr
         # how many iterations we have trained
         iter_count = epoch * len(train_loader) + idx
@@ -413,7 +416,7 @@ def TrainOneBatch(model, optimizer, scheduler, data, loss_fun, args):
 
         print(f'Predicted Scores: {np.around(score.view(-1).detach().cpu().numpy()[::20], 3)}')
         print(f'GT Scores: {np.around(scores.detach().cpu().numpy()[::20], 3)}')
-        print(f'Loss: {np.around(loss.detach().cpu().numpy()[:10], 3)}')
+        print(f'Loss: {np.around(loss.detach().cpu().numpy()[:5], 3)}')
 
     if args.cuda:
         gradient = torch.ones((loss.shape[0]), dtype=torch.long).cuda(args.gpu, non_blocking=args.pin_memory)
@@ -546,9 +549,6 @@ def main(args):
 
     for epoch in range(args.epochs):
 
-        if (epoch + 1) % 2 == 0:
-            evaluate(test_loader, model, epoch, logger, criterion, args)
-
         start = timer()
 
         train(
@@ -566,6 +566,8 @@ def main(args):
         end = timer()
 
         print(f'Epoch completed in {str(timedelta(seconds=end - start))}')
+
+        evaluate(test_loader, model, epoch, logger, criterion, args)
 
         save_checkpoint(
             {
