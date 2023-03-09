@@ -1,20 +1,20 @@
 #!/Users/tihmels/Scripts/thesis-scripts/venv/bin/python -u
 
-import math
-import os
-from argparse import ArgumentParser
 from collections import OrderedDict
-from itertools import repeat
-from pathlib import Path
-from shutil import copy
 
+import math
 import matplotlib
 import numpy as np
+import os
 import torch
 import torchvision.io as io
 from alive_progress import alive_bar
+from argparse import ArgumentParser
+from itertools import repeat
 from matplotlib import pyplot as plt
+from pathlib import Path
 from prettytable import PrettyTable
+from shutil import copy
 from torchvision.transforms import transforms
 from tqdm import tqdm
 
@@ -102,10 +102,6 @@ def visualize_picks(shots, frame_scores, picks, minmax=10):
     maximums = maximums[np.argsort(frame_scores[maximums])][::-1]
     minimums = np.argpartition(frame_scores, minmax)[:minmax]
     minimums = minimums[np.argsort(frame_scores[minimums])]
-
-
-
-
 
     plt.xticks(range(0, len(frame_scores), 1000))
 
@@ -267,7 +263,7 @@ def main(args):
 
     video_summaries = {}
 
-    model = VSum(heads=8, enc_layers=24)
+    model = VSum(heads=8, enc_layers=12)
     model = model.eval()
 
     if checkpoint_path:
@@ -311,13 +307,16 @@ def main(args):
 
             segment_scores = []
 
-            with alive_bar(n_segments, ctrl_c=False, title=f'{video.pk}', length=35) as bar:
-                for segment in tensors:
-                    # batch = segment.unsqueeze(0).cuda() # <---
+            with alive_bar(n_segments, ctrl_c=False, title=f'{video.pk}', length=40, dual_line=True) as bar:
+                for idx, segment in enumerate(tensors):
                     batch = segment.unsqueeze(0)
-                    _, score = model(batch) # <---
-                    # score = torch.rand((1, 1))
+                    _, score = model(batch)
                     segment_scores.append(score.view(-1))
+
+                    if (idx % 10) == 0:
+                        score = score.view(-1).detach().cpu().numpy()
+                        bar.text = f'{idx} : {score}'
+
                     bar()
 
             segment_scores = torch.stack(segment_scores)
