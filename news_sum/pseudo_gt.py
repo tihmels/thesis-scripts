@@ -29,7 +29,7 @@ parser.add_argument('--shuffle', action='store_true')
 parser.add_argument(
     "-th",
     "--threshold",
-    default=0.6,
+    default=0.55,
     type=float,
     help="cut off threshold",
 )
