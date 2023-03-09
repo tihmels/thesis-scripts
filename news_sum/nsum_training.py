@@ -414,9 +414,9 @@ def TrainOneBatch(model, optimizer, scheduler, data, loss_fun, args):
         embedding, score = model(frames)
         loss = loss_fun(score.view(-1), scores)
 
-        print(f'Predicted Scores: {np.around(score.view(-1).detach().cpu().numpy()[::20], 3)}')
-        print(f'GT Scores: {np.around(scores.detach().cpu().numpy()[::20], 3)}')
-        print(f'Loss: {np.around(loss.detach().cpu().numpy()[::5], 3)}')
+        print(f'Predicted Scores: {np.around(score.view(-1).detach().cpu().numpy()[::10], 3)}')
+        print(f'GT Scores: {np.around(scores.detach().cpu().numpy()[::10], 3)}')
+        print(f'Loss: {np.around(loss.detach().cpu().numpy()[::10], 3)}')
 
     if args.cuda:
         gradient = torch.ones((loss.shape[0]), dtype=torch.long).cuda(args.gpu, non_blocking=args.pin_memory)
