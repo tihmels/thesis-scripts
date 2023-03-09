@@ -16,7 +16,7 @@ class NewsSumStoryLoader(Dataset):
             self,
             base_path,
             fps=8,
-            num_frames=480,
+            num_frames=320,
             num_frames_per_segment=16,
             size=224
     ):

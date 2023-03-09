@@ -167,7 +167,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
             f"({story.pk}) {story.video} {story.start_time} - {story.end_time}")
 
         intra_co = int(len(all_shot_features) * 0.2)
-        inter_co = int(len(all_other_features) * 0.6)
+        inter_co = int(len(all_other_features) * 0.4)
         sum_co = int(len(ts100_shot_features) * 0.2)
 
         intra_cluster_sim = mean_segment_similarity(shot_features, all_shot_features, mean_co=intra_co)
@@ -186,6 +186,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         shot_scores[0] = min(shot_scores)
 
         threshold = shot_scores.min() + args.threshold * np.ptp(shot_scores)
+        threshold = shot_scores.max() * args.threshold
 
         n_segments = shot_segments[-1][1] + 1
 
@@ -258,6 +259,8 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
             copy_keyframes(shot_segments, selected, story.frames, selected_path)
             copy_keyframes(shot_segments, maximums, story.frames, highest_path)
             copy_keyframes(shot_segments, minimums, story.frames, lowest_path)
+
+        continue
 
         redis_summary = db.List(get_sum_key(story.pk))
         redis_scores = db.List(get_score_key(story.pk))
