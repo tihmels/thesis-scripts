@@ -272,7 +272,7 @@ def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args):
     if tb_logger is not None:
         # log training data into tensorboard
         logs = OrderedDict()
-        logs["Val_IterLoss"] = losses.avg
+        logs["Validation Loss"] = losses.avg
         logs["F-Score"] = f_scores.avg
         logs["Precision"] = precisions.avg
         logs["Recall"] = recalls.avg
@@ -386,7 +386,7 @@ def log_state(args, dataset, epoch, dtime, idx, optimizer, running_loss, tb_logg
     # log training data into tensorboard
     if tb_logger is not None:
         logs = OrderedDict()
-        logs["Train loss"] = running_loss / args.log_freq
+        logs["Training loss"] = running_loss / args.log_freq
         logs["Learning rate"] = current_lr
         # how many iterations we have trained
         iter_count = epoch * len(train_loader) + idx
