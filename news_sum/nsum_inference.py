@@ -247,6 +247,9 @@ def build_video(video, binary_frame_summary, frames, path):
 def main(args):
     videos = [MainVideo.find(MainVideo.pk == VAO(file).id).first() for file in args.files]
 
+    seed = 0
+    torch.manual_seed(seed)
+
     if args.checkpoint_dir[-3:] == "tar":
         args.log_name = args.checkpoint_dir.split("/")[-2] + "_eval"
         checkpoint_path = args.checkpoint_dir
@@ -263,8 +266,10 @@ def main(args):
 
     video_summaries = {}
 
-    model = VSum(heads=8, enc_layers=12)
-    model = model.eval()
+    model = VSum(heads=8,
+                 enc_layers=12,
+                 space_to_depth=True,
+                 dropout=0.1)
 
     if checkpoint_path:
         print("=> loading checkpoint '{}'".format(checkpoint_path))
@@ -279,6 +284,8 @@ def main(args):
                 checkpoint_path, checkpoint["epoch"]
             )
         )
+
+    model = model.eval()
 
     with torch.no_grad():
         for itr, video in enumerate(videos):
@@ -306,10 +313,6 @@ def main(args):
             tensors = tensors.permute(0, 2, 1, 3, 4)
 
             segment_scores = []
-
-            _, score = model(tensors)
-
-            print()
 
             with alive_bar(n_segments, ctrl_c=False, title=f'{video.pk}', length=40, dual_line=True) as bar:
                 for idx, segment in enumerate(tensors):
