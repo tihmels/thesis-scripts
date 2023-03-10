@@ -137,7 +137,7 @@ def log_summaries(
         scores = [list(map(float, score)) for score in scores]
 
         # evaluate_summary() to be done
-        f_score, prec, recall = evaluate_summary(video_summaries['machine_summary'], pseudo_summaries)
+        f_score, prec, recall = evaluate_summary(video_summaries, pseudo_summaries)
 
         f_scores.update(f_score)
         precisions.update(prec)
@@ -239,7 +239,7 @@ def range_overlap(r1: Range, r2: Range):
 def build_video(video, binary_frame_summary, frames, path):
     summary_frames = [frame for idx, frame in enumerate(frames[:len(binary_frame_summary)]) if
                       binary_frame_summary[idx]]
-    summary_frames = torch.tensor(summary_frames)
+    summary_frames = torch.tensor(np.array(summary_frames))
 
     io.write_video(str(Path(path, f'{video.pk}-SUM.mp4')), summary_frames, 25)
 
@@ -267,15 +267,13 @@ def main(args):
     video_summaries = {}
 
     model = VSum(heads=8,
-                 enc_layers=12,
+                 enc_layers=16,
                  space_to_depth=True,
                  dropout=0.1)
 
     if checkpoint_path:
         print("=> loading checkpoint '{}'".format(checkpoint_path))
         checkpoint = torch.load(checkpoint_path)
-
-        # state_dict = rename_dict(checkpoint["state_dict"])
 
         model.load_state_dict(checkpoint["state_dict"])
 
