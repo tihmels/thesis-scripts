@@ -307,6 +307,10 @@ def main(args):
 
             segment_scores = []
 
+            _, score = model(tensors)
+
+            print()
+
             with alive_bar(n_segments, ctrl_c=False, title=f'{video.pk}', length=40, dual_line=True) as bar:
                 for idx, segment in enumerate(tensors):
                     batch = segment.unsqueeze(0)

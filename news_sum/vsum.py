@@ -83,7 +83,7 @@ class VSum(nn.Module):
             heads=4,
             enc_layers=12,
             d_model=512,
-            dropout=0.5,
+            dropout=0.1,
             token_to_word_path='data/dict.npy',
     ) -> None:
         super(VSum, self).__init__()
