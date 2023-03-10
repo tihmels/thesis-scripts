@@ -166,11 +166,13 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
             f"[{idx + 1}/{len(cluster.ts15s)}] Story: {story.headline} "
             f"({story.pk}) {story.video} {story.start_time} - {story.end_time}")
 
-        intra_co = int(len(all_shot_features) * 0.2)
+        all_shot_features_wo = torch.cat([feat for sidx, feat in enumerate(shot_features_per_story) if sidx != idx])
+
+        intra_co = int(len(all_shot_features_wo) * 0.2)
         inter_co = int(len(all_other_features) * 0.4)
         sum_co = int(len(ts100_shot_features) * 0.2)
 
-        intra_cluster_sim = mean_segment_similarity(shot_features, all_shot_features, mean_co=intra_co)
+        intra_cluster_sim = mean_segment_similarity(shot_features, all_shot_features_wo, mean_co=intra_co)
         inter_cluster_sim = mean_segment_similarity(shot_features, all_other_features, mean_co=inter_co)
         summary_fitness = mean_segment_similarity(shot_features, ts100_shot_features, mean_co=sum_co)
 
@@ -179,6 +181,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         summary_fitness = norm(summary_fitness)
 
         topic_relevance_score = intra_cluster_sim - inter_cluster_sim
+        topic_relevance_score = np.where(topic_relevance_score < 0, 0, topic_relevance_score)
 
         shot_scores = (topic_relevance_score + summary_fitness) / 2
         shot_scores = norm(shot_scores)
@@ -186,7 +189,7 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
         shot_scores[0] = min(shot_scores)
 
         threshold = shot_scores.min() + args.threshold * np.ptp(shot_scores)
-        threshold = shot_scores.max() * args.threshold
+        # threshold = shot_scores.max() * args.threshold
 
         n_segments = shot_segments[-1][1] + 1
 
