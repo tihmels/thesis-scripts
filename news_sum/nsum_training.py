@@ -71,6 +71,11 @@ parser.add_argument(
     help="number of total epochs to run",
 )
 parser.add_argument(
+    "--train_test_split",
+    default=0.8,
+    type=float
+)
+parser.add_argument(
     "--batch_size_eval", type=int, default=16, help="batch size eval"
 )
 parser.add_argument(
@@ -495,7 +500,7 @@ def main(args):
         size=args.video_size,
     )
 
-    train_size = int(0.8 * len(dataset))
+    train_size = int(args.train_test_split * len(dataset))
     test_size = len(dataset) - train_size
 
     train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
