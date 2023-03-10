@@ -505,6 +505,9 @@ def main(args):
 
     train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
 
+    print(f'{len(train_dataset)} samples in training dataset')
+    print(f'{len(test_dataset)} samples in evaluation dataset')
+
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=args.batch_size,
