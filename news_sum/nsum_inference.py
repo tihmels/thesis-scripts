@@ -99,9 +99,9 @@ def visualize_picks(shots, frame_scores, picks, minmax=10):
         plt.fill_between(shot_range, y_min, y_max, color='b', alpha=.1)
 
     maximums = np.argpartition(frame_scores, -minmax)[-minmax:]
-    maximums = maximums[np.argsort(frame_scores[maximums])][::-1]
+    maximums = maximums[np.argsort(np.array(frame_scores)[maximums])][::-1]
     minimums = np.argpartition(frame_scores, minmax)[:minmax]
-    minimums = minimums[np.argsort(frame_scores[minimums])]
+    minimums = minimums[np.argsort(np.array(frame_scores)[minimums])]
 
     plt.xticks(range(0, len(frame_scores), 1000))
 
