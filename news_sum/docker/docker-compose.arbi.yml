@@ -12,6 +12,7 @@ services:
                "--dataset_path", "/home/TS",
                "--num_thread_reader", "0",
                "--epochs", "64",
+               "--train_test_split", "0.8",
                "--batch_size", "8", "--batch_size_eval", "8",
                "--heads", "4", "--enc_layers", "12",
                "--lrv", "0.001", "--lrs", "0.0001",
