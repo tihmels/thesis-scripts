@@ -13,13 +13,13 @@ services:
                "--num_thread_reader", "0",
                "--epochs", "64",
                "--train_test_split", "0.8",
-               "--batch_size", "8", "--batch_size_eval", "8",
+               "--batch_size", "16", "--batch_size_eval", "16",
                "--heads", "4", "--enc_layers", "12",
                "--lrv", "0.001", "--lrs", "0.0001",
                "--weight_decay", "0.00001", "--dropout", "0.1",
                "--num_frames_per_segment", "16",
                "--fps", "8", "--num_frames", "480",
-               "--step_size", "215", "--gamma", "0.1",
+               "--step_size", "100", "--gamma", "0.1",
                "--log_freq", "8", "--log_name", "final"]
     volumes:
       - /home/ma-newssum/TS/:/home/TS/
