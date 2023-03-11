@@ -240,7 +240,7 @@ def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args):
             loss = loss_fun(score.view(-1), gt_scores)
 
             summary_ids = (
-                score.detach().cpu().view(-1).topk(int(0.5 * len(gt_summary)))[1]
+                score.detach().cpu().view(-1).topk(int(int(torch.count_nonzero(gt_summary))))[1]
             )
 
             summary = np.zeros(len(gt_summary), dtype=int)
