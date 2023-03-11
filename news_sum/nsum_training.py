@@ -199,7 +199,7 @@ def log(output, args):
         f.write(output + "\n")
 
 
-def save_checkpoint(state, checkpoint_dir, epoch, n_ckpt=10):
+def save_checkpoint(state, checkpoint_dir, epoch, n_ckpt=5):
     torch.save(
         state, os.path.join(checkpoint_dir, "epoch{:0>4d}.pth.tar".format(epoch))
     )
