@@ -21,6 +21,6 @@ COPY requirements.txt .
 RUN pip3 install -r requirements.txt --no-cache-dir
 RUN apt-get update && apt-get install -y --no-install-recommends dumb-init && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir out && mkdir TS && mkdir out/vsum_output_log && mkdir out/vsum_tboard_log
+RUN mkdir out && mkdir TS
 
 WORKDIR /home/thesis-scripts/news_sum/

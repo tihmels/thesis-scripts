@@ -1,13 +1,13 @@
+from collections import namedtuple
+
+import cv2
 import itertools
 import logging
 import os
 import re
-from collections import namedtuple
 from datetime import datetime, timedelta
 from pathlib import Path
 from shutil import rmtree
-
-import cv2
 
 from common.constants import SUMMARY_VIDEOS_PATH, TV_FILENAME_RE
 from database.model import Story
@@ -53,10 +53,7 @@ def sec_to_time(seconds: int):
 
 
 def read_images(img_paths: [Path], base_path="", cvt_color=cv2.COLOR_BGR2RGB, resize=None):
-    if base_path:
-        images = [cv2.imread(str(Path(base_path, img))) for img in img_paths]
-    else:
-        images = [cv2.imread(str(img)) for img in img_paths]
+    images = [cv2.imread(str(Path(base_path, img))) for img in img_paths]
 
     images = [cv2.cvtColor(img, cvt_color) for img in images]
 

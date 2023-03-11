@@ -267,7 +267,7 @@ def main(args):
     video_summaries = {}
 
     model = VSum(heads=8,
-                 enc_layers=16,
+                 enc_layers=12,
                  space_to_depth=True,
                  dropout=0.1)
 
@@ -289,7 +289,7 @@ def main(args):
         for itr, video in enumerate(videos):
             print("Generating summary for: ", video.pk)
 
-            frames = read_images(video.frames[::3], base_path='/Users/tihmels/TS')
+            frames = read_images(video.frames, base_path='/Users/tihmels/TS')
 
             transform = transforms.Compose(
                 [transforms.ToTensor(), transforms.Resize((224, 224))]
@@ -318,7 +318,7 @@ def main(args):
                     _, score = model(batch)
                     segment_scores.append(score.view(-1))
 
-                    if (idx % 10) == 0:
+                    if (idx % 15) == 0:
                         score = score.view(-1).detach().cpu().numpy()
                         bar.text = f'{idx} : {score}'
 

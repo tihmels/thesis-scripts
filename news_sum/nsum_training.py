@@ -573,7 +573,7 @@ def main(args):
 
         end = timer()
 
-        print(f'Epoch completed in {str(timedelta(seconds=end - start))}')
+        print(f'Epoch {epoch + 1} completed in {str(timedelta(seconds=end - start))}')
 
         evaluate(test_loader, model, epoch, logger, criterion, args)
 
