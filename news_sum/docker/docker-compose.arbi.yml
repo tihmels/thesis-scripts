@@ -20,7 +20,7 @@ services:
                "--num_frames_per_segment", "16",
                "--fps", "8", "--num_frames", "480",
                "--step_size", "110", "--gamma", "0.05",
-               "--log_freq", "4", "--log_name", "LastFinal"]
+               "--log_freq", "4", "--log_name", "LastFinalDropout"]
     volumes:
       - /home/ma-newssum/TS/:/home/TS/
       - /home/ma-newssum/out/:/home/out
