@@ -199,7 +199,7 @@ def log(output, args):
         f.write(output + "\n")
 
 
-def save_checkpoint(state, checkpoint_dir, epoch, n_ckpt=3):
+def save_checkpoint(state, checkpoint_dir, epoch, n_ckpt=10):
     torch.save(
         state, os.path.join(checkpoint_dir, "epoch{:0>4d}.pth.tar".format(epoch))
     )
@@ -240,7 +240,7 @@ def evaluate(test_loader, model, epoch, tb_logger, loss_fun, args):
             loss = loss_fun(score.view(-1), gt_scores)
 
             summary_ids = (
-                score.detach().cpu().view(-1).topk(int(0.45 * len(gt_summary)))[1]
+                score.detach().cpu().view(-1).topk(int(0.5 * len(gt_summary)))[1]
             )
 
             summary = np.zeros(len(gt_summary), dtype=int)

@@ -2,7 +2,7 @@ version: '3.8'
 services:
   redis:
     volumes:
-      - /home/ma-newssum/redis/dump.rdb:/data/dump.rdb
+      - /home/ma-newssum/redis/dump_2.rdb:/data/dump.rdb
   newssum:
     command: [ "python3", "-u", "nsum_training.py",
                "--model_type", "1",
@@ -14,13 +14,13 @@ services:
                "--epochs", "64",
                "--train_test_split", "0.8",
                "--batch_size", "16", "--batch_size_eval", "16",
-               "--heads", "4", "--enc_layers", "12",
+               "--heads", "4", "--enc_layers", "8",
                "--lrv", "0.0001", "--lrs", "0.0001",
-               "--weight_decay", "0.00001", "--dropout", "0.1",
+               "--weight_decay", "0.0001", "--dropout", "0.15",
                "--num_frames_per_segment", "16",
                "--fps", "8", "--num_frames", "480",
-               "--step_size", "110", "--gamma", "0.1",
-               "--log_freq", "4", "--log_name", "newssum_"]
+               "--step_size", "110", "--gamma", "0.05",
+               "--log_freq", "4", "--log_name", "FFFinal"]
     volumes:
       - /home/ma-newssum/TS/:/home/TS/
       - /home/ma-newssum/out/:/home/out

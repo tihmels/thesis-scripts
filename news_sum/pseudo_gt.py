@@ -29,7 +29,7 @@ parser.add_argument('--shuffle', action='store_true')
 parser.add_argument(
     "-th",
     "--threshold",
-    default=0.55,
+    default=0.56,
     type=float,
     help="cut off threshold",
 )
@@ -168,13 +168,13 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
 
         all_shot_features_wo = torch.cat([feat for sidx, feat in enumerate(shot_features_per_story) if sidx != idx])
 
-        intra_co = int(len(all_shot_features_wo) * 0.2)
-        inter_co = int(len(all_other_features) * 0.4)
-        sum_co = int(len(ts100_shot_features) * 0.2)
+        # intra_co = int(len(all_shot_features_wo) * 0.2)
+        # inter_co = int(len(all_other_features) * 0.4)
+        # sum_co = int(len(ts100_shot_features) * 0.2)
 
-        intra_cluster_sim = mean_segment_similarity(shot_features, all_shot_features_wo, mean_co=intra_co)
-        inter_cluster_sim = mean_segment_similarity(shot_features, all_other_features, mean_co=inter_co)
-        summary_fitness = mean_segment_similarity(shot_features, ts100_shot_features, mean_co=sum_co)
+        intra_cluster_sim = mean_segment_similarity(shot_features, all_shot_features_wo)
+        inter_cluster_sim = mean_segment_similarity(shot_features, all_other_features)
+        summary_fitness = mean_segment_similarity(shot_features, ts100_shot_features)
 
         intra_cluster_sim = norm(intra_cluster_sim)
         inter_cluster_sim = norm(inter_cluster_sim)
@@ -262,8 +262,6 @@ def process_cluster(cluster: TopicCluster, other_clusters: [TopicCluster], args)
             copy_keyframes(shot_segments, selected, story.frames, selected_path)
             copy_keyframes(shot_segments, maximums, story.frames, highest_path)
             copy_keyframes(shot_segments, minimums, story.frames, lowest_path)
-
-        continue
 
         redis_summary = db.List(get_sum_key(story.pk))
         redis_scores = db.List(get_score_key(story.pk))
