@@ -72,7 +72,7 @@ parser.add_argument(
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help='Tagesschau video file(s)')
 
 
-def visualize_picks(shots, frame_scores, picks, minmax=10):
+def visualize_picks(stories, shots, frame_scores, picks, high_shots, low_shots):
     plt.figure(figsize=(25, 12))
 
     plt.title("Frame Scores", fontsize=10)
@@ -90,18 +90,27 @@ def visualize_picks(shots, frame_scores, picks, minmax=10):
     plt.xlim([0, len(frame_scores)])
     plt.plot(x_range, frame_scores)
 
-    # plt.vlines([shot.last_frame_idx for shot in shots[:-1]], 0, y_max, colors='grey')
+    plt.vlines([shot.last_frame_idx for shot in shots], y_min, y_max, colors='grey', linestyles='dotted',
+               linewidth=0.5)
+    plt.vlines([story.last_frame_idx for story in stories], y_min, y_max, colors='grey')
 
-    for pick in picks:
-        shot = shots[pick]
+    for idx in picks:
+        shot = shots[idx]
         shot_range = range(shot.first_frame_idx, shot.last_frame_idx)
 
         plt.fill_between(shot_range, y_min, y_max, color='b', alpha=.1)
 
-    maximums = np.argpartition(frame_scores, -minmax)[-minmax:]
-    maximums = maximums[np.argsort(np.array(frame_scores)[maximums])][::-1]
-    minimums = np.argpartition(frame_scores, minmax)[:minmax]
-    minimums = minimums[np.argsort(np.array(frame_scores)[minimums])]
+    for idx in high_shots:
+        shot = shots[idx]
+        shot_range = range(shot.first_frame_idx, shot.last_frame_idx)
+
+        plt.fill_between(shot_range, y_min, y_max, color='g', alpha=.1)
+
+    for idx in low_shots:
+        shot = shots[idx]
+        shot_range = range(shot.first_frame_idx, shot.last_frame_idx)
+
+        plt.fill_between(shot_range, y_min, y_max, color='r', alpha=.1)
 
     plt.xticks(range(0, len(frame_scores), 1000))
 
@@ -244,6 +253,25 @@ def build_video(video, binary_frame_summary, frames, path):
     io.write_video(str(Path(path, f'{video.pk}-SUM.mp4')), summary_frames, 25)
 
 
+def get_top_shots(shot_scores, minmax=36):
+    maximums = np.argpartition(shot_scores, -minmax)[-minmax:]
+    maximums = maximums[np.argsort(np.array(shot_scores)[maximums])][::-1]
+    minimums = np.argpartition(shot_scores, minmax)[:minmax]
+    minimums = minimums[np.argsort(np.array(shot_scores)[minimums])]
+
+    return maximums, minimums
+
+
+def save_shots(video, shots, label):
+    path = Path(f'/Users/tihmels/Desktop/eval/{video.pk}/{label}')
+    path.mkdir(parents=True, exist_ok=True)
+
+    for idx, shot_idx in enumerate(shots):
+        shot = video.shots[shot_idx]
+
+        copy(shot.keyframe, Path(path, f'{idx:02d}'))
+
+
 def main(args):
     videos = [MainVideo.find(MainVideo.pk == VAO(file).id).first() for file in args.files]
 
@@ -289,7 +317,7 @@ def main(args):
         for itr, video in enumerate(videos):
             print("Generating summary for: ", video.pk)
 
-            frames = read_images(video.frames, base_path='/Users/tihmels/TS')
+            frames = read_images(video.frames[::5], base_path='/Users/tihmels/TS')
 
             transform = transforms.Compose(
                 [transforms.ToTensor(), transforms.Resize((224, 224))]
@@ -330,6 +358,8 @@ def main(args):
 
             shot_scores = calc_shot_scores(segment_scores, shots, window_len)
 
+            high_shots, low_shots = get_top_shots(shot_scores, minmax=5)
+
             shot_n_frames = [(shot.last_frame_idx - shot.first_frame_idx) + 1 for shot in shots]
             capacity = int(math.floor(len(frames) * args.proportion))
 
@@ -337,8 +367,11 @@ def main(args):
 
             shot_score_frames = flatten([repeat(shot_scores[idx], shot_n_frames[idx]) for idx in range(len(shots))])
 
-            visualize_picks(shots, shot_score_frames, shot_picks)
+            visualize_picks(video.stories, shots, shot_score_frames, shot_picks, high_shots, low_shots)
             plt.savefig('/Users/tihmels/Desktop/picks.jpg', bbox_inches=0)
+
+            save_shots(video, high_shots, 'high')
+            save_shots(video, low_shots, 'low')
 
             binary_frame_summary = flatten([
                 list(repeat(1 if idx in shot_picks else 0, shot_n_frames[idx])) for idx, shot in enumerate(shots)])
