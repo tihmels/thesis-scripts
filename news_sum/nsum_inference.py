@@ -269,7 +269,7 @@ def save_shots(video, shots, label):
     for idx, shot_idx in enumerate(shots):
         shot = video.shots[shot_idx]
 
-        copy(shot.keyframe, Path(path, f'{idx:02d}'))
+        copy(Path('/Users/tihmels/TS/', shot.keyframe), Path(path, f'{idx:02d}.jpg'))
 
 
 def main(args):

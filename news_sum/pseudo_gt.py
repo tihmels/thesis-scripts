@@ -79,7 +79,7 @@ def extract_shot_features(story: Story, fps, window):
 
     segment_features = torch.tensor(rai.get_tensor(get_vis_key(story.pk)))
 
-    shots = [Range(story.first_frame_idx, story.last_frame_idx) for story in story.shots]
+    shots = [Range(shot.first_frame_idx, shot.last_frame_idx) for shot in story.shots]
 
     curr_shot_idx = 0
 
@@ -87,9 +87,9 @@ def extract_shot_features(story: Story, fps, window):
     moving_avg_count = 1
 
     for seg_idx in range(1, len(segment_features)):
-        segment_range = segment_to_frame_range(story.first_frame_idx, seg_idx, fps=fps, window=window)
+        frame_range = segment_to_frame_range(story.first_frame_idx, seg_idx, fps=fps, window=window)
 
-        shot_overlaps = [range_overlap(segment_range, shot_range) for shot_range in shots]
+        shot_overlaps = [range_overlap(frame_range, shot_range) for shot_range in shots]
         max_overlap = np.argmax(shot_overlaps)
 
         if max_overlap == curr_shot_idx:
