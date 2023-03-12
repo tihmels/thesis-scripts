@@ -72,10 +72,11 @@ parser.add_argument(
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help='Tagesschau video file(s)')
 
 
-def visualize_picks(stories, shots, frame_scores, picks, high_shots, low_shots):
-    plt.figure(figsize=(25, 12))
+def visualize_picks(video, shots, shot_scores, frame_scores, picks, high_shots, low_shots):
+    matplotlib.rcParams.update({'font.size': 18})
+    plt.figure(figsize=(25, 12), dpi=80)
 
-    plt.title("Frame Scores", fontsize=10)
+    plt.title(f'{video.pk}')
 
     plt.xlabel("Frame")
     plt.ylabel("Score")
@@ -90,27 +91,32 @@ def visualize_picks(stories, shots, frame_scores, picks, high_shots, low_shots):
     plt.xlim([0, len(frame_scores)])
     plt.plot(x_range, frame_scores)
 
-    plt.vlines([shot.last_frame_idx for shot in shots], y_min, y_max, colors='grey', linestyles='dotted',
-               linewidth=0.5)
-    plt.vlines([story.last_frame_idx for story in stories], y_min, y_max, colors='grey')
+    plt.vlines([shot.last_frame_idx for shot in shots], y_min, y_max, colors='grey', linestyles='dotted')
+    plt.vlines([story.last_frame_idx for story in video.stories], y_min, y_max, colors='grey')
 
     for idx in picks:
         shot = shots[idx]
         shot_range = range(shot.first_frame_idx, shot.last_frame_idx)
 
-        plt.fill_between(shot_range, y_min, y_max, color='b', alpha=.1)
+        y_from = shot_scores[idx]
+
+        plt.fill_between(shot_range, y_from, y_max, color='b', alpha=.2)
 
     for idx in high_shots:
         shot = shots[idx]
         shot_range = range(shot.first_frame_idx, shot.last_frame_idx)
 
-        plt.fill_between(shot_range, y_min, y_max, color='g', alpha=.1)
+        y_to = shot_scores[idx]
+
+        plt.fill_between(shot_range, y_min, y_to, color='g', alpha=.2)
 
     for idx in low_shots:
         shot = shots[idx]
         shot_range = range(shot.first_frame_idx, shot.last_frame_idx)
 
-        plt.fill_between(shot_range, y_min, y_max, color='r', alpha=.1)
+        y_to = shot_scores[idx]
+
+        plt.fill_between(shot_range, y_min, y_to, color='r', alpha=.2)
 
     plt.xticks(range(0, len(frame_scores), 1000))
 
@@ -358,7 +364,7 @@ def main(args):
 
             shot_scores = calc_shot_scores(segment_scores, shots, window_len)
 
-            high_shots, low_shots = get_top_shots(shot_scores, minmax=50)
+            high_shots, low_shots = get_top_shots(shot_scores, minmax=36)
 
             shot_n_frames = [(shot.last_frame_idx - shot.first_frame_idx) + 1 for shot in shots]
             capacity = int(math.floor(len(frames) * args.proportion))
@@ -367,15 +373,15 @@ def main(args):
 
             shot_score_frames = flatten([repeat(shot_scores[idx], shot_n_frames[idx]) for idx in range(len(shots))])
 
-            visualize_picks(video.stories, shots, shot_score_frames, shot_picks, high_shots, low_shots)
+            visualize_picks(video, shots, shot_scores, shot_score_frames, shot_picks, high_shots, low_shots)
 
             plt.subplots_adjust(left=0.1, right=0.95, top=0.915)
             plt.margins(0.015, tight=True)
-            plt.show()
             plt.savefig('/Users/tihmels/Desktop/picks.jpg', bbox_inches=0)
 
             save_shots(video, high_shots, 'high')
             save_shots(video, low_shots, 'low')
+            save_shots(video, shot_picks, 'knapsack')
 
             binary_frame_summary = flatten([
                 list(repeat(1 if idx in shot_picks else 0, shot_n_frames[idx])) for idx, shot in enumerate(shots)])
