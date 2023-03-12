@@ -317,7 +317,7 @@ def main(args):
         for itr, video in enumerate(videos):
             print("Generating summary for: ", video.pk)
 
-            frames = read_images(video.frames[::5], base_path='/Users/tihmels/TS')
+            frames = read_images(video.frames, base_path='/Users/tihmels/TS')
 
             transform = transforms.Compose(
                 [transforms.ToTensor(), transforms.Resize((224, 224))]
@@ -358,7 +358,7 @@ def main(args):
 
             shot_scores = calc_shot_scores(segment_scores, shots, window_len)
 
-            high_shots, low_shots = get_top_shots(shot_scores, minmax=5)
+            high_shots, low_shots = get_top_shots(shot_scores, minmax=50)
 
             shot_n_frames = [(shot.last_frame_idx - shot.first_frame_idx) + 1 for shot in shots]
             capacity = int(math.floor(len(frames) * args.proportion))
@@ -368,6 +368,10 @@ def main(args):
             shot_score_frames = flatten([repeat(shot_scores[idx], shot_n_frames[idx]) for idx in range(len(shots))])
 
             visualize_picks(video.stories, shots, shot_score_frames, shot_picks, high_shots, low_shots)
+
+            plt.subplots_adjust(left=0.1, right=0.95, top=0.915)
+            plt.margins(0.015, tight=True)
+            plt.show()
             plt.savefig('/Users/tihmels/Desktop/picks.jpg', bbox_inches=0)
 
             save_shots(video, high_shots, 'high')
@@ -383,6 +387,8 @@ def main(args):
             video_summaries[video.pk]["machine_summary"] = binary_frame_summary
 
             build_video(video, binary_frame_summary, frames, Path('/Users/tihmels/Desktop/'))
+
+            return
 
         # Calculate scores and log videos
         log_summaries(
