@@ -73,7 +73,7 @@ parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs=
 
 
 def visualize_picks(video, shots, shot_scores, frame_scores, picks, high_shots, low_shots):
-    matplotlib.rcParams.update({'font.size': 18})
+    matplotlib.rcParams.update({'font.size': 16})
     plt.figure(figsize=(25, 12), dpi=120)
 
     plt.title(f'{video.pk}')
@@ -220,16 +220,6 @@ def log_summaries(
             for keyframe in non_summary_keyframes:
                 copy(keyframe, non_kf_path)
 
-    # CHECK Whats happening here
-    # Sort scores and visualize
-    # sorted_ids = sorted(
-    #     video_summaries, key=lambda x: (video_summaries[x]["segment_scores"])
-    # )
-    #
-    # # Top 10 and bottom 10 scoring videos
-    # top_bottom_10 = sorted_ids[-10:]
-    # top_bottom_10.extend(sorted_ids[:10])
-
 
 def rename_dict(state_dict):
     # create new OrderedDict that does not contain `module.`
@@ -308,7 +298,7 @@ def main(args):
     model = VSum(heads=8,
                  enc_layers=12,
                  space_to_depth=True,
-                 dropout=0.1)
+                 dropout=0.8)
 
     if checkpoint_path:
         print("=> loading checkpoint '{}'".format(checkpoint_path))
@@ -357,7 +347,7 @@ def main(args):
                     _, score = model(batch)
                     segment_scores.append(score.view(-1))
 
-                    if (idx % 15) == 0:
+                    if (idx % 10) == 0:
                         score = score.view(-1).detach().cpu().numpy()
                         bar.text = f'{idx} : {score}'
 
