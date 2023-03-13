@@ -74,7 +74,7 @@ parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs=
 
 def visualize_picks(video, shots, shot_scores, frame_scores, picks, high_shots, low_shots):
     matplotlib.rcParams.update({'font.size': 18})
-    plt.figure(figsize=(25, 12), dpi=80)
+    plt.figure(figsize=(25, 12), dpi=120)
 
     plt.title(f'{video.pk}')
 
