@@ -15,12 +15,12 @@ services:
                "--train_test_split", "0.8",
                "--batch_size", "16", "--batch_size_eval", "16",
                "--heads", "8", "--enc_layers", "12",
-               "--lrv", "0.003", "--lrs", "0.0001",
-               "--weight_decay", "0.3", "--dropout", "0.7",
+               "--lrv", "0.001", "--lrs", "0.0001",
+               "--weight_decay", "0.5", "--dropout", "0.8",
                "--num_frames_per_segment", "16",
                "--fps", "8", "--num_frames", "480",
                "--step_size", "66", "--gamma", "0.05",
-               "--log_freq", "4", "--log_name", "NowFinalLastTryXXX"]
+               "--log_freq", "4", "--log_name", "XXXNowFinalLastTryXXX"]
     volumes:
       - /home/ma-newssum/TS/:/home/TS/
       - /home/ma-newssum/out/:/home/out

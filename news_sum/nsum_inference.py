@@ -88,10 +88,15 @@ def visualize_picks(video, shots, shot_scores, frame_scores, picks, high_shots, 
 
     x_range = list(range(len(frame_scores)))
 
+    print(f'Len Frame Scores {len(frame_scores)}')
+    print(f'Len Shot Scores {len(shot_scores)}')
+    print(f'Total Shots in Video: {len(shots)}')
+    print(f'Total Frames in Video: {len(video.frames)}')
+    print(f'Total Shot Frames: {sum([(shot.last_frame_idx - shot.first_frame_idx) for shot in shots])}')
+
     plt.xlim([0, len(frame_scores)])
     plt.plot(x_range, frame_scores)
 
-    # plt.vlines([shot.last_frame_idx for shot in shots], y_min, y_max, colors='grey', linestyles='dotted')
     plt.vlines([story.last_frame_idx for story in video.stories], y_min, y_max, colors='grey')
 
     for idx in picks:
@@ -100,23 +105,23 @@ def visualize_picks(video, shots, shot_scores, frame_scores, picks, high_shots, 
 
         y_from = shot_scores[idx]
 
-        plt.fill_between(shot_range, y_from, y_max, color='b', alpha=.2)
+        # plt.fill_between(shot_range, y_from, y_max, color='b', alpha=.2)
 
     for idx in high_shots:
         shot = shots[idx]
-        shot_range = range(shot.first_frame_idx - 1, shot.last_frame_idx - 1)
+        shot_range = range(shot.first_frame_idx, shot.last_frame_idx)
 
         y_to = shot_scores[idx]
 
-        plt.fill_between(shot_range, y_min, y_to, color='g', alpha=.2)
+        plt.fill_between(shot_range, y_min, y_max, color='g', alpha=.2)
 
     for idx in low_shots:
         shot = shots[idx]
-        shot_range = range(shot.first_frame_idx - 1, shot.last_frame_idx - 1)
+        shot_range = range(shot.first_frame_idx, shot.last_frame_idx)
 
         y_to = shot_scores[idx]
 
-        plt.fill_between(shot_range, y_min, y_to, color='r', alpha=.2)
+        plt.fill_between(shot_range, y_min, y_max, color='r', alpha=.2)
 
     plt.xticks(range(0, len(frame_scores), 1000))
 
@@ -366,7 +371,7 @@ def main(args):
 
             high_shots, low_shots = get_top_shots(shot_scores, minmax=36)
 
-            shot_n_frames = [(shot.last_frame_idx - shot.first_frame_idx) for shot in shots]
+            shot_n_frames = [(shot.last_frame_idx - shot.first_frame_idx) + 1 for shot in shots]
             capacity = int(math.floor(len(frames) * args.proportion))
 
             shot_picks = knapsack_ortools(shot_scores, shot_n_frames, capacity)
