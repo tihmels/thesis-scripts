@@ -56,7 +56,7 @@ class NewsSumStoryLoader(Dataset):
         story = self.stories[idx]
 
         summary = torch.LongTensor(self.summaries[idx])
-        scores = torch.FloatTensor(self.scores[idx])
+        scores = torch.FloatTensor(self.scores[idx]) / 0.1
 
         n_story_segments = len(summary)
 
