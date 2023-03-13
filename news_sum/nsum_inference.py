@@ -67,7 +67,7 @@ parser.add_argument(
     "--window_len", type=int, default=16, help="window len"
 )
 parser.add_argument(
-    "--proportion", type=float, default=0.12, help="percentage value to reduce to main edition to"
+    "--proportion", type=float, default=0.12, help="percentage value to reduce the main edition to"
 )
 parser.add_argument('files', type=lambda p: Path(p).resolve(strict=True), nargs='+', help='Tagesschau video file(s)')
 
