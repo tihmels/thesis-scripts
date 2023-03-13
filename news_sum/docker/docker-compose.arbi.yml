@@ -19,8 +19,8 @@ services:
                "--weight_decay", "0.5", "--dropout", "0.8",
                "--num_frames_per_segment", "16",
                "--fps", "8", "--num_frames", "480",
-               "--step_size", "22", "--gamma", "0.05",
-               "--log_freq", "4", "--log_name", "Cmon"]
+               "--step_size", "22", "--gamma", "0.8",
+               "--log_freq", "4", "--log_name", "Gamma"]
     volumes:
       - /home/ma-newssum/TS/:/home/TS/
       - /home/ma-newssum/out/:/home/out

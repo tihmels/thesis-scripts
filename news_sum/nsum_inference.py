@@ -86,13 +86,7 @@ def visualize_picks(video, shots, shot_scores, frame_scores, picks, high_shots, 
     y_min = y_min - (y_max - y_min) * 0.1
     y_max = y_max + (y_max - y_min) * 0.1
 
-    x_range = list(range(len(frame_scores)))
-
-    print(f'Len Frame Scores {len(frame_scores)}')
-    print(f'Len Shot Scores {len(shot_scores)}')
-    print(f'Total Shots in Video: {len(shots)}')
-    print(f'Total Frames in Video: {len(video.frames)}')
-    print(f'Total Shot Frames: {sum([(shot.last_frame_idx - shot.first_frame_idx) for shot in shots])}')
+    x_range = list(range(len(video.frames)))
 
     plt.xlim([0, len(frame_scores)])
     plt.plot(x_range, frame_scores)
@@ -105,23 +99,23 @@ def visualize_picks(video, shots, shot_scores, frame_scores, picks, high_shots, 
 
         y_from = shot_scores[idx]
 
-        # plt.fill_between(shot_range, y_from, y_max, color='b', alpha=.2)
+        plt.fill_between(shot_range, y_from, y_max, color='b', alpha=.2)
 
-    for idx in high_shots:
+    for idx in high_shots[:36]:
         shot = shots[idx]
         shot_range = range(shot.first_frame_idx, shot.last_frame_idx)
 
         y_to = shot_scores[idx]
 
-        plt.fill_between(shot_range, y_min, y_max, color='g', alpha=.2)
+        plt.fill_between(shot_range, y_min, y_to, color='g', alpha=.2)
 
-    for idx in low_shots:
+    for idx in low_shots[:36]:
         shot = shots[idx]
         shot_range = range(shot.first_frame_idx, shot.last_frame_idx)
 
         y_to = shot_scores[idx]
 
-        plt.fill_between(shot_range, y_min, y_max, color='r', alpha=.2)
+        plt.fill_between(shot_range, y_min, y_to, color='r', alpha=.2)
 
     plt.xticks(range(0, len(frame_scores), 1000))
 
@@ -254,7 +248,7 @@ def build_video(video, binary_frame_summary, frames, path):
     io.write_video(str(Path(path, f'{video.pk}-SUM.mp4')), summary_frames, 25)
 
 
-def get_top_shots(shot_scores, minmax=36):
+def get_top_shots(shot_scores, minmax=50):
     maximums = np.argpartition(shot_scores, -minmax)[-minmax:]
     maximums = maximums[np.argsort(np.array(shot_scores)[maximums])][::-1]
     minimums = np.argpartition(shot_scores, minmax)[:minmax]
@@ -359,18 +353,26 @@ def main(args):
 
             shot_scores = calc_shot_scores(segment_scores, shots, window_len)
 
-            high_shots, low_shots = get_top_shots(shot_scores, minmax=36)
+            high_shots, low_shots = get_top_shots(shot_scores, minmax=50)
 
             shot_n_frames = [(shot.last_frame_idx - shot.first_frame_idx) + 1 for shot in shots]
             capacity = int(math.floor(len(frames) * args.proportion))
 
             shot_picks = knapsack_ortools(shot_scores, shot_n_frames, capacity)
 
-            shot_score_frames = flatten([repeat(shot_scores[idx], shot_n_frames[idx]) for idx in range(len(shots))])
+            current_shot_idx = 0
+            frame_scores = []
 
-            visualize_picks(video, shots, shot_scores, shot_score_frames, shot_picks, high_shots, low_shots)
+            for idx, frame in enumerate(video.frames):
+                if idx <= shots[current_shot_idx].last_frame_idx:
+                    frame_scores.append(shot_scores[current_shot_idx])
+                else:
+                    current_shot_idx = current_shot_idx + 1
+                    frame_scores.append(shot_scores[current_shot_idx])
 
-            plt.subplots_adjust(left=0.1, right=0.95, top=0.915)
+            visualize_picks(video, shots, shot_scores, frame_scores, shot_picks, high_shots, low_shots)
+
+            plt.subplots_adjust(left=0.1, right=0.95, top=0.75, bottom=0.25)
             plt.margins(0.015, tight=True)
             plt.savefig('/Users/tihmels/Desktop/picks.jpg', bbox_inches=0)
 
@@ -407,19 +409,19 @@ def calc_shot_scores(segment_scores, shots, window_len):
     for shot in shots:
         shot_range = Range(shot.first_frame_idx, shot.last_frame_idx)
 
-        segment_idxs = [idx for idx in range(len(segment_scores)) if
-                        range_overlap(shot_range, seg_idx_to_frame_range(idx)) > 0]
+        shot_segment_idxs = [idx for idx in range(len(segment_scores)) if
+                             range_overlap(shot_range, seg_idx_to_frame_range(idx)) > 0]
 
         total_score = 0
 
-        for seg_idx in segment_idxs:
+        for seg_idx in shot_segment_idxs:
             score = segment_scores[seg_idx]
             score_per_frame = score / window_len
 
             n_frames_overlap = range_overlap(shot_range, seg_idx_to_frame_range(seg_idx))
             total_score += score_per_frame * n_frames_overlap
 
-        shot_scores.append(total_score / (shot.last_frame_idx - shot.first_frame_idx))
+        shot_scores.append(total_score / (shot.last_frame_idx - shot.first_frame_idx + 1))
 
     return shot_scores
 
