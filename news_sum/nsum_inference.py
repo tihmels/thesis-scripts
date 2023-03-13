@@ -91,7 +91,7 @@ def visualize_picks(video, shots, shot_scores, frame_scores, picks, high_shots, 
     plt.xlim([0, len(frame_scores)])
     plt.plot(x_range, frame_scores)
 
-    plt.vlines([shot.last_frame_idx for shot in shots], y_min, y_max, colors='grey', linestyles='dotted')
+    # plt.vlines([shot.last_frame_idx for shot in shots], y_min, y_max, colors='grey', linestyles='dotted')
     plt.vlines([story.last_frame_idx for story in video.stories], y_min, y_max, colors='grey')
 
     for idx in picks:
@@ -104,7 +104,7 @@ def visualize_picks(video, shots, shot_scores, frame_scores, picks, high_shots, 
 
     for idx in high_shots:
         shot = shots[idx]
-        shot_range = range(shot.first_frame_idx, shot.last_frame_idx)
+        shot_range = range(shot.first_frame_idx - 1, shot.last_frame_idx - 1)
 
         y_to = shot_scores[idx]
 
@@ -112,7 +112,7 @@ def visualize_picks(video, shots, shot_scores, frame_scores, picks, high_shots, 
 
     for idx in low_shots:
         shot = shots[idx]
-        shot_range = range(shot.first_frame_idx, shot.last_frame_idx)
+        shot_range = range(shot.first_frame_idx - 1, shot.last_frame_idx - 1)
 
         y_to = shot_scores[idx]
 
@@ -366,7 +366,7 @@ def main(args):
 
             high_shots, low_shots = get_top_shots(shot_scores, minmax=36)
 
-            shot_n_frames = [(shot.last_frame_idx - shot.first_frame_idx) + 1 for shot in shots]
+            shot_n_frames = [(shot.last_frame_idx - shot.first_frame_idx) for shot in shots]
             capacity = int(math.floor(len(frames) * args.proportion))
 
             shot_picks = knapsack_ortools(shot_scores, shot_n_frames, capacity)

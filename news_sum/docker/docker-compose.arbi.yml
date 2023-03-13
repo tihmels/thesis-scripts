@@ -16,7 +16,7 @@ services:
                "--batch_size", "16", "--batch_size_eval", "16",
                "--heads", "8", "--enc_layers", "12",
                "--lrv", "0.001", "--lrs", "0.0001",
-               "--weight_decay", "0.1", "--dropout", "0.5",
+               "--weight_decay", "0.1", "--dropout", "0.8",
                "--num_frames_per_segment", "16",
                "--fps", "8", "--num_frames", "480",
                "--step_size", "66", "--gamma", "0.05",
