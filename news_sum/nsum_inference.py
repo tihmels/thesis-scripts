@@ -91,7 +91,7 @@ def visualize_picks(video, shots, shot_scores, frame_scores, picks, high_shots, 
     plt.xlim([0, len(frame_scores)])
     plt.plot(x_range, frame_scores)
 
-    plt.vlines([story.last_frame_idx for story in video.stories], y_min, y_max, colors='grey')
+    plt.vlines([story.last_frame_idx for story in video.stories], y_min, y_max, colors='black')
 
     for idx in picks:
         shot = shots[idx]
@@ -99,7 +99,7 @@ def visualize_picks(video, shots, shot_scores, frame_scores, picks, high_shots, 
 
         y_from = shot_scores[idx]
 
-        plt.fill_between(shot_range, y_from, y_max, color='b', alpha=.2)
+        plt.fill_between(shot_range, y_from, y_max, color='b', alpha=.15)
 
     for idx in high_shots[:36]:
         shot = shots[idx]
@@ -107,7 +107,8 @@ def visualize_picks(video, shots, shot_scores, frame_scores, picks, high_shots, 
 
         y_to = shot_scores[idx]
 
-        plt.fill_between(shot_range, y_min, y_to, color='g', alpha=.2)
+        plt.fill_between(shot_range, y_min, y_to, color='g', alpha=.15)
+        # plt.fill_between(shot_range, y_min, y_max, color='g', alpha=.15)
 
     for idx in low_shots[:36]:
         shot = shots[idx]
@@ -115,7 +116,8 @@ def visualize_picks(video, shots, shot_scores, frame_scores, picks, high_shots, 
 
         y_to = shot_scores[idx]
 
-        plt.fill_between(shot_range, y_min, y_to, color='r', alpha=.2)
+        plt.fill_between(shot_range, y_min, y_to, color='r', alpha=.15)
+        # plt.fill_between(shot_range, y_min, y_max, color='r', alpha=.15)
 
     plt.xticks(range(0, len(frame_scores), 1000))
 
@@ -353,10 +355,23 @@ def main(args):
 
             shot_scores = calc_shot_scores(segment_scores, shots, window_len)
 
-            high_shots, low_shots = get_top_shots(shot_scores, minmax=50)
-
             shot_n_frames = [(shot.last_frame_idx - shot.first_frame_idx) + 1 for shot in shots]
             capacity = int(math.floor(len(frames) * args.proportion))
+
+            linmap = lambda a, b, c, d, e: (a - b) * (e - d) / (c - b) + d
+
+            for idx in range(len(shots)):
+                shot = shots[idx]
+                duration = (shot.last_frame_idx - shot.first_frame_idx)
+                if duration > 150:
+                    penalty = linmap(duration, 150, 1200, 0.978, 0.973)
+                    shot_scores[idx] = shot_scores[idx] * penalty
+
+            shot_scores_min_idx = np.argmin(shot_scores)
+            shot_scores[shot_scores_min_idx] = np.min(
+                [score for idx, score in enumerate(shot_scores) if idx != shot_scores_min_idx])
+
+            high_shots, low_shots = get_top_shots(shot_scores, minmax=50)
 
             shot_picks = knapsack_ortools(shot_scores, shot_n_frames, capacity)
 
@@ -372,7 +387,7 @@ def main(args):
 
             visualize_picks(video, shots, shot_scores, frame_scores, shot_picks, high_shots, low_shots)
 
-            plt.subplots_adjust(left=0.1, right=0.95, top=0.75, bottom=0.25)
+            plt.subplots_adjust(left=0.05, right=0.95, top=0.75, bottom=0.25)
             plt.margins(0.015, tight=True)
             plt.savefig('/Users/tihmels/Desktop/picks.jpg', bbox_inches=0)
 
